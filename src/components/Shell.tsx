@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, type Issue, type Status } from '@/lib/issues';
+import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Issue, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 
@@ -28,7 +28,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     const n = issues.length + 1;
     setIssues((all) => [
       ...all,
-      { id: `DEL-${n}`, title: `New issue ${n}`, description: '', status: 'todo', priority: 0, assignee_id: null, project_id: null, cycle_id: null, label_ids: [], parent_id: null, sort_key: String(n).padStart(4, '0'), version: 1 },
+      { id: `DEL-${n}`, title: `New issue ${n}`, description: '', status: 'todo', priority: 0, assignee_id: null, project_id: null, cycle_id: null, label_ids: [], parent_id: null, sort_key: String(n).padStart(4, '0'), version: 1, created_at: new Date().toISOString() },
     ]);
   }
   function openPalette() { setPalette(true); setQ(''); setPi(0); }
@@ -77,6 +77,8 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
       <span className='id'>{i.id}</span>
       <StatusIcon status={i.status} />
       <span className='title'>{i.title}</span>
+      <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</span>
+      <span className='date'>{fmtDate(i.created_at)}</span>
       {assignee(i)}
     </div>
   );

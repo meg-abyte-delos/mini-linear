@@ -12,6 +12,12 @@ export const USERS = [
   { id: 'u3', name: 'Ada Byte', initials: 'AB', hue: 'h3' },
 ] as const;
 
+export const LABELS = [
+  { id: 'l1', name: 'Bug', hue: 'lb1' },
+  { id: 'l2', name: 'Feature', hue: 'lb2' },
+  { id: 'l3', name: 'Infra', hue: 'lb3' },
+] as const;
+
 export interface Issue {
   id: string; // TEAMKEY-n
   title: string;
@@ -25,14 +31,20 @@ export interface Issue {
   parent_id: string | null;
   sort_key: string;
   version: number;
+  created_at: string;
 }
 
 const TITLES = ['Set up CI', 'Cronkit parser port', 'Board drag and drop', 'Command palette', 'RLS review', 'CSP nonce middleware', 'Issue detail panel', 'Cycle view', 'Label picker', 'Empty states'];
 export const MOCK_ISSUES: Issue[] = TITLES.map((title, i) => ({
   id: `DEL-${i + 1}`, title, description: '', status: STATUSES[i % 5] as Status,
   priority: (i % 5) as Issue['priority'], assignee_id: i % 4 === 3 ? null : (USERS[i % 3]?.id ?? null), project_id: null, cycle_id: null,
-  label_ids: [], parent_id: null, sort_key: String(i + 1).padStart(4, '0'), version: 1,
+  label_ids: i % 3 === 2 ? [] : [LABELS[i % 3]?.id ?? 'l1'], parent_id: null, sort_key: String(i + 1).padStart(4, '0'), version: 1,
+  created_at: new Date(Date.UTC(2026, 9, 27 - i)).toISOString(),
 }));
+
+export function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
 
 export async function listIssues(): Promise<Issue[]> {
   return MOCK_ISSUES;
