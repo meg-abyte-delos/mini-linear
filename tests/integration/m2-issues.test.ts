@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "node:crypto";
-import { appSql, ownerSql, seedTwoWorkspaces, type Seed } from "../helpers/seed";
+import { ownerSql, seedTwoWorkspaces, type Seed } from "../helpers/seed";
 import { setSessionResolver, db } from "../../src/lib/http/ctx";
 import * as H from "../../src/lib/issues/handlers";
 
