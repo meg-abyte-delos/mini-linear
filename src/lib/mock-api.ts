@@ -1,6 +1,7 @@
 // Mock issues API: zod-validated input, soft delete, ids never reused.
 import { z } from 'zod';
-import { MOCK_ISSUES, STATUSES, type Issue } from '@/lib/issues';
+import { MOCK_ISSUES, STATUSES, type Issue, type Status } from '@/lib/issues';
+import { moveIssue } from '@/lib/move';
 
 export const issueInput = z.object({
   title: z.string().trim().min(1).max(255),
@@ -42,6 +43,14 @@ export function createStore(seed: Issue[] = []) {
       const defined = Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined));
       Object.assign(cur, defined, { version: cur.version + 1 });
       return { ...cur };
+    },
+    // Reorder / change status through the pure moveIssue; deleted rows stay in place. Null on unknown or deleted id.
+    move(id: string, status: Status, beforeId: string | null): Issue | null {
+      const cur = all.find((i) => i.id === id && i.deleted_at === null);
+      if (!cur) return null;
+      const out = moveIssue(all, id, status, beforeId);
+      if (out !== all) all.splice(0, all.length, ...(out as Issue[]));
+      return { ...(all.find((i) => i.id === id) as Issue) };
     },
     remove(id: string): boolean {
       const cur = all.find((i) => i.id === id && i.deleted_at === null);

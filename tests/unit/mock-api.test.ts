@@ -38,3 +38,18 @@ describe('mock api', () => {
     expect(u?.status).toBe('in_progress');
   });
 });
+
+describe('store.move', () => {
+  it('changes status, bumps version, reorders and ignores unknown or deleted ids', () => {
+    const s = createStore();
+    const a = s.create({ title: 'a', status: 'todo' });
+    const b = s.create({ title: 'b', status: 'done' });
+    const m = s.move(b.id, 'todo', a.id)!;
+    expect(m.status).toBe('todo');
+    expect(m.version).toBe(2);
+    expect(s.list().map((i) => i.id)).toEqual([b.id, a.id]);
+    expect(s.move('DEL-99', 'done', null)).toBeNull();
+    s.remove(a.id);
+    expect(s.move(a.id, 'done', null)).toBeNull();
+  });
+});

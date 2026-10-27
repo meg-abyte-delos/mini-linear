@@ -4,20 +4,21 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Is
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { createStore } from '@/lib/mock-api';
-import { moveIssue } from '@/lib/move';
 
 type View = 'list' | 'board';
 interface Cmd { id: string; label: string; hint?: string; run: () => void }
 
 export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
-  const [issues, setIssues] = useState(initialIssues);
+  const store = useRef(createStore(initialIssues));
+  // The store is the single source of truth; React state is a snapshot refreshed after each mutation.
+  const [issues, setIssues] = useState(() => store.current.list());
+  const sync = () => setIssues(store.current.list());
   const [view, setView] = useState<View>('list');
   const [selId, setSelId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [palette, setPalette] = useState(false);
   const [q, setQ] = useState('');
   const [pi, setPi] = useState(0);
-  const store = useRef(createStore(initialIssues));
   const returnFocus = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -33,11 +34,13 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   function cycleStatus() {
     if (!current) return;
     const next = STATUSES[(STATUSES.indexOf(current.status) + 1) % STATUSES.length] as Status;
-    setIssues((all) => all.map((i) => (i.id === current.id ? { ...i, status: next, version: i.version + 1 } : i)));
+    store.current.update(current.id, { status: next });
+    sync();
   }
   // Drag and drop: drop on a section sets its status (appended); drop on a row/card inserts before it.
   function moveTo(id: string, status: Status, beforeId: string | null) {
-    setIssues((all) => moveIssue(all, id, status, beforeId) as Issue[]);
+    store.current.move(id, status, beforeId);
+    sync();
     setSelId(id);
   }
   const dragProps = (i: Issue) => ({
@@ -52,8 +55,8 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveTo(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
   function create() {
-    const n = store.current.create({ title: 'New issue' });
-    setIssues((all) => [...all, { ...n, title: `New issue ${n.id.split('-')[1]}` }]);
+    store.current.create({ title: 'New issue' });
+    sync();
   }
   function openPalette() { returnFocus.current = document.activeElement as HTMLElement | null; setPalette(true); setQ(''); setPi(0); }
   function closePalette() { setPalette(false); const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
