@@ -1,0 +1,5 @@
+# Tables exempt from tenant RLS (Spec v1.1 Appendix A, S12). Adding a line requires Rex's sign-off.
+users
+sessions
+email_verifications
+password_resets
