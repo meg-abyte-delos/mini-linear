@@ -1,5 +1,5 @@
 import postgres from "postgres";
-import { ApiError, errorResponse } from "./errors";
+import { ApiError, errorResponse, isDeadlock } from "./errors";
 
 export type Role = "owner" | "admin" | "member" | "guest";
 export type Ctx = { tx: postgres.TransactionSql; userId: string; workspaceId: string; role: Role; req: Request };
@@ -29,13 +29,21 @@ export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx
   try {
     const userId = await getSessionUser(req);
     if (!userId) throw new ApiError("unauthenticated");
-    return (await sql.begin(async (tx) => {
+    // 40P01 (deadlock, e.g. two parent-trigger updates crossing) is transient: retry the whole tx once on a fresh
+    // clone of the request (the body stream can only be read once), then surface it as 409 via errorResponse.
+    const run = (r: Request) => sql.begin(async (tx) => {
       const rows = await tx<{ workspace_id: string; role: Role }[]>`select workspace_id, role from resolve_workspace(${slug}, ${userId})`;
       if (rows.length === 0) throw new ApiError("not_found");
       const { workspace_id, role } = rows[0]!;
       await tx`select set_config('app.workspace_id', ${workspace_id}, true)`;
-      return fn({ tx, userId, workspaceId: workspace_id, role, req });
-    })) as Response;
+      return fn({ tx, userId, workspaceId: workspace_id, role, req: r });
+    });
+    try {
+      return (await run(req.clone())) as Response;
+    } catch (e) {
+      if (!isDeadlock(e)) throw e;
+      return (await run(req)) as Response;
+    }
   } catch (e) {
     return errorResponse(e);
   }
