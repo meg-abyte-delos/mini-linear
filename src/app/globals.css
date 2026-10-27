@@ -87,3 +87,7 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 
 .row[aria-selected=true] .date { color:#a0a5ae; }
 .crumbs .crumb-title { margin:0; font:inherit; font-weight:600; }
+
+.row.dragging, .card.dragging { opacity:.4; }
+.row.over, .card.over { box-shadow:inset 0 2px 0 var(--accent); }
+.group.over-zone, .col.over-zone { outline:1px dashed var(--accent); outline-offset:-1px; }

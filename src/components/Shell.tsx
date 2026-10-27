@@ -20,6 +20,9 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const returnFocus = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const dragRef = useRef<string | null>(null);
+  const [overKey, setOverKey] = useState<string | null>(null);
 
   const ordered = useMemo(() => STATUSES.flatMap((s) => issues.filter((i) => i.status === s)), [issues]);
   const current = ordered.find((i) => i.id === selId) ?? ordered[0];
@@ -31,6 +34,31 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     const next = STATUSES[(STATUSES.indexOf(current.status) + 1) % STATUSES.length] as Status;
     setIssues((all) => all.map((i) => (i.id === current.id ? { ...i, status: next, version: i.version + 1 } : i)));
   }
+  // Drag and drop: drop on a section sets its status (appended); drop on a row/card inserts before it.
+  function moveIssue(id: string, status: Status, beforeId: string | null) {
+    setIssues((all) => {
+      const src = all.find((i) => i.id === id);
+      if (!src || id === beforeId) return all;
+      const moved = src.status === status ? src : { ...src, status, version: src.version + 1 };
+      const rest = all.filter((i) => i.id !== id);
+      const at = beforeId ? rest.findIndex((i) => i.id === beforeId) : -1;
+      if (at < 0) { const last = rest.map((i) => i.status).lastIndexOf(status); rest.splice(last + 1, 0, moved); }
+      else rest.splice(at, 0, moved);
+      return rest;
+    });
+    setSelId(id);
+  }
+  const dragProps = (i: Issue) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', i.id); e.dataTransfer.effectAllowed = 'move'; dragRef.current = i.id; setDragId(i.id); },
+    onDragEnd: () => { dragRef.current = null; setDragId(null); setOverKey(null); },
+    onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); e.stopPropagation(); setOverKey(i.id); } },
+    onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); e.stopPropagation(); moveIssue(d, i.status, i.id); dragRef.current = null; setDragId(null); setOverKey(null); },
+  });
+  const zoneProps = (s: Status) => ({
+    onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); setOverKey(`z-${s}`); } },
+    onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveIssue(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
+  });
   function create() {
     const n = store.current.create({ title: 'New issue' });
     setIssues((all) => [...all, { ...n, title: `New issue ${n.id.split('-')[1]}` }]);
@@ -89,7 +117,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
   const row = (i: Issue) => (
-    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className='row' onClick={() => select(i, true)}>
+    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <PriorityIcon priority={i.priority} />
       <span className='id'>{i.id}</span>
       <StatusIcon status={i.status} />
@@ -100,7 +128,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     </div>
   );
   const card = (i: Issue) => (
-    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className='card' onClick={() => select(i, true)}>
+    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
       <div className='card-meta'><PriorityIcon priority={i.priority} /></div>
@@ -142,7 +170,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
               const items = issues.filter((i) => i.status === s);
               if (!items.length) return null;
               return (
-                <section key={s} className='group' aria-labelledby={`g-${s}`}>
+                <section key={s} className={`group${overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${s}`} {...zoneProps(s)}>
                   <h2 id={`g-${s}`}><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{items.length}</span></h2>
                   <div role='listbox' aria-labelledby={`g-${s}`}>{items.map(row)}</div>
                 </section>
@@ -152,7 +180,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
         ) : (
           <div className='board'>
             {STATUSES.map((s) => (
-              <section key={s} className='col' aria-labelledby={`c-${s}`}>
+              <section key={s} className={`col${overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`c-${s}`} {...zoneProps(s)}>
                 <h2 id={`c-${s}`}><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span></h2>
                 <div role='listbox' aria-labelledby={`c-${s}`}>{issues.filter((i) => i.status === s).map(card)}</div>
               </section>
