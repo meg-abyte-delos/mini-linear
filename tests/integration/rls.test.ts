@@ -24,7 +24,7 @@ run("M1 RLS", () => {
   });
   it("WITH CHECK blocks inserting into another workspace", async () => {
     await expect(withWorkspace(app, seed.a.id, (tx) =>
-      tx`insert into teams (id, workspace_id, name) values (gen_random_uuid(), ${seed.b.id}, 'x')`)).rejects.toThrow();
+      tx`insert into teams (id, workspace_id, name, key) values (gen_random_uuid(), ${seed.b.id}, 'x', 'XX')`)).rejects.toThrow();
   });
   it("resolve_workspace returns the workspace only for members", async () => {
     const ok = await app`select * from resolve_workspace(${seed.a.slug}, ${seed.a.member})`;
@@ -53,7 +53,7 @@ run("M1 RLS", () => {
     const team = crypto.randomUUID();
     await owner.begin(async (tx) => {
       await tx`select set_config('app.workspace_id', ${seed.b.id}, true)`;
-      await tx`insert into teams (id, workspace_id, name) values (${team}, ${seed.b.id}, 't')`;
+      await tx`insert into teams (id, workspace_id, name, key) values (${team}, ${seed.b.id}, 't', 'TT')`;
     });
     await expect(withWorkspace(app, seed.a.id, (tx) =>
       tx`insert into team_memberships (workspace_id, team_id, user_id) values (${seed.a.id}, ${team}, ${seed.a.member})`)).rejects.toThrow(/foreign key/i);
