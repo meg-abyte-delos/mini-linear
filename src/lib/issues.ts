@@ -49,3 +49,14 @@ export function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
+
+/** Perf fixture for A4.3 (`?seed=N`, capped): N extra issues spread over all statuses. */
+export function seedIssues(n: number): Issue[] {
+  const count = Math.max(0, Math.min(5000, Math.floor(n)));
+  return Array.from({ length: count }, (_, k) => ({
+    id: `DEL-${100 + k}`, title: `Seeded issue ${k + 1}`, description: '', status: STATUSES[k % STATUSES.length] as Status,
+    priority: (k % 5) as Issue['priority'], assignee_id: USERS[k % USERS.length]?.id ?? null, project_id: null, cycle_id: null,
+    label_ids: k % 3 === 2 ? [] : [LABELS[k % 3]?.id ?? 'l1'], parent_id: null, sort_key: String(1000 + k).padStart(5, '0'), version: 1,
+    created_at: new Date(Date.UTC(2026, 9, 27 - (k % 20))).toISOString(), deleted_at: null,
+  }));
+}
