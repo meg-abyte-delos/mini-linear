@@ -5,11 +5,44 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Is
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { createStore } from '@/lib/mock-api';
+import { visibleWindow, scrollToIndex } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
 
 type View = 'list' | 'board';
 type PickKind = 'priority' | 'assignee' | 'label';
 interface Cmd { id: string; label: string; hint?: string; run: () => void }
+
+function Column({ status, items, renderCard, selectedId, overZone, zone }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [top, setTop] = useState(0);
+  const [vh, setVh] = useState(800);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const measure = () => setVh(el.clientHeight || 800);
+    measure();
+    const ro = new ResizeObserver(measure); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Keep the selected card inside the rendered window (J/K moves selection through off-screen cards).
+  const selIdx = selectedId ? items.findIndex((i) => i.id === selectedId) : -1;
+  useEffect(() => {
+    const el = ref.current; if (!el || selIdx < 0) return;
+    const next = scrollToIndex(selIdx, el.scrollTop, el.clientHeight || vh);
+    if (next !== el.scrollTop) { el.scrollTop = next; setTop(next); }
+  }, [selIdx, vh]);
+  const w = visibleWindow(items.length, top, vh);
+  return (
+    <section className={`col${overZone ? ' over-zone' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
+      <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
+      <div className='col-scroll' ref={ref} onScroll={(e) => setTop(e.currentTarget.scrollTop)} data-testid={`col-${status}`}>
+        <div role='listbox' aria-labelledby={`c-${status}`} style={{ paddingTop: w.padTop, paddingBottom: w.padBottom }}>
+          {items.slice(w.start, w.end).map((i, k) => renderCard(i, w.start + k + 1, items.length))}
+        </div>
+        {!items.length && <p className='col-empty'>No issues</p>}
+      </div>
+    </section>
+  );
+}
 
 export function Shell({ initialIssues, loadError = null }: { initialIssues: Issue[]; loadError?: string | null }) {
   const router = useRouter();
@@ -52,6 +85,15 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
     store.current.move(id, status, beforeId);
     sync();
     setSelId(id);
+  }
+  // Keyboard reorder (Alt+ArrowUp/Down): swap with the neighbour in the same status column.
+  function reorder(dir: -1 | 1) {
+    const id = currentIdRef.current; if (!id) return;
+    const col = orderedRef.current.filter((i) => i.status === orderedRef.current.find((x) => x.id === id)?.status);
+    const at = col.findIndex((i) => i.id === id), to = at + dir;
+    if (at < 0 || to < 0 || to >= col.length) return;
+    const before = dir < 0 ? col[to]!.id : (col[to + 1]?.id ?? null);
+    moveTo(id, col[at]!.status, before);
   }
   const dragProps = (i: Issue) => ({
     draggable: true,
@@ -106,9 +148,9 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
   const results = fuzzyFilter(commands, q, (c) => c.label);
-  const actions = useRef({ create, cycleStatus, closePalette, openPalette, openPick });
+  const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick });
   const paletteOpen = useRef(false);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { create, cycleStatus, closePalette, openPalette, openPick }; paletteOpen.current = palette; });
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick }; paletteOpen.current = palette; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -127,6 +169,7 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
         if (e.key === 'Escape' && paletteOpen.current) actions.current.closePalette();
         return;
       }
+      if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); actions.current.reorder(e.key === 'ArrowUp' ? -1 : 1); return; }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (e.key === 'Escape') { setOpen(false); if (paletteOpen.current) actions.current.closePalette(); }
@@ -162,8 +205,8 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
       {assignee(i)}
     </div>
   );
-  const card = (i: Issue) => (
-    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
+  const card = (i: Issue, pos?: number, size?: number) => (
+    <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
       <div className='card-meta'><PriorityIcon priority={i.priority} />{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
@@ -223,11 +266,7 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
         ) : (
           <div className='board'>
             {STATUSES.map((s) => (
-              <section key={s} className={`col${overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`c-${s}`} {...zoneProps(s)}>
-                <h2 id={`c-${s}`}><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span></h2>
-                <div role='listbox' aria-labelledby={`c-${s}`}>{issues.filter((i) => i.status === s).map(card)}</div>
-                {!issues.some((i) => i.status === s) && <p className='col-empty'>No issues</p>}
-              </section>
+              <Column key={s} status={s} items={issues.filter((i) => i.status === s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} />
             ))}
           </div>
         )}

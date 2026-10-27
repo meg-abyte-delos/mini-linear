@@ -55,3 +55,17 @@ test('dnd board: dropping on the last column (scrolled into view)', async ({ pag
   await page.mouse.up();
   expect(await statusOf(page, id)).toBe(await h.locator('span').nth(0).textContent());
 });
+
+test('Alt+ArrowDown / Alt+ArrowUp reorders within a column (WCAG 2.5.7)', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('html[data-ready]');
+  const opts = page.getByRole('option');
+  const a = (await opts.nth(0).getAttribute('data-id'))!;
+  const b = (await opts.nth(1).getAttribute('data-id'))!;
+  await opts.first().focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  await expect(opts.nth(1)).toHaveAttribute('data-id', a);
+  await expect(opts.nth(0)).toHaveAttribute('data-id', b);
+  await page.keyboard.press('Alt+ArrowUp');
+  await expect(opts.nth(0)).toHaveAttribute('data-id', a);
+});

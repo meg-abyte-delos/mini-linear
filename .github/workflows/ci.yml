@@ -5,9 +5,9 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
   build-test:
     runs-on: ubuntu-latest
@@ -22,9 +22,9 @@ jobs:
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
       DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with: { node-version: 20 }
       - run: pnpm install --no-frozen-lockfile  # switch to --frozen-lockfile once pnpm-lock.yaml is committed (S9)
       - run: pnpm audit --prod --audit-level=high
