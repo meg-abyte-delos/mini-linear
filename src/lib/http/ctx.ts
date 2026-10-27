@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { ApiError, errorResponse, isDeadlock } from "./errors";
+import { resolveSession } from "../auth/session";
 
 export type Role = "owner" | "admin" | "member" | "guest";
 export type Ctx = { tx: postgres.TransactionSql; userId: string; workspaceId: string; role: Role; req: Request };
@@ -8,8 +9,8 @@ let _sql: postgres.Sql | undefined;
 export const db = () => (_sql ??= postgres(process.env.DATABASE_URL ?? ""));
 
 /**
- * Seam for M1 sessions: resolves the signed-in user id from the request cookie, or null. The M1 handlers batch
- * replaces this default; M2 routes and tests only depend on the signature. The default accepts nothing.
+ * Seam for M1 sessions: resolves the signed-in user id from the request cookie, or null. Default is the M1 cookie
+ * session lookup; tests may override it with setSessionResolver.
  */
 export type SessionResolver = (req: Request) => Promise<string | null>;
 // Stored on globalThis: Next can load this module once per bundle (instrumentation vs route handlers),
@@ -17,7 +18,8 @@ export type SessionResolver = (req: Request) => Promise<string | null>;
 const KEY = Symbol.for('mini-linear.sessionResolver');
 type G = typeof globalThis & { [KEY]?: SessionResolver };
 export const setSessionResolver = (r: SessionResolver) => { (globalThis as G)[KEY] = r; };
-export const getSessionUser: SessionResolver = (req) => ((globalThis as G)[KEY] ?? (async () => null))(req);
+// Default: M1 cookie session lookup (overridable, e.g. by the dev stub or tests).
+export const getSessionUser: SessionResolver = (req) => ((globalThis as G)[KEY] ?? ((r: Request) => resolveSession(db(), r)))(req);
 
 const ORDER: Role[] = ["guest", "member", "admin", "owner"];
 export const atLeast = (role: Role, min: Role) => ORDER.indexOf(role) >= ORDER.indexOf(min);
