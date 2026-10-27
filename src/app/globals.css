@@ -91,3 +91,12 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .row.dragging, .card.dragging { opacity:.4; }
 .row.over, .card.over { box-shadow:inset 0 2px 0 var(--accent); }
 .group.over-zone, .col.over-zone { outline:1px dashed var(--accent); outline-offset:-1px; }
+.av.h4 { background:#7a4fa0; } .av.h5 { background:#3f6fb5; }
+.picker-scrim { position:fixed; inset:0; z-index:60; }
+.picker { position:fixed; width:240px; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:0 16px 48px rgba(0,0,0,.6); overflow:hidden; }
+.picker input { width:100%; padding:10px 12px; font:inherit; color:var(--fg); background:none; border:0; border-bottom:1px solid var(--line); }
+.picker input:focus-visible { outline:none; }
+.picker ul { margin:0; padding:4px; max-height:220px; overflow:auto; }
+.picker li { list-style:none; display:flex; align-items:center; gap:8px; height:30px; padding:0 8px; border-radius:6px; cursor:pointer; color:var(--fg); }
+.picker li[data-active=true] { background:var(--sel); box-shadow:inset 2px 0 0 var(--accent); }
+.picker li .tick { margin-left:auto; color:var(--accent); }

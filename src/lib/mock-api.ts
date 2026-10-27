@@ -17,6 +17,7 @@ export const issuePatch = z.object({
   status: z.enum(STATUSES).optional(),
   priority: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
   assignee_id: z.string().nullable().optional(),
+  label_ids: z.array(z.string()).max(50).optional(),
 }).strict();
 export type IssueInput = z.input<typeof issueInput>;
 
@@ -36,7 +37,7 @@ export function createStore(seed: Issue[] = []) {
       all.push(issue);
       return { ...issue };
     },
-    update(id: string, patch: Partial<IssueInput>): Issue | null {
+    update(id: string, patch: z.input<typeof issuePatch>): Issue | null {
       const cur = all.find((i) => i.id === id && i.deleted_at === null);
       if (!cur) return null;
       const v = issuePatch.parse(patch);

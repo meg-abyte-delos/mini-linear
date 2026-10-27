@@ -10,6 +10,8 @@ export const USERS = [
   { id: 'u1', name: 'Meg Abyte', initials: 'MA', hue: 'h1' },
   { id: 'u2', name: 'Linus Patch', initials: 'LP', hue: 'h2' },
   { id: 'u3', name: 'Ada Byte', initials: 'AB', hue: 'h3' },
+  { id: 'u4', name: 'Rex Review', initials: 'RR', hue: 'h4' },
+  { id: 'u5', name: 'Tess Tester', initials: 'TT', hue: 'h5' },
 ] as const;
 
 export const LABELS = [

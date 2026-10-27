@@ -4,12 +4,15 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Is
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { createStore } from '@/lib/mock-api';
+import { Picker, type PickOption } from '@/components/Picker';
 
 type View = 'list' | 'board';
+type PickKind = 'priority' | 'assignee' | 'label';
 interface Cmd { id: string; label: string; hint?: string; run: () => void }
 
 export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
-  const store = useRef(createStore(initialIssues));
+  const [storeInst] = useState(() => createStore(initialIssues));
+  const store = useRef(storeInst);
   // The store is the single source of truth; React state is a snapshot refreshed after each mutation.
   const [issues, setIssues] = useState(() => store.current.list());
   const sync = () => setIssues(store.current.list());
@@ -22,6 +25,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const returnFocus = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const [pick, setPick] = useState<{ kind: PickKind; id: string; rect: DOMRect | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -54,6 +58,29 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); setOverKey(`z-${s}`); } },
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveTo(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
+  function openPick(kind: PickKind) {
+    const id = currentIdRef.current; if (!id) return;
+    const rect = document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.getBoundingClientRect() ?? null;
+    setPick({ kind, id, rect });
+  }
+  function closePick() {
+    const id = pick?.id; setPick(null);
+    setTimeout(() => document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.focus(), 0);
+  }
+  function applyPick(optId: string) {
+    if (!pick) return;
+    const cur = store.current.list().find((x) => x.id === pick.id); if (!cur) return;
+    if (pick.kind === 'priority') { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); sync(); closePick(); }
+    else if (pick.kind === 'assignee') { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); sync(); closePick(); }
+    else { store.current.update(cur.id, { label_ids: cur.label_ids.includes(optId) ? cur.label_ids.filter((l) => l !== optId) : [...cur.label_ids, optId] }); sync(); }
+  }
+  function pickOptions(): PickOption[] {
+    const cur = pick && issues.find((x) => x.id === pick.id);
+    if (!pick || !cur) return [];
+    if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, lead: <PriorityIcon priority={n as Issue['priority']} /> }));
+    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    return LABELS.map((l) => ({ id: l.id, label: l.name, checked: cur.label_ids.includes(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
+  }
   function create() {
     store.current.create({ title: 'New issue' });
     sync();
@@ -67,12 +94,15 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     { id: 'board', label: 'Go to board view', run: () => setView('board') },
     { id: 'status', label: 'Change status of selected issue', hint: 'S', run: cycleStatus },
     ...STATUSES.map((st) => ({ id: `move-${st}`, label: `Move to ${STATUS_LABEL[st]}`, run: () => { if (currentIdRef.current) moveTo(currentIdRef.current, st, null); } })),
+    { id: 'set-priority', label: 'Set priority…', hint: 'P', run: () => setTimeout(() => openPick('priority'), 0) },
+    { id: 'set-assignee', label: 'Set assignee…', hint: 'A', run: () => setTimeout(() => openPick('assignee'), 0) },
+    { id: 'set-label', label: 'Set label…', hint: 'L', run: () => setTimeout(() => openPick('label'), 0) },
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
   const results = fuzzyFilter(commands, q, (c) => c.label);
-  const actions = useRef({ create, cycleStatus, closePalette, openPalette });
+  const actions = useRef({ create, cycleStatus, closePalette, openPalette, openPick });
   const paletteOpen = useRef(false);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { create, cycleStatus, closePalette, openPalette }; paletteOpen.current = palette; });
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { create, cycleStatus, closePalette, openPalette, openPick }; paletteOpen.current = palette; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -103,6 +133,9 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
       else if (e.key === 'Enter') { if (!t.closest('button, a, [role="button"], select')) setOpen(true); }
       else if (k === 'c') { e.preventDefault(); actions.current.create(); }
       else if (k === 's') actions.current.cycleStatus();
+      else if (k === 'p') { e.preventDefault(); actions.current.openPick('priority'); }
+      else if (k === 'a') { e.preventDefault(); actions.current.openPick('assignee'); }
+      else if (k === 'l') { e.preventDefault(); actions.current.openPick('label'); }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -191,10 +224,12 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
           <dl>
             <dt>Status</dt><dd><StatusIcon status={current.status} />{STATUS_LABEL[current.status]}</dd>
             <dt>Priority</dt><dd><PriorityIcon priority={current.priority} />{PRIORITY_LABEL[current.priority]}</dd>
+            <dt>Labels</dt><dd>{current.label_ids.length ? current.label_ids.map((l) => LABELS.find((x) => x.id === l)?.name).join(', ') : 'None'}</dd>
             <dt>Assignee</dt><dd>{assignee(current)}{who(current.assignee_id)?.name ?? 'Unassigned'}</dd>
           </dl>
         </aside>
       )}
+      {pick && <Picker title={pick.kind === 'priority' ? 'Set priority' : pick.kind === 'assignee' ? 'Set assignee' : 'Set labels'} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {palette && (
         <div className='overlay' onClick={closePalette}>
           <div className='palette' ref={dialogRef} role='dialog' aria-modal='true' aria-label='Command palette' onClick={(e) => e.stopPropagation()}

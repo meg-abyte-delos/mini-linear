@@ -53,3 +53,24 @@ describe('store.move', () => {
     expect(s.move(a.id, 'done', null)).toBeNull();
   });
 });
+
+describe('priority / assignee / labels updates', () => {
+  it('each field update goes through update and bumps the version', () => {
+    const s = createStore();
+    const a = s.create({ title: 'a' });
+    expect(a.priority).toBe(0); expect(a.assignee_id).toBeNull(); expect(a.label_ids).toEqual([]);
+    const p = s.update(a.id, { priority: 2 })!;
+    expect(p.priority).toBe(2); expect(p.version).toBe(a.version + 1);
+    const u = s.update(a.id, { assignee_id: 'u2' })!;
+    expect(u.assignee_id).toBe('u2'); expect(u.priority).toBe(2); expect(u.version).toBe(a.version + 2);
+    expect(s.update(a.id, { assignee_id: null })!.assignee_id).toBeNull();
+    const l = s.update(a.id, { label_ids: ['l1', 'l3'] })!;
+    expect(l.label_ids).toEqual(['l1', 'l3']); expect(l.version).toBe(a.version + 4);
+  });
+  it('rejects invalid priority and non-array labels', () => {
+    const s = createStore();
+    const a = s.create({ title: 'a' });
+    expect(() => s.update(a.id, { priority: 7 as never })).toThrow();
+    expect(() => s.update(a.id, { label_ids: 'l1' as never })).toThrow();
+  });
+});
