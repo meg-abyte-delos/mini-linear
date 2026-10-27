@@ -1,0 +1,5 @@
+/db/rls-exempt-allowlist.txt @meg-abyte-delos
+/scripts/check-rls.mts @meg-abyte-delos
+/db/migrations/ @meg-abyte-delos
+/.github/ @meg-abyte-delos
+# Rex is reviewer of record for these paths (no GitHub account yet).

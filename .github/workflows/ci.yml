@@ -1,5 +1,6 @@
 name: CI
 on: { pull_request: {}, push: { branches: [main] } }
+permissions: { contents: read }
 jobs:
   secrets:
     runs-on: ubuntu-latest
@@ -18,6 +19,7 @@ jobs:
         options: --health-cmd pg_isready --health-interval 5s --health-retries 10
     env:
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
+      DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -27,5 +29,12 @@ jobs:
       - run: pnpm audit --prod --audit-level=high
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Create app_user, migrate as owner, grant
+        run: |
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f db/roles/001_app_user.sql
+          psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -c "ALTER ROLE app_user PASSWORD 'ci_only_app'"
+          pnpm db:migrate
+          psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f db/roles/900_grants.sql
       - run: pnpm check:rls
       - run: pnpm build
