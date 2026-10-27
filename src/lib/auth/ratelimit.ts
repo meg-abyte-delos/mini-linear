@@ -19,12 +19,21 @@ export async function hit(sql: postgres.Sql, key: string, limit: number, windowS
 let socketAddr: (req: Request) => string | null = () => null;
 let socketResolverSet = false;
 export const setSocketAddrResolver = (f: typeof socketAddr) => { socketAddr = f; socketResolverSet = true; };
+/** Test seam: forget the resolver. */
+export const resetSocketAddrResolverForTests = () => { socketAddr = () => null; socketResolverSet = false; };
 /**
- * TODO(prod): the shared "unknown" bucket must not reach production. The host adapter MUST call setSocketAddrResolver.
- * Called at startup (src/instrumentation.ts); warns loudly when no resolver is set. Returns true if a warning was emitted.
+ * The shared "unknown" bucket must not reach production: every request would share one rate-limit key.
+ * Called at startup (src/instrumentation.ts). With NODE_ENV=production and no resolver it THROWS (fail closed);
+ * elsewhere it warns. Returns true if a warning was emitted.
  */
-export const warnIfNoSocketResolver = (log: (m: string) => void = (m) => console.warn(m)): boolean => {
+export const warnIfNoSocketResolver = (
+  log: (m: string) => void = (m) => console.warn(m),
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): boolean => {
   if (socketResolverSet) return false;
+  if (nodeEnv === "production") {
+    throw new Error("[mini-linear] setSocketAddrResolver is not set in production: all requests without a trusted X-Forwarded-For hop would share one rate-limit bucket. Refusing to start.");
+  }
   log("[mini-linear] WARNING: setSocketAddrResolver is not set; requests without a trusted X-Forwarded-For hop share one 'unknown' rate-limit bucket. Not acceptable in production.");
   return true;
 };
