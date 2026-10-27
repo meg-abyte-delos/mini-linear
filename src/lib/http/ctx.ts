@@ -1,6 +1,7 @@
 import postgres from "postgres";
 import { ApiError, errorResponse, isDeadlock } from "./errors";
 import { resolveSession } from "../auth/session";
+import { originAllowed } from "../auth/origin";
 
 export type Role = "owner" | "admin" | "member" | "guest";
 export type Ctx = { tx: postgres.TransactionSql; userId: string; workspaceId: string; role: Role; req: Request };
@@ -32,6 +33,7 @@ export function requireRole(ctx: Ctx, min: Role) { if (!atLeast(ctx.role, min)) 
  */
 export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx) => Promise<Response>, sql: postgres.Sql = db()): Promise<Response> {
   try {
+    if (!originAllowed(req)) throw new ApiError("forbidden", "cross-origin request refused");
     const userId = await getSessionUser(req);
     if (!userId) throw new ApiError("unauthenticated");
     // 40P01 (deadlock, e.g. two parent-trigger updates crossing) is transient: retry the whole tx once on a fresh
@@ -49,6 +51,18 @@ export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx
       if (!isDeadlock(e)) throw e;
       return (await run(req)) as Response;
     }
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+/** Authenticated, not workspace-scoped (workspace creation, listing, invite acceptance). Origin-checked, one tx, rolled back on throw. */
+export async function withUser(req: Request, fn: (tx: postgres.TransactionSql, userId: string) => Promise<Response>, sql: postgres.Sql = db()): Promise<Response> {
+  try {
+    if (!originAllowed(req)) throw new ApiError("forbidden", "cross-origin request refused");
+    const userId = await getSessionUser(req);
+    if (!userId) throw new ApiError("unauthenticated");
+    return (await sql.begin((tx) => fn(tx, userId))) as Response;
   } catch (e) {
     return errorResponse(e);
   }

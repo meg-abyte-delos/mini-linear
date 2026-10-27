@@ -27,10 +27,10 @@ export const shareIssue = (req: Request, slug: string, rawId: string) => withWor
   return Response.json({ issue_id: id, guest_user_id: b.guest_user_id }, { status: 201 });
 });
 
-/** Revoke a share: DELETE ...?guest_user_id=<uuid>. 204 whether or not it was active (idempotent), 404 if the issue is unknown. */
-export const unshareIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+/** Revoke a share: DELETE .../issues/{id}/shares/{guest_user_id}. 204 whether or not it was active (idempotent), 404 if the issue is unknown. */
+export const unshareIssue = (req: Request, slug: string, rawId: string, rawGuest: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
-  const id = parseId(rawId), q = parseQuery(req, z.object({ guest_user_id: uuidSchema }));
+  const id = parseId(rawId), q = { guest_user_id: parseId(rawGuest) };
   await liveIssue(ctx, id);
   const u = await ctx.tx`update issue_shares set revoked_at = now() where issue_id = ${id} and guest_user_id = ${q.guest_user_id} and revoked_at is null returning guest_user_id`;
   if (u.length) await audit(ctx, "issue_share", id, "delete", { guest_user_id: { before: q.guest_user_id, after: null } });
