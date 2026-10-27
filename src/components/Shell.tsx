@@ -1,5 +1,5 @@
 'use client';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Issue, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
@@ -13,7 +13,6 @@ interface Cmd { id: string; label: string; hint?: string; run: () => void }
 
 export function Shell({ initialIssues, loadError = null }: { initialIssues: Issue[]; loadError?: string | null }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [storeInst] = useState(() => createStore(initialIssues));
   const store = useRef(storeInst);
   // The store is the single source of truth; React state is a snapshot refreshed after each mutation.
@@ -33,7 +32,8 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
   const dragRef = useRef<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
 
-  // Signals that handlers are attached (tests wait for it before sending keys).
+  // Test hook, not product behaviour: e2e tests wait for html[data-ready] so key presses
+  // are not sent before hydration has attached the handlers.
   useEffect(() => { document.documentElement.dataset.ready = '1'; return () => { delete document.documentElement.dataset.ready; }; }, []);
 
   const ordered = useMemo(() => STATUSES.flatMap((s) => issues.filter((i) => i.status === s)), [issues]);
@@ -200,7 +200,7 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
         {loadError ? (
           <div className='state error' role='alert'>
             <p>{loadError}. Check your connection and try again.</p>
-            <button onClick={() => { router.replace(pathname); router.refresh(); }}>Retry</button>
+            <button onClick={() => router.refresh()}>Retry</button>
           </div>
         ) : issues.length === 0 ? (
           <div className='state empty' role='status'>

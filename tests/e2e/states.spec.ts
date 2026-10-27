@@ -13,13 +13,16 @@ test('loading: skeleton status shown, then the list', async ({ page }) => {
   await expect(page.getByRole('status', { name: 'Loading issues' })).toHaveCount(0);
 });
 
-test('error: alert with Retry, retry recovers, axe clean', async ({ page }) => {
+test('error: fixed message, Retry keeps ?state (persistent failure), plain URL recovers, axe clean', async ({ page }) => {
   await page.goto('/?state=error');
   await page.waitForSelector('html[data-ready]');
   const alert = page.locator('.state.error');
   await expect(alert).toContainText('Could not load issues');
   await axe(page, 'error');
   await alert.getByRole('button', { name: 'Retry' }).click();
+  await expect(page).toHaveURL(/state=error/);
+  await expect(alert).toBeVisible();
+  await page.goto('/');
   await expect(page.getByRole('option').first()).toBeVisible();
   await expect(page.locator('.state.error')).toHaveCount(0);
 });
