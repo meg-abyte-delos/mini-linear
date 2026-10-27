@@ -1,0 +1,14 @@
+# Database setup (M1)
+
+Roles:
+- **superuser** (CI service / DBA only): runs `db/bootstrap-roles.sql` once (creates `definer`, NOLOGIN BYPASSRLS).
+- **owner**: NOSUPERUSER NOBYPASSRLS, member of `definer`. Runs migrations. **Never used at runtime.**
+- **app_user**: NOSUPERUSER NOBYPASSRLS, owns nothing. The ONLY role in the runtime `DATABASE_URL`.
+
+Order: bootstrap (superuser) -> `db/roles/001_app_user.sql` (owner) -> `db/migrations/*.sql` via `psql -v ON_ERROR_STOP=1` (owner) -> `db/roles/900_grants.sql` (owner) -> `pnpm check:rls`.
+
+**Migrations are raw SQL applied with psql**, not `drizzle-kit migrate` (its journal is not maintained). `src/db/schema.ts` mirrors the SQL for typed queries only.
+
+Runtime rule (S12, Rex review #7): the owner role is a member of `definer` (BYPASSRLS), so `DATABASE_OWNER_URL` must exist only in migration/CI jobs, never in the app process env. The app reads `DATABASE_URL` (app_user) only.
+
+`resolve_workspace(slug, user)` is SECURITY DEFINER and trusts `p_user`: call it only from the session layer with the user id from a validated session.

@@ -8,6 +8,9 @@ if (!ownerUrl || !appUrl) { console.error("S12: DATABASE_OWNER_URL and DATABASE_
 
 const allow = new Set(readFileSync("db/rls-exempt-allowlist.txt", "utf8").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#")));
 const norm = (e: string | null | undefined) => (e ?? "").toLowerCase().replace(/\s+/g, "").replace(/::text/g, "");
+// Rule 2 (id-keyed tenant table, e.g. workspaces): no workspace_id column, the row id IS the tenant key.
+const ID_KEYED = new Set(["workspaces"]);
+const OK_ID = /^\(?id=\(?nullif\(current_setting\('app\.workspace_id',true\),''\)\)?::uuid\)?$/;
 const OK = /workspace_id=\(?nullif\(current_setting\('app\.workspace_id',true\),''\)\)?::uuid/;
 const errors: string[] = [];
 const sql = postgres(ownerUrl, { max: 1 });
@@ -39,6 +42,17 @@ try {
   for (const t of tables) {
     seen.add(t.relname);
     if (allow.has(t.relname)) { if (t.has_ws) errors.push(`${t.relname}: allowlisted but has workspace_id (should be under RLS)`); continue; }
+    if (ID_KEYED.has(t.relname)) {
+      if (t.has_ws) { errors.push(`${t.relname}: id-keyed table must not have workspace_id`); continue; }
+      if (!t.rls || !t.force) errors.push(`${t.relname}: ENABLE + FORCE RLS required (id-keyed)`);
+      const ip = await sql`select qual, with_check, cmd from pg_policies where schemaname='public' and tablename=${t.relname}`;
+      if (ip.length === 0) errors.push(`${t.relname}: no policy (id-keyed)`);
+      for (const p of ip) {
+        if (!OK_ID.test(norm(p.qual))) errors.push(`${t.relname}: id-keyed policy USING must be id = nullif(current_setting('app.workspace_id', true), '')::uuid`);
+        if (p.cmd !== "SELECT" && p.cmd !== "DELETE" && !OK_ID.test(norm(p.with_check))) errors.push(`${t.relname}: id-keyed policy WITH CHECK missing or wrong`);
+      }
+      continue;
+    }
     if (!t.has_ws) { errors.push(`${t.relname}: no workspace_id and not in allowlist`); continue; }
     if (!t.rls || !t.force) errors.push(`${t.relname}: ENABLE + FORCE RLS required`);
     const pols = await sql`select qual, with_check, cmd from pg_policies where schemaname='public' and tablename=${t.relname}`;
@@ -65,7 +79,9 @@ try {
   const app = postgres(appUrl, { max: 1 });
   try {
     for (const t of tables) {
-      if (allow.has(t.relname) || !t.has_ws) continue;
+      if (allow.has(t.relname) || (!t.has_ws && !ID_KEYED.has(t.relname))) continue;
+      // id-keyed tables (workspaces): app_user having no SELECT at all is the stronger guarantee.
+      if (ID_KEYED.has(t.relname)) { const [g] = await sql`select has_table_privilege('app_user', ${t.oid}::oid, 'SELECT') s`; if (!g!.s) continue; }
       const [r] = await app.unsafe(`select count(*)::int n from public."${t.relname.replace(/"/g, '""')}"`);
       if (r!.n !== 0) errors.push(`${t.relname}: ${r!.n} rows visible to app_user with no workspace set`);
     }
