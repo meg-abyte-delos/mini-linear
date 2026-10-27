@@ -11,6 +11,14 @@ export type Seed = { a: SeededWorkspace; b: SeededWorkspace };
 
 async function seedWorkspace(sql: postgres.Sql, slug: string): Promise<SeededWorkspace> {
   const ws = randomUUID();
+  // The owner is NOT superuser/BYPASSRLS, so FORCE RLS applies: set the tenant in one tx.
+  return sql.begin(async (tx) => {
+    await tx`select set_config('app.workspace_id', ${ws}, true)`;
+    return seedWorkspaceTx(tx, slug, ws);
+  }) as Promise<SeededWorkspace>;
+}
+
+async function seedWorkspaceTx(sql: postgres.TransactionSql, slug: string, ws: string): Promise<SeededWorkspace> {
   await sql`insert into workspaces (id, slug, name) values (${ws}, ${slug}, ${slug})`;
   const ids = {} as Record<Role, string>;
   for (const role of ["owner", "admin", "member", "guest"] as const) {
