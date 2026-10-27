@@ -1,5 +1,5 @@
-// @ts-nocheck TODO(M1): black-box suite drafted before the M1 routes exist; remove once typed against the real API.
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment -- TODO(M1) draft suite */
+// @ts-nocheck TODO(M1): black-box suite drafted before the M1 routes exist; remove once typed against the real API.
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createHash, randomBytes } from 'node:crypto';
 import { ownerPool, appPool, api, world } from './helpers/world';
