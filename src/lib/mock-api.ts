@@ -39,7 +39,8 @@ export function createStore(seed: Issue[] = []) {
       const cur = all.find((i) => i.id === id && i.deleted_at === null);
       if (!cur) return null;
       const v = issuePatch.parse(patch);
-      Object.assign(cur, v, { version: cur.version + 1 });
+      const defined = Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined));
+      Object.assign(cur, defined, { version: cur.version + 1 });
       return { ...cur };
     },
     remove(id: string): boolean {

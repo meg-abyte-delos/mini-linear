@@ -30,4 +30,11 @@ describe('mock api', () => {
     const u = s.update(a.id, { title: 'b' })!;
     expect(u).toMatchObject({ title: 'b', description: 'd', status: 'in_progress', priority: 2, assignee_id: 'u1' });
   });
+  it('ignores undefined keys in update', () => {
+    const s = createStore();
+    const a = s.create({ title: 'a', status: 'in_progress' });
+    const u = s.update(a.id, { title: 'b', status: undefined });
+    expect(u?.title).toBe('b');
+    expect(u?.status).toBe('in_progress');
+  });
 });

@@ -76,7 +76,7 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .palette ul { margin:0; padding:6px; overflow:auto; max-height:40vh; }
 .palette li { list-style:none; display:flex; align-items:center; padding:0 10px; height:34px; border-radius:6px; cursor:pointer; color:var(--fg); }
 .palette li[aria-selected=true] { background:var(--sel); box-shadow:inset 2px 0 0 var(--accent); }
-.palette-foot { padding:8px 14px; border-top:1px solid var(--line); color:var(--dim); font-size:11px; display:flex; gap:8px; align-items:center; }
+.palette-foot { padding:8px 14px; border-top:1px solid var(--line); color:#8a8f99; font-size:11px; display:flex; gap:8px; align-items:center; }
 .palette-foot kbd { margin-left:6px; }
 .empty { color:var(--muted); padding:48px 16px; text-align:center; }
 
