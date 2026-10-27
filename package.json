@@ -15,7 +15,7 @@
     "test": "vitest run --coverage",
     "test:e2e": "playwright test",
     "db:migrate": "drizzle-kit migrate",
-    "check:rls": "tsx scripts/check-rls.ts"
+    "check:rls": "tsx scripts/check-rls.mts"
   },
   "dependencies": {
     "next": "16.4.3",
