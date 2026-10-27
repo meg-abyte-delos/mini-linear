@@ -1,1 +1,6 @@
-export default function Home() { return <main>Mini-Linear</main>; }
+import { listIssues } from '@/lib/issues';
+import { Shell } from '@/components/Shell';
+
+export default async function Home() {
+  return <Shell initialIssues={await listIssues()} />;
+}
