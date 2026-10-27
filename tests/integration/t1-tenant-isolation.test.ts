@@ -1,10 +1,11 @@
+import { runIntegration } from './helpers/gate';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appPool, ownerPool, api, world } from './helpers/world';
 let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { W = await world(); });
 const P1 = '/api/v1/w/w1', P2 = '/api/v1/w/w2';
 
-describe('T1 raw SQL as app_user', () => {
+describe.runIf(runIntegration)('T1 raw SQL as app_user', () => {
   it('no setting -> 0 rows', async () => {
     expect((await appPool.query('select count(*)::int n from issues')).rows[0].n).toBe(0);
   });
@@ -38,7 +39,7 @@ describe('T1 raw SQL as app_user', () => {
   });
 });
 
-describe('T1 forged workspace_id / slug', () => {
+describe.runIf(runIntegration)('T1 forged workspace_id / slug', () => {
   it('body workspace_id is ignored or rejected, nothing lands in W1', async () => {
     const r = await api(W.B1, 'POST', `${P2}/issues`, { title: 'forged-body', workspace_id: W.w1, team_id: W.t2 });
     expect([201, 400, 404, 422]).toContain(r.status);
@@ -56,7 +57,7 @@ describe('T1 forged workspace_id / slug', () => {
   it('W1 slug as non-member -> 404', async () => expect((await api(W.B1, 'GET', `${P1}/issues`)).status).toBe(404));
 });
 
-describe('T1 cross-tenant references write nothing', () => {
+describe.runIf(runIntegration)('T1 cross-tenant references write nothing', () => {
   it.each([['label_ids', 'label'], ['project_id', 'project'], ['team_id', 'team'], ['parent_id', 'issue']])(
     'W1 %s used by B1 in W2 -> 404/422 and nothing written', async (field, kind) => {
       const ref = (await ownerPool.query(`select id from ${kind}s where workspace_id=$1 limit 1`, [W.w1])).rows[0].id;
@@ -69,7 +70,7 @@ describe('T1 cross-tenant references write nothing', () => {
     });
 });
 
-describe('T1 SSE and tampered cursors', () => {
+describe.runIf(runIntegration)('T1 SSE and tampered cursors', () => {
   it('B1 sync on W1 -> 404', async () => {
     expect((await api(W.B1, 'GET', `${P1}/sync?since=0`)).status).toBe(404);
   });

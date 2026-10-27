@@ -1,10 +1,11 @@
+import { runIntegration } from './helpers/gate';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appPool, ownerPool, api, world } from './helpers/world';
 let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { W = await world(); });
 const P1 = '/api/v1/w/w1';
 
-describe('A1.1 cross-tenant requests return 404 on every endpoint', () => {
+describe.runIf(runIntegration)('A1.1 cross-tenant requests return 404 on every endpoint', () => {
   // Placeholder list: T2 requires this to be generated from the real route table.
   const routes: [string, string][] = [
     ['GET', '/issues/:issue'], ['PATCH', '/issues/:issue'], ['DELETE', '/issues/:issue'],
@@ -23,7 +24,7 @@ describe('A1.1 cross-tenant requests return 404 on every endpoint', () => {
   });
 });
 
-describe('A1.2 RLS with app.workspace_id unset returns 0 rows', () => {
+describe.runIf(runIntegration)('A1.2 RLS with app.workspace_id unset returns 0 rows', () => {
   it('every tenant table returns 0 rows for app_user without the setting', async () => {
     const tables = (await ownerPool.query(
       `select table_name from information_schema.columns where table_schema='public' and column_name='workspace_id'`)).rows;
@@ -47,7 +48,7 @@ describe('A1.2 RLS with app.workspace_id unset returns 0 rows', () => {
   });
 });
 
-describe('A1.3 invalid invites return 404 INVITE_INVALID', () => {
+describe.runIf(runIntegration)('A1.3 invalid invites return 404 INVITE_INVALID', () => {
   const accept = (token: string) => api(W.N, 'POST', '/api/v1/invites/accept', { token });
   it('missing, unknown, malformed tokens give identical status and body', async () => {
     const rs = await Promise.all([accept(''), accept('nope'), accept('a'.repeat(43))]);
@@ -59,7 +60,7 @@ describe('A1.3 invalid invites return 404 INVITE_INVALID', () => {
   it.todo('expired / reused / wrong-email / revoked tokens: same snapshot (needs invite seed)');
 });
 
-describe('A1.4 guest permissions', () => {
+describe.runIf(runIntegration)('A1.4 guest permissions', () => {
   it('guest cannot create an issue (403)', async () => {
     const r = await api(W.G1, 'POST', `${P1}/issues`, { title: 'g', team_id: W.t1 });
     expect(r.status).toBe(403);
