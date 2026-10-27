@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { visibleWindow, scrollToIndex, CARD_H } from '../../src/lib/virtual';
+import { visibleWindow, scrollToIndex, CARD_H, cardHeight, visibleWindowVar } from '../../src/lib/virtual';
 
 describe('visibleWindow (A4.3)', () => {
   it('renders a small slice of 2,000 items', () => {
@@ -26,5 +26,19 @@ describe('scrollToIndex', () => {
     expect(scrollToIndex(0, 500, 600)).toBe(0);
     expect(scrollToIndex(20, 0, 600)).toBe(20 * CARD_H + CARD_H - 600);
     expect(scrollToIndex(2, 0, 600)).toBe(0);
+  });
+});
+
+describe('variable heights', () => {
+  it('cardHeight grows with 3+ labels', () => {
+    expect(cardHeight(0)).toBe(CARD_H);
+    expect(cardHeight(2)).toBe(CARD_H);
+    expect(cardHeight(3)).toBeGreaterThan(CARD_H);
+  });
+  it('window pads add up to the total', () => {
+    const hs = Array.from({ length: 500 }, (_, k) => cardHeight(k % 5));
+    const total = hs.reduce((a, b) => a + b, 0);
+    const w = visibleWindowVar(hs, 3000, 600);
+    expect(w.padTop + hs.slice(w.start, w.end).reduce((a, b) => a + b, 0) + w.padBottom).toBe(total);
   });
 });

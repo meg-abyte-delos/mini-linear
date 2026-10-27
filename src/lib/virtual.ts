@@ -1,5 +1,6 @@
-// Fixed-height windowing for board columns (A4.3). Pure so it can be unit tested.
-export const CARD_H = 92; // card height + gap, in px; .card has a fixed height in CSS
+// Windowing for board columns (A4.3). Pure so it can be unit tested.
+export const CARD_H = 92; // minimum card height (86) + top gap (6), in px
+export const CHIP_ROW_H = 22; // extra height per wrapped row of label chips
 
 export interface Window { start: number; end: number; padTop: number; padBottom: number }
 
@@ -17,5 +18,34 @@ export function scrollToIndex(index: number, scrollTop: number, viewportH: numbe
   const top = index * itemH;
   if (top < scrollTop) return top;
   if (top + itemH > scrollTop + viewportH) return top + itemH - viewportH;
+  return scrollTop;
+}
+
+/** Estimated slot height of a card: grows by one chip row per 3 labels, since .card height is auto. */
+export function cardHeight(labelCount: number): number {
+  const rows = Math.max(1, Math.ceil((labelCount + 1) / 3));
+  return CARD_H + (rows - 1) * CHIP_ROW_H;
+}
+
+/** Window over items of varying height (prefix sums). */
+export function visibleWindowVar(heights: number[], scrollTop: number, viewportH: number, overscan = 4): Window {
+  const n = heights.length;
+  if (n <= 0) return { start: 0, end: 0, padTop: 0, padBottom: 0 };
+  const offs: number[] = [0];
+  for (let k = 0; k < n; k++) offs.push(offs[k]! + heights[k]!);
+  const st = Math.max(0, scrollTop), bottom = st + Math.max(0, viewportH);
+  let first = 0; while (first < n - 1 && offs[first + 1]! <= st) first++;
+  let last = first; while (last < n && offs[last]! < bottom) last++;
+  const start = Math.min(Math.max(0, first - overscan), n - 1);
+  const end = Math.min(n, Math.max(start + 1, last + overscan));
+  return { start, end, padTop: offs[start]!, padBottom: offs[n]! - offs[end]! };
+}
+
+/** scrollTop bringing item `index` into view, over variable heights. */
+export function scrollToIndexVar(heights: number[], index: number, scrollTop: number, viewportH: number): number {
+  let top = 0; for (let k = 0; k < index; k++) top += heights[k]!;
+  const h = heights[index] ?? CARD_H;
+  if (top < scrollTop) return top;
+  if (top + h > scrollTop + viewportH) return top + h - viewportH;
   return scrollTop;
 }
