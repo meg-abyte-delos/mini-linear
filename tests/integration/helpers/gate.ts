@@ -1,4 +1,4 @@
-// CI gate (Tess, per Rex): integration suites FAIL, never skip, when enabled and env is missing.
+// CI gate (Tess, per Rex): integration suites FAIL, never skip, when enabled without their env.
 // TEST_BASE_URL is not required: world.ts defaults it to http://localhost:3000.
 const REQUIRED = ['APP_DATABASE_URL', 'OWNER_DATABASE_URL'];
 const missing = REQUIRED.filter((k) => !process.env[k]);
