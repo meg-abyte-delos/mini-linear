@@ -23,7 +23,7 @@ jobs:
       DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: pnpm install --no-frozen-lockfile  # switch to --frozen-lockfile once pnpm-lock.yaml is committed (S9)
