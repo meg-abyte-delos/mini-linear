@@ -15,7 +15,20 @@ export async function hit(sql: postgres.Sql, key: string, limit: number, windowS
 }
 
 /** Client address: first X-Forwarded-For hop (the app is assumed to run behind one trusted proxy), else a shared bucket. */
-export const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+/** Socket peer address seam: Next route handlers expose none on Request, so the host adapter may set it. Default is a shared "unknown" bucket (fails closed). */
+let socketAddr: (req: Request) => string | null = () => null;
+export const setSocketAddrResolver = (f: typeof socketAddr) => { socketAddr = f; };
+/**
+ * Client IP for rate limiting. X-Forwarded-For is client-controlled on its left side, so the FIRST hop is never used:
+ * walk the list from the right and take the first hop not in TRUSTED_PROXIES (comma-separated env); each trusted proxy
+ * appended the address it saw, so the first untrusted one from the right is the real peer. No usable hop -> socket address -> "unknown".
+ */
+export const clientIp = (req: Request): string => {
+  const trusted = new Set((process.env.TRUSTED_PROXIES ?? "").split(",").map((x) => x.trim()).filter(Boolean));
+  const hops = (req.headers.get("x-forwarded-for") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  for (let i = hops.length - 1; i >= 0; i--) if (!trusted.has(hops[i]!)) return hops[i]!;
+  return socketAddr(req) ?? "unknown";
+};
 
 /** Housekeeping: drop windows older than a day. Safe to call from anywhere. */
 export const purgeOld = (sql: postgres.Sql) => sql`delete from rate_limits where window_start < now() - interval '1 day'`;
