@@ -45,9 +45,11 @@ export const signup = route(async (req, sql) => {
 
 export const verifyEmail = route(async (req, sql) => {
   const { token: t } = await parseJson(req, z.object({ token }));
-  const r = await sql`update email_verifications set used_at = now() where token_hash = ${hashToken(t)} and used_at is null and expires_at > now() returning user_id`;
-  if (r.length === 0) throw new ApiError("bad_request", "invalid or expired token");
-  await sql`update users set email_verified_at = coalesce(email_verified_at, now()) where id = ${r[0]!.user_id}`;
+  await sql.begin(async (tx) => {
+    const r = await tx`update email_verifications set used_at = now() where token_hash = ${hashToken(t)} and used_at is null and expires_at > now() returning user_id`;
+    if (r.length === 0) throw new ApiError("bad_request", "invalid or expired token");
+    await tx`update users set email_verified_at = coalesce(email_verified_at, now()) where id = ${r[0]!.user_id}`;
+  });
   return Response.json({ status: "verified" });
 });
 
@@ -112,6 +114,7 @@ export const passwordResetConfirm = route(async (req, sql) => {
     const r = await tx`update password_resets set used_at = now() where token_hash = ${hashToken(body.token)} and used_at is null and expires_at > now() returning user_id`;
     if (r.length === 0) throw new ApiError("bad_request", "invalid or expired token");
     const uid = r[0]!.user_id as string;
+    await tx`update password_resets set used_at = now() where user_id = ${uid} and used_at is null`; // invalidate sibling tokens
     await tx`update users set password_hash = ${hash}, failed_logins = 0, locked_until = null where id = ${uid}`;
     await destroyAllSessions(tx as unknown as postgres.Sql, uid);
   });

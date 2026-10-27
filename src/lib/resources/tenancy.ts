@@ -50,7 +50,7 @@ const roleOf = async (tx: Parameters<Parameters<typeof withWorkspaceCtx>[2]>[0][
   if (!r[0]) throw new ApiError("not_found");
   return r[0].role;
 };
-const lastOwner = async (tx: Parameters<Parameters<typeof withWorkspaceCtx>[2]>[0]["tx"]) => (await tx`select 1 from memberships where role = 'owner' limit 2`).length < 2;
+const lastOwner = async (tx: Parameters<Parameters<typeof withWorkspaceCtx>[2]>[0]["tx"]) => (await tx`select 1 from memberships where role = 'owner' for update`).length < 2;
 
 export const listMembers = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");

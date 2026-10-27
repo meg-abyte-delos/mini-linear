@@ -1,4 +1,5 @@
 import type postgres from "postgres";
+import { isIP } from "node:net";
 import { ApiError } from "../http/errors";
 
 /**
@@ -40,15 +41,29 @@ export const warnIfNoSocketResolver = (
   return true;
 };
 /**
- * Client IP for rate limiting. X-Forwarded-For is client-controlled on its left side, so the FIRST hop is never used:
- * walk the list from the right and take the first hop not in TRUSTED_PROXIES (comma-separated env); each trusted proxy
- * appended the address it saw, so the first untrusted one from the right is the real peer. No usable hop -> socket address -> "unknown".
+ * Client IP for rate limiting. The chain is X-Forwarded-For hops followed by the socket peer address.
+ * Walk it from the right, skipping hops in TRUSTED_PROXIES (comma-separated env); the first untrusted hop is the client.
+ * If the socket peer itself is untrusted (or TRUSTED_PROXIES is empty), X-Forwarded-For is ignored entirely: a direct
+ * client can forge any value there. Hops that are not valid IPs end the walk. No usable hop -> "unknown".
  */
+const normIp = (x: string | null | undefined): string | null => {
+  if (!x) return null;
+  let v = x.trim();
+  if (v.startsWith("::ffff:") && isIP(v.slice(7)) === 4) v = v.slice(7);
+  return v.length <= 45 && isIP(v) ? v : null;
+};
 export const clientIp = (req: Request): string => {
-  const trusted = new Set((process.env.TRUSTED_PROXIES ?? "").split(",").map((x) => x.trim()).filter(Boolean));
-  const hops = (req.headers.get("x-forwarded-for") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-  for (let i = hops.length - 1; i >= 0; i--) if (!trusted.has(hops[i]!)) return hops[i]!;
-  return socketAddr(req) ?? "unknown";
+  const trusted = new Set((process.env.TRUSTED_PROXIES ?? "").split(",").map((x) => normIp(x)).filter((x): x is string => !!x));
+  const peer = normIp(socketAddr(req));
+  if (!peer) return "unknown";
+  if (!trusted.has(peer)) return peer;
+  const hops = (req.headers.get("x-forwarded-for") ?? "").split(",").slice(-32);
+  for (let i = hops.length - 1; i >= 0; i--) {
+    const h = normIp(hops[i]);
+    if (!h) break;
+    if (!trusted.has(h)) return h;
+  }
+  return peer;
 };
 
 /** Housekeeping: drop windows older than a day. Safe to call from anywhere. */
