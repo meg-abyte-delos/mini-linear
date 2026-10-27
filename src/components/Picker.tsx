@@ -39,8 +39,8 @@ export function Picker({ title, options, multi, anchor, onPick, onClose }: Props
         />
         <ul id='picker-list' role='listbox' aria-label={title} aria-multiselectable={multi || undefined}>
           {results.map((o, idx) => (
-            <li key={o.id} id={`po-${o.id}`} role='option' aria-selected={multi ? !!o.checked : idx === active} data-active={idx === active} onClick={() => onPick(o.id)}>
-              {o.lead}<span>{o.label}</span>{multi && <span className='tick' aria-hidden='true'>{o.checked ? '✓' : ''}</span>}
+            <li key={o.id} id={`po-${o.id}`} role='option' aria-selected={!!o.checked} data-active={idx === active} onClick={() => onPick(o.id)}>
+              {o.lead}<span>{o.label}</span>{o.checked !== undefined && <span className='tick' aria-hidden='true'>{o.checked ? '✓' : ''}</span>}
             </li>
           ))}
           {results.length === 0 && <li role='option' aria-selected='false' aria-disabled='true'>No match</li>}

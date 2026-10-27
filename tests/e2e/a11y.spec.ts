@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 
 test('axe: no wcag2a/aa violations on list, palette, board', async ({ page }) => {
   await page.goto('/');
+  await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('option').first()).toBeVisible();
   const scan = async (label: string) => {
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
@@ -19,6 +20,7 @@ test('axe: no wcag2a/aa violations on list, palette, board', async ({ page }) =>
 
 test('keyboard: roving j/k, palette trap, focus return', async ({ page }) => {
   await page.goto('/');
+  await page.waitForSelector('html[data-ready]');
   await page.getByRole('option').first().focus();
   await page.keyboard.press('j');
   await expect(page.getByRole('option', { selected: true })).toBeFocused();
@@ -43,6 +45,7 @@ test('keyboard: roving j/k, palette trap, focus return', async ({ page }) => {
 
 test('Enter on a focused button does not open the detail panel', async ({ page }) => {
   await page.goto('/');
+  await page.waitForSelector('html[data-ready]');
   const before = await page.locator('aside').count();
   await page.getByRole('button', { name: /board/i }).focus();
   await page.keyboard.press('Enter');

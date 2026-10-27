@@ -1,4 +1,5 @@
 'use client';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Issue, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
@@ -10,7 +11,9 @@ type View = 'list' | 'board';
 type PickKind = 'priority' | 'assignee' | 'label';
 interface Cmd { id: string; label: string; hint?: string; run: () => void }
 
-export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
+export function Shell({ initialIssues, loadError = null }: { initialIssues: Issue[]; loadError?: string | null }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [storeInst] = useState(() => createStore(initialIssues));
   const store = useRef(storeInst);
   // The store is the single source of truth; React state is a snapshot refreshed after each mutation.
@@ -29,6 +32,9 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
+
+  // Signals that handlers are attached (tests wait for it before sending keys).
+  useEffect(() => { document.documentElement.dataset.ready = '1'; return () => { delete document.documentElement.dataset.ready; }; }, []);
 
   const ordered = useMemo(() => STATUSES.flatMap((s) => issues.filter((i) => i.status === s)), [issues]);
   const current = ordered.find((i) => i.id === selId) ?? ordered[0];
@@ -77,8 +83,8 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   function pickOptions(): PickOption[] {
     const cur = pick && issues.find((x) => x.id === pick.id);
     if (!pick || !cur) return [];
-    if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: cur.priority === n, lead: <PriorityIcon priority={n as Issue['priority']} /> }));
+    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: cur.assignee_id === null, lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: cur.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     return LABELS.map((l) => ({ id: l.id, label: l.name, checked: cur.label_ids.includes(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
   function create() {
@@ -160,7 +166,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
-      <div className='card-meta'><PriorityIcon priority={i.priority} /></div>
+      <div className='card-meta'><PriorityIcon priority={i.priority} />{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
   );
 
@@ -191,8 +197,16 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
             <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>
           </div>
         </header>
-        {issues.length === 0 ? (
-          <p className='empty'>No issues yet. Press C to create one.</p>
+        {loadError ? (
+          <div className='state error' role='alert'>
+            <p>{loadError}. Check your connection and try again.</p>
+            <button onClick={() => { router.replace(pathname); router.refresh(); }}>Retry</button>
+          </div>
+        ) : issues.length === 0 ? (
+          <div className='state empty' role='status'>
+            <p>No issues yet.</p>
+            <button onClick={create}>Create issue <kbd>C</kbd></button>
+          </div>
         ) : view === 'list' ? (
           <div className='scroll'>
             {STATUSES.map((s) => {
@@ -212,6 +226,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
               <section key={s} className={`col${overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`c-${s}`} {...zoneProps(s)}>
                 <h2 id={`c-${s}`}><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span></h2>
                 <div role='listbox' aria-labelledby={`c-${s}`}>{issues.filter((i) => i.status === s).map(card)}</div>
+                {!issues.some((i) => i.status === s) && <p className='col-empty'>No issues</p>}
               </section>
             ))}
           </div>

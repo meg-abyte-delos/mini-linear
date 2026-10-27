@@ -46,7 +46,7 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .card-top { display:flex; align-items:center; justify-content:space-between; }
 .card .id { color:var(--muted); font-size:12px; }
 .card-title { font-weight:500; }
-.card-meta { display:flex; gap:8px; }
+.card-meta { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
 .si { flex:none; stroke:var(--s-todo); }
 .si .fill { fill:var(--s-todo); stroke:none; }
@@ -100,3 +100,12 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .picker li { list-style:none; display:flex; align-items:center; gap:8px; height:30px; padding:0 8px; border-radius:6px; cursor:pointer; color:var(--fg); }
 .picker li[data-active=true] { background:var(--sel); box-shadow:inset 2px 0 0 var(--accent); }
 .picker li .tick { margin-left:auto; color:var(--accent); }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.state { display:flex; flex-direction:column; align-items:center; gap:12px; padding:64px 16px; color:var(--muted); }
+.state button { background:transparent; color:inherit; border:1px solid currentColor; border-radius:6px; padding:6px 12px; cursor:pointer; }
+.col-empty { color:var(--muted); font-size:12px; padding:8px; }
+.skeleton { pointer-events:none; }
+.sk { display:inline-block; height:10px; border-radius:4px; background:currentColor; opacity:.15; animation:sk 1.2s ease-in-out infinite; }
+.sk-s { width:14px; margin-right:12px; }
+@keyframes sk { 50% { opacity:.06; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation:none; } }

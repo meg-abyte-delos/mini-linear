@@ -64,6 +64,16 @@ export function createStore(seed: Issue[] = []) {
 }
 
 export const store = createStore(MOCK_ISSUES);
-export async function listIssues(): Promise<Issue[]> {
+// Simulation modes for the mock API (via ?state=): loading = slow response, error = failure, empty = no issues.
+export type SimState = 'loading' | 'error' | 'empty' | undefined;
+export const LOADING_DELAY_MS = 1500;
+export function parseSimState(v: string | string[] | undefined): SimState {
+  const x = Array.isArray(v) ? v[0] : v;
+  return x === 'loading' || x === 'error' || x === 'empty' ? x : undefined;
+}
+export async function listIssues(sim?: SimState, delayMs = LOADING_DELAY_MS): Promise<Issue[]> {
+  if (sim === 'loading') await new Promise((r) => setTimeout(r, delayMs));
+  if (sim === 'error') throw new Error('Could not load issues');
+  if (sim === 'empty') return [];
   return store.list();
 }
