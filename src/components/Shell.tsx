@@ -5,7 +5,7 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, PROJECTS, CYCLES
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { createStore } from '@/lib/mock-api';
-import { visibleWindow, scrollToIndex } from '@/lib/virtual';
+import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
 
@@ -27,13 +27,14 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
     return () => ro.disconnect();
   }, []);
   // Keep the selected card inside the rendered window (J/K moves selection through off-screen cards).
+  const heights = useMemo(() => items.map((i) => cardHeight(i.label_ids.length)), [items]);
   const selIdx = selectedId ? items.findIndex((i) => i.id === selectedId) : -1;
   useEffect(() => {
     const el = ref.current; if (!el || selIdx < 0) return;
-    const next = scrollToIndex(selIdx, el.scrollTop, el.clientHeight || vh);
+    const next = scrollToIndexVar(heights, selIdx, el.scrollTop, el.clientHeight || vh);
     if (next !== el.scrollTop) { el.scrollTop = next; setTop(next); }
-  }, [selIdx, vh]);
-  const w = visibleWindow(items.length, top, vh);
+  }, [selIdx, vh, heights]);
+  const w = visibleWindowVar(heights, top, vh);
   return (
     <section className={`col${overZone ? ' over-zone' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
       <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
@@ -47,7 +48,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
-export function Shell({ initialIssues, loadError = null, initialFilters = emptyFilters(), today }: { initialIssues: Issue[]; loadError?: string | null; initialFilters?: Filters; today: string }) {
+export function Shell({ initialIssues, loadError = null, initialFilters = emptyFilters(), today, initialView = 'list' }: { initialIssues: Issue[]; loadError?: string | null; initialFilters?: Filters; today: string; initialView?: View }) {
   const router = useRouter();
   const [storeInst] = useState(() => createStore(initialIssues));
   const store = useRef(storeInst);
@@ -79,7 +80,15 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
     const o = filterOptions(kind).filter((x) => x.checked);
     return o.length === 1 ? o[0]!.label : `${o.length} selected`;
   }
-  const [view, setView] = useState<View>('list');
+  const [view, setViewState] = useState<View>(initialView);
+  // The view lives in the URL too (?view=board|cycles; list is the default and drops the param).
+  function setView(v: View) {
+    setViewState(v);
+    const sp = new URLSearchParams(window.location.search);
+    if (v === 'list') sp.delete('view'); else sp.set('view', v);
+    const qs = sp.toString().replace(/%2C/gi, ',');
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+  }
   const [selId, setSelId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [palette, setPalette] = useState(false);
@@ -92,6 +101,12 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
   const [dragId, setDragId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
+  // The drag source can unmount mid-drag (virtualized column scrolled away), so its own onDragEnd never fires: reset on window.
+  useEffect(() => {
+    const end = () => { dragRef.current = null; setDragId(null); setOverKey(null); };
+    window.addEventListener('dragend', end);
+    return () => window.removeEventListener('dragend', end);
+  }, []);
 
   // Test hook, not product behaviour: e2e tests wait for html[data-ready] so key presses
   // are not sent before hydration has attached the handlers.
@@ -157,9 +172,13 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
     if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: cur.assignee_id === null, lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: cur.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     return LABELS.map((l) => ({ id: l.id, label: l.name, checked: cur.label_ids.includes(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
+  // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
   function create() {
-    store.current.create({ title: 'New issue' });
+    const made = store.current.create({ title: 'New issue' });
     sync();
+    if (view === 'cycles') setView('list');
+    if (made && activeCount(filters) > 0 && applyFilters([made], filters).length === 0) setFilters(emptyFilters());
+    if (made) setSelId(made.id);
   }
   function openPalette() { returnFocus.current = document.activeElement as HTMLElement | null; setPalette(true); setQ(''); setPi(0); }
   function closePalette() { setPalette(false); const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
@@ -170,7 +189,7 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
     { id: 'board', label: 'Go to board view', run: () => setView('board') },
     { id: 'cycles', label: 'Go to cycles', run: () => setView('cycles') },
     { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
-    ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0) })),
+    ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => { if (view === 'cycles') setView('list'); setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0); } })),
     { id: 'status', label: 'Change status of selected issue', hint: 'S', run: cycleStatus },
     ...STATUSES.map((st) => ({ id: `move-${st}`, label: `Move to ${STATUS_LABEL[st]}`, run: () => { if (currentIdRef.current) moveTo(currentIdRef.current, st, null); } })),
     { id: 'set-priority', label: 'Set priority…', hint: 'P', run: () => setTimeout(() => openPick('priority'), 0) },
@@ -274,7 +293,7 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
         {view !== 'cycles' && !loadError && allIssues.length > 0 && (
           <div className='filterbar' role='toolbar' aria-label='Filters'>
             {FILTER_KEYS.map((k) => (
-              <button key={k} id={`fb-${k}`} className={`fchip${filters[k].length ? ' on' : ''}`} aria-haspopup='dialog' onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
+              <button key={k} id={`fb-${k}`} className={`fchip${filters[k].length ? ' on' : ''}`} aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed={filters[k].length > 0} onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
                 {FILTER_LABEL[k]}{filters[k].length > 0 && <span className='fval'>: {filterValueLabel(k)}</span>}
               </button>
             ))}
@@ -299,6 +318,7 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
                 <section key={b.id} className='group' aria-labelledby={`cy-${b.id}`}>
                   <h2 id={`cy-${b.id}`}><span>{b.title}</span><span className='count'>{cs.length}</span></h2>
                   {cs.length === 0 ? <p className='col-empty'>No {b.id} cycles</p> : cs.map((c) => {
+                    // Progress ignores list filters on purpose; cycle_id already scopes issues to the cycle's team.
                     const its = allIssues.filter((i) => i.cycle_id === c.id);
                     const done = its.filter((i) => i.status === 'done' || i.status === 'canceled').length;
                     const pct = its.length ? Math.round((done / its.length) * 100) : 0;
