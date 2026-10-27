@@ -20,6 +20,17 @@ export const LABELS = [
   { id: 'l3', name: 'Infra', hue: 'lb3' },
 ] as const;
 
+// M2 API shapes (PR #10): project {id,name,description,team_ids}, cycle {id,team_id,name,start_date,end_date (YYYY-MM-DD)}.
+export const PROJECTS = [
+  { id: 'p1', name: 'Mini Linear', description: '', team_ids: ['t1'] },
+  { id: 'p2', name: 'Cronkit', description: '', team_ids: ['t1'] },
+] as const;
+export const CYCLES = [
+  { id: 'c1', team_id: 't1', name: 'Cycle 1', start_date: '2026-10-05', end_date: '2026-10-18' },
+  { id: 'c2', team_id: 't1', name: 'Cycle 2', start_date: '2026-10-19', end_date: '2026-11-01' },
+  { id: 'c3', team_id: 't1', name: 'Cycle 3', start_date: '2026-11-02', end_date: '2026-11-15' },
+] as const;
+
 export interface Issue {
   id: string; // TEAMKEY-n
   title: string;
@@ -40,7 +51,7 @@ export interface Issue {
 const TITLES = ['Set up CI', 'Cronkit parser port', 'Board drag and drop', 'Command palette', 'RLS review', 'CSP nonce proxy', 'Issue detail panel', 'Cycle view', 'Label picker', 'Empty states'];
 export const MOCK_ISSUES: Issue[] = TITLES.map((title, i) => ({
   id: `DEL-${i + 1}`, title, description: '', status: STATUSES[i % 5] as Status,
-  priority: (i % 5) as Issue['priority'], assignee_id: i % 4 === 3 ? null : (USERS[i % 3]?.id ?? null), project_id: null, cycle_id: null,
+  priority: (i % 5) as Issue['priority'], assignee_id: i % 4 === 3 ? null : (USERS[i % 3]?.id ?? null), project_id: PROJECTS[i % 2]?.id ?? null, cycle_id: i % 4 === 3 ? null : (CYCLES[i % 3]?.id ?? null),
   label_ids: i % 3 === 2 ? [] : [LABELS[i % 3]?.id ?? 'l1'], parent_id: null, sort_key: String(i + 1).padStart(4, '0'), version: 1,
   created_at: new Date(Date.UTC(2026, 9, 27 - i)).toISOString(), deleted_at: null,
 }));
