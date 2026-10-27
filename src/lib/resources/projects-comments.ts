@@ -33,6 +33,12 @@ export const listProjects = (req: Request, slug: string) => withWorkspaceCtx(req
 export const createProject = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const b = await parseJson(req, projectBody.partial({ description: true, team_ids: true })), id = uuidv7();
+  // Members must put the project in at least one of their own teams (else they could not see what they created); admin+ see everything.
+  if (!atLeast(ctx.role, "admin")) {
+    const ids = b.team_ids ?? [];
+    const mine = ids.length ? await ctx.tx`select 1 from team_memberships where user_id = ${ctx.userId} and team_id in ${ctx.tx(ids)}` : [];
+    if (mine.length === 0) throw new ApiError("validation_failed", "team_ids must include one of your teams");
+  }
   await ctx.tx`insert into projects (id, workspace_id, name, description) values (${id}, ${ctx.workspaceId}, ${b.name}, ${b.description ?? ""})`;
   await setTeams(ctx, id, b.team_ids ?? []);
   const rows = await ctx.tx<Row[]>`${PSEL(ctx)} where p.id = ${id}`; // not via pvisible: a member may create a project for teams they are not in
@@ -43,6 +49,7 @@ export const getProjectH = (req: Request, slug: string, rawId: string) => withWo
 export const patchProject = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, projectBody.partial());
+  if (b.team_ids) requireRole(ctx, "admin"); // changing team scope is admin-only
   const before = await getProject(ctx, id);
   if (Number(before.version) !== want) throw stale(before);
   const u = await ctx.tx`update projects set name = ${b.name ?? (before.name as string)}, description = ${b.description ?? (before.description as string)}, version = version + 1, updated_at = now()

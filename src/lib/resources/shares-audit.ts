@@ -44,14 +44,15 @@ export const listShares = (req: Request, slug: string, rawId: string) => withWor
   return Response.json({ items: await SHARE(ctx, id), next_cursor: null });
 });
 
-/** Audit log, admin+, newest first (uuidv7 ids are time-ordered, so id desc is the stable keyset). Filters: entity, entity_id. */
+/** Audit log, admin+, newest first. Keyset = (created_at desc, id desc), matching audit_events_list_idx. Filters: entity, entity_id. */
 export const listAudit = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "admin");
   const q = parseQuery(req, listQuery.extend({ entity: z.string().min(1).max(64).optional(), entity_id: uuidSchema.optional() }));
-  const c = q.cursor ? decodeCursor(q.cursor, ctx.workspaceId, "audit").id : null, t = ctx.tx;
-  const rows = await t<Row[]>`select id, actor_id, entity, entity_id, action, diff, created_at from audit_events
-    where ${c ? t`id < ${c}::uuid` : t`true`} ${q.entity ? t`and entity = ${q.entity}` : t``} ${q.entity_id ? t`and entity_id = ${q.entity_id}` : t``}
-    order by id desc limit ${q.limit + 1}`;
-  const p = page(rows, q.limit, ctx.workspaceId, "audit", (r) => ({ k: r.id as string, id: r.id as string }));
-  return Response.json({ items: p.items, next_cursor: p.next_cursor });
+  const c = q.cursor ? decodeCursor(q.cursor, ctx.workspaceId, "audit") : null, t = ctx.tx;
+  // created_at::text keeps microsecond precision for the cursor; ::text::timestamptz stops postgres.js from round-tripping it through a JS Date (ms), which would skip or repeat rows.
+  const rows = await t<Row[]>`select id, actor_id, entity, entity_id, action, diff, created_at, created_at::text as _k from audit_events
+    where ${c ? t`(created_at, id) < (${c.k}::text::timestamptz, ${c.id}::uuid)` : t`true`} ${q.entity ? t`and entity = ${q.entity}` : t``} ${q.entity_id ? t`and entity_id = ${q.entity_id}` : t``}
+    order by created_at desc, id desc limit ${q.limit + 1}`;
+  const p = page(rows, q.limit, ctx.workspaceId, "audit", (r) => ({ k: r._k as string, id: r.id as string }));
+  return Response.json({ items: p.items.map((r) => { const o = { ...r }; delete o._k; return o; }), next_cursor: p.next_cursor });
 });

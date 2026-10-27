@@ -16,6 +16,7 @@ const getLabel = async (ctx: Ctx, id: string) => {
   return r[0];
 };
 export const listLabels = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "member"); // guests: no labels (same as projects)
   const q = parseQuery(req, listQuery), c = afterId(ctx, "labels", q);
   const rows = await ctx.tx<Row[]>`${LSEL(ctx)} where ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} order by id limit ${q.limit + 1}`;
   return listPage(ctx, "labels", q, rows);
@@ -28,7 +29,7 @@ export const createLabel = (req: Request, slug: string) => withWorkspaceCtx(req,
   await audit(ctx, "label", id, "create", diffOf(null, row, LABEL_F));
   return out(row, 201);
 });
-export const getLabelH = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => out(await getLabel(ctx, parseId(rawId))));
+export const getLabelH = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => { requireRole(ctx, "member"); return out(await getLabel(ctx, parseId(rawId))); });
 export const patchLabel = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, labelBody.partial());
@@ -62,6 +63,7 @@ const getCycle = async (ctx: Ctx, id: string) => {
 };
 const ordered = (s: string, e: string) => { if (e < s) throw new ApiError("validation_failed", "end_date before start_date"); };
 export const listCycles = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "member"); // guests: no cycles (same as projects)
   const q = parseQuery(req, listQuery.extend({ team_id: uuidSchema.optional() })), c = afterId(ctx, "cycles", q);
   const rows = await ctx.tx<Row[]>`${CSEL(ctx)} where ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} ${q.team_id ? ctx.tx`and team_id = ${q.team_id}` : ctx.tx``} order by id limit ${q.limit + 1}`;
   return listPage(ctx, "cycles", q, rows);
@@ -75,7 +77,7 @@ export const createCycle = (req: Request, slug: string) => withWorkspaceCtx(req,
   await audit(ctx, "cycle", id, "create", diffOf(null, row, CYCLE_F));
   return out(row, 201);
 });
-export const getCycleH = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => out(await getCycle(ctx, parseId(rawId))));
+export const getCycleH = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => { requireRole(ctx, "member"); return out(await getCycle(ctx, parseId(rawId))); });
 export const patchCycle = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "admin");
   const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, cycleBody.omit({ team_id: true }).partial());

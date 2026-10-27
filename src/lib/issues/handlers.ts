@@ -6,6 +6,7 @@ import { ifMatchVersion, listQuery, parseId, parseJson, parseQuery, uuidSchema }
 import { recordAudit, diffOf } from "../audit";
 import { allocateIssueNumber } from "../../db/issues";
 import { uuidv7 } from "../uuid7";
+import { assertAssignee } from "../resources/common";
 
 const STATUS = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 const FIELDS = ["title", "description", "status", "priority", "assignee_id", "project_id", "cycle_id", "parent_id"];
@@ -56,6 +57,11 @@ async function setLabels(ctx: Ctx, issueId: string, ids: string[]) {
   await ctx.tx`delete from issue_labels where issue_id = ${issueId}`;
   for (const l of new Set(ids)) await ctx.tx`insert into issue_labels (workspace_id, issue_id, label_id) values (${ctx.workspaceId}, ${issueId}, ${l})`; // composite FK rejects foreign-tenant labels
 }
+/** A cycle belongs to one team; an issue may only use a cycle of its own team (same 422 for unknown / foreign cycle). */
+async function assertCycleTeam(ctx: Ctx, cycleId: string, teamId: string) {
+  const r = await ctx.tx`select 1 from cycles where id = ${cycleId} and team_id = ${teamId}`;
+  if (r.length === 0) throw new ApiError("validation_failed", "cycle must belong to the issue's team");
+}
 const stale = (r: Row) => new ApiError("precondition_failed", "stale version", { current_version: r.version });
 
 export const listIssues = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -78,6 +84,8 @@ export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req,
   const b = await parseJson(req, createBody);
   const n = await allocateIssueNumber(ctx.tx, b.team_id).catch(() => { throw new ApiError("validation_failed", "unknown team"); });
   const id = uuidv7();
+  if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
+  if (b.cycle_id) await assertCycleTeam(ctx, b.cycle_id, b.team_id);
   await ctx.tx`insert into issues (id, workspace_id, team_id, number, title, description, status, priority, assignee_id, project_id, cycle_id, parent_id, sort_key, created_by)
     values (${id}, ${ctx.workspaceId}, ${b.team_id}, ${n}, ${b.title}, ${b.description}, ${b.status}, ${b.priority}, ${b.assignee_id}, ${b.project_id}, ${b.cycle_id}, ${b.parent_id}, ${newSortKey()}, ${ctx.userId})`;
   await setLabels(ctx, id, b.label_ids);
@@ -97,6 +105,8 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
   const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, patchBody);
   const before = await load(ctx, id);
   if (Number(before.version) !== want) throw stale(before);
+  if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
+  if (b.cycle_id) await assertCycleTeam(ctx, b.cycle_id, before.team_id as string);
   const pick = <K extends keyof typeof b>(k: K, cur: unknown) => (b[k] !== undefined ? b[k] : cur);
   // The version predicate is in the UPDATE too: closes the race between the read above and this write.
   const upd = await ctx.tx`update issues set title = ${pick("title", before.title) as string}, description = ${pick("description", before.description) as string},

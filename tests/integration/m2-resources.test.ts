@@ -87,7 +87,12 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect((await call(P.getProjectH as Fn, seed.a.member, {}, seed.a.slug, other.id)).status).toBe(404);
     expect((await send(P.createProject as Fn, seed.a.admin, "POST", { name: "bad", team_ids: [teamB] }, seed.a.slug)).status).toBe(422);
     expect((await mut(P.patchProject as Fn, seed.a.member, "PATCH", 3, { name: "z" }, seed.a.slug, p.id)).status).toBe(412);
-    const u = await mut(P.patchProject as Fn, seed.a.member, "PATCH", 1, { name: "P1b", team_ids: [teamA, teamA2] }, seed.a.slug, p.id);
+    expect((await mut(P.patchProject as Fn, seed.a.member, "PATCH", 1, { team_ids: [teamA, teamA2] }, seed.a.slug, p.id)).status).toBe(403); // team scope is admin-only
+    expect((await send(P.createProject as Fn, seed.a.member, "POST", { name: "nt" }, seed.a.slug)).status).toBe(422); // member: must include one of own teams
+    expect((await send(P.createProject as Fn, seed.a.member, "POST", { name: "nt", team_ids: [teamA2] }, seed.a.slug)).status).toBe(422);
+    const mine = await send(P.createProject as Fn, seed.a.member, "POST", { name: "mine", team_ids: [teamA, teamA2] }, seed.a.slug);
+    expect(mine.status).toBe(201);
+    const u = await mut(P.patchProject as Fn, seed.a.admin, "PATCH", 1, { name: "P1b", team_ids: [teamA, teamA2] }, seed.a.slug, p.id);
     expect(u.status).toBe(200); expect((await u.json()).team_ids.sort()).toEqual([teamA, teamA2].sort());
     const a = await asOwner(seed.a.id, (tx) => tx`select diff from audit_events where entity = 'project' and entity_id = ${p.id} and action = 'update'`);
     expect(Object.keys(a[0]!.diff as object).sort()).toEqual(["name", "team_ids"]);
