@@ -103,7 +103,8 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 .state { display:flex; flex-direction:column; align-items:center; gap:12px; padding:64px 16px; color:var(--muted); }
 .state.empty, .state.error { flex:1; justify-content:center; padding-top:16px; padding-bottom:16px; }
-.state.empty { color:#b4b8c0; }
+.state.empty { color:var(--muted-strong); }
+.state.error { color:var(--danger); }
 .state button { background:transparent; color:inherit; border:1px solid currentColor; border-radius:6px; padding:6px 12px; cursor:pointer; }
 .col-empty { color:var(--muted); font-size:12px; padding:8px; }
 .skeleton { pointer-events:none; }
