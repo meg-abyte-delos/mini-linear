@@ -1,0 +1,9 @@
+/* Design tokens. Dark by default. */
+:root, [data-theme='dark'] {
+  --bg:#0f1011; --side:#141516; --panel:#17181a; --raised:#1c1d20; --line:#26272b; --line-soft:#1f2023;
+  --fg:#e6e6e8; --muted:#8a8f98; --dim:#5b5f67; --hover:#1b1c1f; --sel:#21232a;
+  --accent:#28aba5;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --r-sm:5px; --r-md:8px; --r-lg:12px;
+  --fs-xs:11px; --fs-sm:12px; --fs-base:13px; --fs-lg:15px; --fs-xl:18px; --row-h:32px; --accent-fg:#06201f;
+  --s-backlog:#6b6f76; --s-todo:#bfc2c8; --s-progress:#f2c94c; --s-review:#28aba5; --s-done:#5e6ad2; --s-canceled:#6b6f76; --urgent:#eb5757;
+}

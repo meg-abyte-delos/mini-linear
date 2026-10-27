@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, type Issue, type Status } from '@/lib/issues';
+import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, type Issue, type Status } from '@/lib/issues';
+import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 
 type View = 'list' | 'board';
-interface Cmd { id: string; label: string; run: () => void }
+interface Cmd { id: string; label: string; hint?: string; run: () => void }
 
 export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const [issues, setIssues] = useState(initialIssues);
@@ -33,11 +34,11 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   function openPalette() { setPalette(true); setQ(''); setPi(0); }
 
   const commands: Cmd[] = [
-    { id: 'create', label: 'Create issue', run: create },
+    { id: 'create', label: 'Create issue', hint: 'C', run: create },
     { id: 'list', label: 'Go to list view', run: () => setView('list') },
     { id: 'board', label: 'Go to board view', run: () => setView('board') },
-    { id: 'status', label: 'Change status of selected issue', run: cycleStatus },
-    { id: 'open', label: 'Open selected issue', run: () => setOpen(true) },
+    { id: 'status', label: 'Change status of selected issue', hint: 'S', run: cycleStatus },
+    { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
   const results = fuzzyFilter(commands, q, (c) => c.label);
   const actions = useRef({ create, cycleStatus });
@@ -66,41 +67,65 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [ordered.length]);
 
-  const item = (i: Issue, cls: string) => (
-    <div
-      key={i.id} role='option' tabIndex={-1} aria-selected={current?.id === i.id} className={cls}
-      onClick={() => { setSel(ordered.findIndex((x) => x.id === i.id)); setOpen(true); }}
-    >
-      <span className='id'>{i.id}</span><span>{i.title}</span>
-      {cls === 'row' && <span>{PRIORITY_LABEL[i.priority]}</span>}
+  const who = (id: string | null) => USERS.find((u) => u.id === id);
+  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />; };
+  const select = (i: Issue, openPanel: boolean) => { setSel(ordered.findIndex((x) => x.id === i.id)); if (openPanel) setOpen(true); };
+
+  const row = (i: Issue) => (
+    <div key={i.id} role='option' tabIndex={-1} aria-selected={current?.id === i.id} className='row' onClick={() => select(i, true)}>
+      <PriorityIcon priority={i.priority} />
+      <span className='id'>{i.id}</span>
+      <StatusIcon status={i.status} />
+      <span className='title'>{i.title}</span>
+      {assignee(i)}
+    </div>
+  );
+  const card = (i: Issue) => (
+    <div key={i.id} role='option' tabIndex={-1} aria-selected={current?.id === i.id} className='card' onClick={() => select(i, true)}>
+      <div className='card-top'><span className='id'>{i.id}</span>{assignee(i)}</div>
+      <div className='card-title'>{i.title}</div>
+      <div className='card-meta'><PriorityIcon priority={i.priority} /></div>
     </div>
   );
 
   return (
     <div className='shell'>
-      <aside className='side'>
-        <h1>Mini-Linear</h1>
+      <aside className='side' aria-label='Sidebar'>
+        <div className='ws'><span className='ws-logo' aria-hidden='true'>D</span><span className='ws-name'>Delos</span></div>
+        <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>
+        <button className='side-btn' onClick={openPalette} aria-label='Open command palette'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
         <nav aria-label='Primary'>
-          <button aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
-          <button aria-pressed={view === 'board'} onClick={() => setView('board')}>Board</button>
-          <button onClick={openPalette} aria-label='Open command palette'>Commands</button>
+          <a className='side-link' href='#inbox' onClick={(e) => e.preventDefault()}><Icon name='inbox' /><span>Inbox</span></a>
+          <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><Icon name='issues' /><span>My issues</span></a>
+          <a className='side-link' href='#views' onClick={(e) => e.preventDefault()}><Icon name='views' /><span>Views</span></a>
+        </nav>
+        <div className='side-label'>Your teams</div>
+        <nav aria-label='Teams'>
+          <a className='side-link' href='#team' onClick={(e) => e.preventDefault()}><Icon name='team' /><span>Delos</span></a>
+          <a className='side-link sub active' aria-current='page' href='#issues' onClick={(e) => e.preventDefault()}><span>Issues</span></a>
+          <a className='side-link sub' href='#cycles' onClick={(e) => e.preventDefault()}><span>Cycles</span></a>
+          <a className='side-link sub' href='#projects' onClick={(e) => e.preventDefault()}><span>Projects</span></a>
         </nav>
       </aside>
       <main className='main'>
-        <div className='toolbar'>
-          <button onClick={create}>New issue (C)</button>
-        </div>
+        <header className='head'>
+          <div className='crumbs'><span>Delos</span><span className='sep'>/</span><strong>Issues</strong><span className='count'>{issues.length}</span></div>
+          <div className='switch' role='group' aria-label='View'>
+            <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
+            <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>
+          </div>
+        </header>
         {issues.length === 0 ? (
           <p className='empty'>No issues yet. Press C to create one.</p>
         ) : view === 'list' ? (
-          <div role='listbox' aria-label='Issue list'>
+          <div className='scroll' role='listbox' aria-label='Issue list'>
             {STATUSES.map((s) => {
               const items = issues.filter((i) => i.status === s);
               if (!items.length) return null;
               return (
                 <section key={s} className='group' aria-label={STATUS_LABEL[s]}>
-                  <h2>{STATUS_LABEL[s]} ({items.length})</h2>
-                  {items.map((i) => item(i, 'row'))}
+                  <h2><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{items.length}</span></h2>
+                  {items.map(row)}
                 </section>
               );
             })}
@@ -109,8 +134,8 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
           <div className='board' role='listbox' aria-label='Issue board'>
             {STATUSES.map((s) => (
               <section key={s} className='col' aria-label={STATUS_LABEL[s]}>
-                <h2>{STATUS_LABEL[s]}</h2>
-                {issues.filter((i) => i.status === s).map((i) => item(i, 'card'))}
+                <h2><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span></h2>
+                {issues.filter((i) => i.status === s).map(card)}
               </section>
             ))}
           </div>
@@ -118,17 +143,20 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
       </main>
       {open && current && (
         <aside className='panel' aria-label='Issue detail'>
-          <h2>{current.id}: {current.title}</h2>
-          <p>Status: {STATUS_LABEL[current.status]}</p>
-          <p>Priority: {PRIORITY_LABEL[current.priority]}</p>
-          <button onClick={() => setOpen(false)}>Close (Esc)</button>
+          <div className='panel-head'><span className='id'>{current.id}</span><button onClick={() => setOpen(false)} aria-label='Close detail panel'>Esc</button></div>
+          <h2>{current.title}</h2>
+          <dl>
+            <dt>Status</dt><dd><StatusIcon status={current.status} />{STATUS_LABEL[current.status]}</dd>
+            <dt>Priority</dt><dd><PriorityIcon priority={current.priority} />{PRIORITY_LABEL[current.priority]}</dd>
+            <dt>Assignee</dt><dd>{assignee(current)}{who(current.assignee_id)?.name ?? 'Unassigned'}</dd>
+          </dl>
         </aside>
       )}
       {palette && (
         <div className='overlay' onClick={() => setPalette(false)}>
           <div className='palette' role='dialog' aria-modal='true' aria-label='Command palette' onClick={(e) => e.stopPropagation()}>
             <input
-              autoFocus aria-label='Search commands' value={q}
+              autoFocus aria-label='Search commands' placeholder='Type a command or search…' value={q}
               onChange={(e) => { setQ(e.target.value); setPi(0); }}
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') { e.preventDefault(); setPi((p) => Math.min(p + 1, results.length - 1)); }
@@ -138,10 +166,11 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
             />
             <ul role='listbox' aria-label='Commands'>
               {results.map((c, idx) => (
-                <li key={c.id} role='option' aria-selected={idx === pi} onClick={() => { c.run(); setPalette(false); }}>{c.label}</li>
+                <li key={c.id} role='option' aria-selected={idx === pi} onClick={() => { c.run(); setPalette(false); }}><span>{c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
               ))}
               {results.length === 0 && <li role='option' aria-selected='false'>No matching command</li>}
             </ul>
+            <div className='palette-foot'><kbd>↑↓</kbd> navigate <kbd>↵</kbd> run <kbd>esc</kbd> close</div>
           </div>
         </div>
       )}

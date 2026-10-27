@@ -6,6 +6,12 @@ export const STATUS_LABEL: Record<Status, string> = {
 };
 export const PRIORITY_LABEL = ['No priority', 'Urgent', 'High', 'Medium', 'Low'] as const;
 
+export const USERS = [
+  { id: 'u1', name: 'Meg Abyte', initials: 'MA', hue: 'h1' },
+  { id: 'u2', name: 'Linus Patch', initials: 'LP', hue: 'h2' },
+  { id: 'u3', name: 'Ada Byte', initials: 'AB', hue: 'h3' },
+] as const;
+
 export interface Issue {
   id: string; // TEAMKEY-n
   title: string;
@@ -24,7 +30,7 @@ export interface Issue {
 const TITLES = ['Set up CI', 'Cronkit parser port', 'Board drag and drop', 'Command palette', 'RLS review', 'CSP nonce middleware', 'Issue detail panel', 'Cycle view', 'Label picker', 'Empty states'];
 export const MOCK_ISSUES: Issue[] = TITLES.map((title, i) => ({
   id: `DEL-${i + 1}`, title, description: '', status: STATUSES[i % 5] as Status,
-  priority: (i % 5) as Issue['priority'], assignee_id: null, project_id: null, cycle_id: null,
+  priority: (i % 5) as Issue['priority'], assignee_id: i % 4 === 3 ? null : (USERS[i % 3]?.id ?? null), project_id: null, cycle_id: null,
   label_ids: [], parent_id: null, sort_key: String(i + 1).padStart(4, '0'), version: 1,
 }));
 
