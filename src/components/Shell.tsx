@@ -86,6 +86,15 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
     sync();
     setSelId(id);
   }
+  // Keyboard reorder (Alt+ArrowUp/Down): swap with the neighbour in the same status column.
+  function reorder(dir: -1 | 1) {
+    const id = currentIdRef.current; if (!id) return;
+    const col = orderedRef.current.filter((i) => i.status === orderedRef.current.find((x) => x.id === id)?.status);
+    const at = col.findIndex((i) => i.id === id), to = at + dir;
+    if (at < 0 || to < 0 || to >= col.length) return;
+    const before = dir < 0 ? col[to]!.id : (col[to + 1]?.id ?? null);
+    moveTo(id, col[at]!.status, before);
+  }
   const dragProps = (i: Issue) => ({
     draggable: true,
     onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', i.id); e.dataTransfer.effectAllowed = 'move'; dragRef.current = i.id; setDragId(i.id); },
@@ -139,9 +148,9 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
   const results = fuzzyFilter(commands, q, (c) => c.label);
-  const actions = useRef({ create, cycleStatus, closePalette, openPalette, openPick });
+  const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick });
   const paletteOpen = useRef(false);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { create, cycleStatus, closePalette, openPalette, openPick }; paletteOpen.current = palette; });
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick }; paletteOpen.current = palette; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -160,6 +169,7 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
         if (e.key === 'Escape' && paletteOpen.current) actions.current.closePalette();
         return;
       }
+      if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); actions.current.reorder(e.key === 'ArrowUp' ? -1 : 1); return; }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (e.key === 'Escape') { setOpen(false); if (paletteOpen.current) actions.current.closePalette(); }
