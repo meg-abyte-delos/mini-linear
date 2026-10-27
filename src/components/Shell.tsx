@@ -5,7 +5,7 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, PROJECTS, CYCLES
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { createStore } from '@/lib/mock-api';
-import { visibleWindow, scrollToIndex } from '@/lib/virtual';
+import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
 
@@ -27,13 +27,14 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
     return () => ro.disconnect();
   }, []);
   // Keep the selected card inside the rendered window (J/K moves selection through off-screen cards).
+  const heights = useMemo(() => items.map((i) => cardHeight(i.label_ids.length)), [items]);
   const selIdx = selectedId ? items.findIndex((i) => i.id === selectedId) : -1;
   useEffect(() => {
     const el = ref.current; if (!el || selIdx < 0) return;
-    const next = scrollToIndex(selIdx, el.scrollTop, el.clientHeight || vh);
+    const next = scrollToIndexVar(heights, selIdx, el.scrollTop, el.clientHeight || vh);
     if (next !== el.scrollTop) { el.scrollTop = next; setTop(next); }
-  }, [selIdx, vh]);
-  const w = visibleWindow(items.length, top, vh);
+  }, [selIdx, vh, heights]);
+  const w = visibleWindowVar(heights, top, vh);
   return (
     <section className={`col${overZone ? ' over-zone' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
       <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
@@ -92,6 +93,12 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
   const [dragId, setDragId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
+  // The drag source can unmount mid-drag (virtualized column scrolled away), so its own onDragEnd never fires: reset on window.
+  useEffect(() => {
+    const end = () => { dragRef.current = null; setDragId(null); setOverKey(null); };
+    window.addEventListener('dragend', end);
+    return () => window.removeEventListener('dragend', end);
+  }, []);
 
   // Test hook, not product behaviour: e2e tests wait for html[data-ready] so key presses
   // are not sent before hydration has attached the handlers.

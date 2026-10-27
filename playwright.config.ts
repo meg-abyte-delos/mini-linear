@@ -7,5 +7,6 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
+    env: { PERF_SEED: '1' }, // enables the ?seed=N perf fixture in the production build used by e2e
   },
 });
