@@ -1,14 +1,17 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Issue, type Status } from '@/lib/issues';
+import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, PROJECTS, CYCLES, fmtDate, type Issue, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { createStore } from '@/lib/mock-api';
 import { visibleWindow, scrollToIndex } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
+import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
 
-type View = 'list' | 'board';
+type View = 'list' | 'board' | 'cycles';
+const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
+const BUCKETS: { id: CycleBucket; title: string }[] = [{ id: 'active', title: 'Active' }, { id: 'upcoming', title: 'Upcoming' }, { id: 'past', title: 'Past' }];
 type PickKind = 'priority' | 'assignee' | 'label';
 interface Cmd { id: string; label: string; hint?: string; run: () => void }
 
@@ -44,13 +47,38 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
-export function Shell({ initialIssues, loadError = null }: { initialIssues: Issue[]; loadError?: string | null }) {
+export function Shell({ initialIssues, loadError = null, initialFilters = emptyFilters(), today }: { initialIssues: Issue[]; loadError?: string | null; initialFilters?: Filters; today: string }) {
   const router = useRouter();
   const [storeInst] = useState(() => createStore(initialIssues));
   const store = useRef(storeInst);
   // The store is the single source of truth; React state is a snapshot refreshed after each mutation.
-  const [issues, setIssues] = useState(() => store.current.list());
+  const [allIssues, setIssues] = useState(() => store.current.list());
   const sync = () => setIssues(store.current.list());
+  const [filters, setFiltersState] = useState<Filters>(initialFilters);
+  const [filterPick, setFilterPick] = useState<{ kind: FilterKey; rect: DOMRect | null } | null>(null);
+  const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
+  // Filters live in the URL: replaceState keeps other params (seed, state) and does not refetch.
+  function setFilters(f: Filters) {
+    setFiltersState(f);
+    const qs = writeFilters(window.location.search, f);
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+  }
+  function toggleFilter(kind: FilterKey, id: string) {
+    const cur = filters[kind];
+    setFilters({ ...filters, [kind]: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] });
+  }
+  function filterOptions(kind: FilterKey): PickOption[] {
+    const on = (id: string) => filters[kind].includes(id);
+    if (kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: on(st), lead: <StatusIcon status={st} /> }));
+    if (kind === 'assignee') return [{ id: NONE, label: 'Unassigned', checked: on(NONE), lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: on(u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (kind === 'label') return LABELS.map((l) => ({ id: l.id, label: l.name, checked: on(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
+    if (kind === 'project') return [{ id: NONE, label: 'No project', checked: on(NONE) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: on(p.id) }))];
+    return [{ id: NONE, label: 'No cycle', checked: on(NONE) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: on(c.id) }))];
+  }
+  function filterValueLabel(kind: FilterKey): string {
+    const o = filterOptions(kind).filter((x) => x.checked);
+    return o.length === 1 ? o[0]!.label : `${o.length} selected`;
+  }
   const [view, setView] = useState<View>('list');
   const [selId, setSelId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -123,7 +151,7 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
     else { store.current.update(cur.id, { label_ids: cur.label_ids.includes(optId) ? cur.label_ids.filter((l) => l !== optId) : [...cur.label_ids, optId] }); sync(); }
   }
   function pickOptions(): PickOption[] {
-    const cur = pick && issues.find((x) => x.id === pick.id);
+    const cur = pick && allIssues.find((x) => x.id === pick.id);
     if (!pick || !cur) return [];
     if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: cur.priority === n, lead: <PriorityIcon priority={n as Issue['priority']} /> }));
     if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: cur.assignee_id === null, lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: cur.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
@@ -140,6 +168,9 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
     { id: 'create', label: 'Create issue', hint: 'C', run: create },
     { id: 'list', label: 'Go to list view', run: () => setView('list') },
     { id: 'board', label: 'Go to board view', run: () => setView('board') },
+    { id: 'cycles', label: 'Go to cycles', run: () => setView('cycles') },
+    { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
+    ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0) })),
     { id: 'status', label: 'Change status of selected issue', hint: 'S', run: cycleStatus },
     ...STATUSES.map((st) => ({ id: `move-${st}`, label: `Move to ${STATUS_LABEL[st]}`, run: () => { if (currentIdRef.current) moveTo(currentIdRef.current, st, null); } })),
     { id: 'set-priority', label: 'Set priority…', hint: 'P', run: () => setTimeout(() => openPick('priority'), 0) },
@@ -227,28 +258,68 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
           <a className='side-link' href='#team' onClick={(e) => e.preventDefault()}><Icon name='team' /><span>Delos</span></a>
-          <a className='side-link sub active' aria-current='page' href='#issues' onClick={(e) => e.preventDefault()}><span>Issues</span></a>
-          <a className='side-link sub' href='#cycles' onClick={(e) => e.preventDefault()}><span>Cycles</span></a>
+          <a className={`side-link sub${view !== 'cycles' ? ' active' : ''}`} aria-current={view !== 'cycles' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles') setView('list'); }}><span>Issues</span></a>
+          <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><span>Cycles</span></a>
           <a className='side-link sub' href='#projects' onClick={(e) => e.preventDefault()}><span>Projects</span></a>
         </nav>
       </aside>
       <main className='main' ref={mainRef}>
         <header className='head'>
-          <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>Issues</h1><span className='count'>{issues.length}</span></div>
+          <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'cycles' ? 'Cycles' : 'Issues'}</h1><span className='count'>{view === 'cycles' ? CYCLES.length : issues.length}</span></div>
           <div className='switch' role='group' aria-label='View'>
             <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
             <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>
           </div>
         </header>
+        {view !== 'cycles' && !loadError && allIssues.length > 0 && (
+          <div className='filterbar' role='toolbar' aria-label='Filters'>
+            {FILTER_KEYS.map((k) => (
+              <button key={k} id={`fb-${k}`} className={`fchip${filters[k].length ? ' on' : ''}`} aria-haspopup='dialog' onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
+                {FILTER_LABEL[k]}{filters[k].length > 0 && <span className='fval'>: {filterValueLabel(k)}</span>}
+              </button>
+            ))}
+            {activeCount(filters) > 0 && <button className='fclear' onClick={() => setFilters(emptyFilters())}>Clear filters</button>}
+          </div>
+        )}
         {loadError ? (
           <div className='state error' role='alert'>
             <p>{loadError}. Check your connection and try again.</p>
             <button onClick={() => router.refresh()}>Retry</button>
           </div>
-        ) : issues.length === 0 ? (
+        ) : allIssues.length === 0 ? (
           <div className='state empty' role='status'>
             <p>No issues yet.</p>
             <button onClick={create}>Create issue <kbd>C</kbd></button>
+          </div>
+        ) : view === 'cycles' ? (
+          <div className='scroll cycles'>
+            {BUCKETS.map((b) => {
+              const cs = CYCLES.filter((c) => cycleBucket(c, today) === b.id);
+              return (
+                <section key={b.id} className='group' aria-labelledby={`cy-${b.id}`}>
+                  <h2 id={`cy-${b.id}`}><span>{b.title}</span><span className='count'>{cs.length}</span></h2>
+                  {cs.length === 0 ? <p className='col-empty'>No {b.id} cycles</p> : cs.map((c) => {
+                    const its = allIssues.filter((i) => i.cycle_id === c.id);
+                    const done = its.filter((i) => i.status === 'done' || i.status === 'canceled').length;
+                    const pct = its.length ? Math.round((done / its.length) * 100) : 0;
+                    return (
+                      <div key={c.id} className='cycle' data-cycle={c.id} data-bucket={b.id}>
+                        <span className='cy-name'>{c.name}</span>
+                        <span className='cy-dates'>{fmtDate(c.start_date)} to {fmtDate(c.end_date)}</span>
+                        <span className='cy-prog' role='img' aria-label={`${pct}% complete, ${done} of ${its.length} issues`}><span style={{ width: `${pct}%` }} /></span>
+                        <span className='cy-count'>{done}/{its.length}</span>
+                        <button onClick={() => { setFilters({ ...emptyFilters(), cycle: [c.id] }); setView('list'); }}>View issues</button>
+                      </div>
+                    );
+                  })}
+                </section>
+              );
+            })}
+          </div>
+        ) : issues.length === 0 ? (
+          <div className='state empty' role='status'>
+            <p>No issues match these filters.</p>
+            <button onClick={() => setFilters(emptyFilters())}>Clear filters</button>
           </div>
         ) : view === 'list' ? (
           <div className='scroll'>
@@ -284,6 +355,7 @@ export function Shell({ initialIssues, loadError = null }: { initialIssues: Issu
         </aside>
       )}
       {pick && <Picker title={pick.kind === 'priority' ? 'Set priority' : pick.kind === 'assignee' ? 'Set assignee' : 'Set labels'} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
+      {filterPick && <Picker title={`Filter by ${FILTER_LABEL[filterPick.kind].toLowerCase()}`} multi anchor={filterPick.rect} options={filterOptions(filterPick.kind)} onPick={(id) => toggleFilter(filterPick.kind, id)} onClose={() => { const k = filterPick.kind; setFilterPick(null); setTimeout(() => document.getElementById(`fb-${k}`)?.focus(), 0); }} />}
       {palette && (
         <div className='overlay' onClick={closePalette}>
           <div className='palette' ref={dialogRef} role='dialog' aria-modal='true' aria-label='Command palette' onClick={(e) => e.stopPropagation()}
