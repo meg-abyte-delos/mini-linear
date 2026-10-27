@@ -59,7 +59,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
       if (e.key === 'Escape') { setOpen(false); setPalette(false); }
       else if (k === 'j') setSel((s) => Math.min(s + 1, ordered.length - 1));
       else if (k === 'k') setSel((s) => Math.max(s - 1, 0));
-      else if (e.key === 'Enter') setOpen(true);
+      else if (e.key === 'Enter') { if (!t.closest('button, a, [role="button"], select')) setOpen(true); }
       else if (k === 'c') { e.preventDefault(); actions.current.create(); }
       else if (k === 's') actions.current.cycleStatus();
     }

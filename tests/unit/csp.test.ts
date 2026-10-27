@@ -19,3 +19,18 @@ describe('fuzzy', () => {
     expect(fuzzyFilter(['a'], 'zz', (x) => x)).toEqual([]);
   });
 });
+
+describe('S10 CSP hardening', () => {
+  it('prod: object-src none, upgrade-insecure-requests, no unsafe-eval', () => {
+    const csp = buildCsp('n', false);
+    expect(csp).toContain(`object-src 'none'`);
+    expect(csp).toContain('upgrade-insecure-requests');
+    expect(csp).not.toContain('unsafe-eval');
+  });
+  it('dev only: allows unsafe-eval, never unsafe-inline', () => {
+    const csp = buildCsp('n', true);
+    expect(csp).toContain(`'unsafe-eval'`);
+    expect(csp).not.toContain('unsafe-inline');
+    expect(csp).not.toContain('upgrade-insecure-requests');
+  });
+});
