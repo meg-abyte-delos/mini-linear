@@ -4,6 +4,7 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Is
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { createStore } from '@/lib/mock-api';
+import { moveIssue } from '@/lib/move';
 
 type View = 'list' | 'board';
 interface Cmd { id: string; label: string; hint?: string; run: () => void }
@@ -35,17 +36,8 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     setIssues((all) => all.map((i) => (i.id === current.id ? { ...i, status: next, version: i.version + 1 } : i)));
   }
   // Drag and drop: drop on a section sets its status (appended); drop on a row/card inserts before it.
-  function moveIssue(id: string, status: Status, beforeId: string | null) {
-    setIssues((all) => {
-      const src = all.find((i) => i.id === id);
-      if (!src || id === beforeId) return all;
-      const moved = src.status === status ? src : { ...src, status, version: src.version + 1 };
-      const rest = all.filter((i) => i.id !== id);
-      const at = beforeId ? rest.findIndex((i) => i.id === beforeId) : -1;
-      if (at < 0) { const last = rest.map((i) => i.status).lastIndexOf(status); rest.splice(last + 1, 0, moved); }
-      else rest.splice(at, 0, moved);
-      return rest;
-    });
+  function moveTo(id: string, status: Status, beforeId: string | null) {
+    setIssues((all) => moveIssue(all, id, status, beforeId) as Issue[]);
     setSelId(id);
   }
   const dragProps = (i: Issue) => ({
@@ -53,11 +45,11 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', i.id); e.dataTransfer.effectAllowed = 'move'; dragRef.current = i.id; setDragId(i.id); },
     onDragEnd: () => { dragRef.current = null; setDragId(null); setOverKey(null); },
     onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); e.stopPropagation(); setOverKey(i.id); } },
-    onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); e.stopPropagation(); moveIssue(d, i.status, i.id); dragRef.current = null; setDragId(null); setOverKey(null); },
+    onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); e.stopPropagation(); moveTo(d, i.status, i.id); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
   const zoneProps = (s: Status) => ({
     onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); setOverKey(`z-${s}`); } },
-    onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveIssue(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
+    onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveTo(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
   function create() {
     const n = store.current.create({ title: 'New issue' });
@@ -71,6 +63,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     { id: 'list', label: 'Go to list view', run: () => setView('list') },
     { id: 'board', label: 'Go to board view', run: () => setView('board') },
     { id: 'status', label: 'Change status of selected issue', hint: 'S', run: cycleStatus },
+    ...STATUSES.map((st) => ({ id: `move-${st}`, label: `Move to ${STATUS_LABEL[st]}`, run: () => { if (currentIdRef.current) moveTo(currentIdRef.current, st, null); } })),
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
   const results = fuzzyFilter(commands, q, (c) => c.label);
