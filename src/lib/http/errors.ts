@@ -16,6 +16,7 @@ export function errorResponse(e: unknown): Response {
   if (e instanceof ApiError) err = e;
   else if (e instanceof ZodError) err = new ApiError("validation_failed", "invalid request", e.issues.map((i) => ({ path: i.path.join("."), message: i.message })));
   else if (pgCode(e) === "23514") err = new ApiError("validation_failed", "constraint violated");
+  else if (pgCode(e) === "23P01") err = new ApiError("conflict", "overlaps an existing entry");
   else if (pgCode(e) === "23505") err = new ApiError("conflict", "already exists");
   else if (pgCode(e) === "23503") err = new ApiError("validation_failed", "referenced entity not found");
   else err = new ApiError("internal", "internal error");
