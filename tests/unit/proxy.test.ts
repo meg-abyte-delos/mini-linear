@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { NextRequest } from 'next/server';
-import { middleware } from '../../src/middleware';
+import { proxy } from '../../src/proxy';
 import { SECURITY_HEADERS } from '../../src/lib/csp';
 
-const run = () => middleware(new NextRequest('http://localhost/'));
+const run = () => proxy(new NextRequest('http://localhost/'));
 const nonceOf = (csp: string) => /'nonce-([^']+)'/.exec(csp)?.[1];
 
-describe('middleware (S10)', () => {
+describe('proxy (S10)', () => {
   it('issues a different nonce per request', () => {
     const a = nonceOf(run().headers.get('content-security-policy')!);
     const b = nonceOf(run().headers.get('content-security-policy')!);
