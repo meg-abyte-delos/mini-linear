@@ -32,7 +32,8 @@ export const CYCLES = [
 ] as const;
 
 export interface Issue {
-  id: string; // TEAMKEY-n
+  id: string; // mock: TEAMKEY-n. API mode: UUID (key); show `identifier`.
+  identifier?: string; // API mode: "DEL-12"
   title: string;
   description: string;
   status: Status;
@@ -71,3 +72,10 @@ export function seedIssues(n: number): Issue[] {
     created_at: new Date(Date.UTC(2026, 9, 27 - (k % 20))).toISOString(), deleted_at: null,
   }));
 }
+
+// Lookup data for filters, pickers and the cycles view. Mocks by default; API mode fills it from /labels, /cycles, /projects.
+export interface LabelMeta { id: string; name: string; hue: string }
+export interface ProjectMeta { id: string; name: string; description: string; team_ids: readonly string[] }
+export interface CycleMeta { id: string; team_id: string; name: string; start_date: string; end_date: string }
+export interface Meta { labels: readonly LabelMeta[]; projects: readonly ProjectMeta[]; cycles: readonly CycleMeta[] }
+export const MOCK_META: Meta = { labels: LABELS, projects: PROJECTS, cycles: CYCLES };

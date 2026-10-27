@@ -53,6 +53,11 @@ export function createStore(seed: Issue[] = []) {
       if (out !== all) all.splice(0, all.length, ...(out as Issue[]));
       return { ...(all.find((i) => i.id === id) as Issue) };
     },
+    // API mode: put a server row into the local snapshot (replace by id, or append). The server owns id, identifier and version.
+    upsert(issue: Issue): void {
+      const at = all.findIndex((i) => i.id === issue.id);
+      if (at < 0) all.push({ ...issue }); else all[at] = { ...issue };
+    },
     remove(id: string): boolean {
       const cur = all.find((i) => i.id === id && i.deleted_at === null);
       if (!cur) return false;
