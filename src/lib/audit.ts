@@ -22,3 +22,10 @@ export async function recordAudit(tx: postgres.TransactionSql, e: { workspaceId:
   await tx`insert into audit_events (id, workspace_id, actor_id, entity, entity_id, action, diff)
     values (${uuidv7()}, ${e.workspaceId}, ${e.actorId}, ${e.entity}, ${e.entityId}, ${e.action}, ${tx.json(diff as never)})`;
 }
+
+/** Deep copy with every secret-looking key (password, hash, token, secret, cookie) replaced by "[redacted]" (S11). */
+export function redact(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(redact);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, SECRET_KEYS.test(k) ? "[redacted]" : redact(x)]));
+  return v;
+}
