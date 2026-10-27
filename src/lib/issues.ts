@@ -37,7 +37,7 @@ export interface Issue {
   deleted_at: string | null;
 }
 
-const TITLES = ['Set up CI', 'Cronkit parser port', 'Board drag and drop', 'Command palette', 'RLS review', 'CSP nonce middleware', 'Issue detail panel', 'Cycle view', 'Label picker', 'Empty states'];
+const TITLES = ['Set up CI', 'Cronkit parser port', 'Board drag and drop', 'Command palette', 'RLS review', 'CSP nonce proxy', 'Issue detail panel', 'Cycle view', 'Label picker', 'Empty states'];
 export const MOCK_ISSUES: Issue[] = TITLES.map((title, i) => ({
   id: `DEL-${i + 1}`, title, description: '', status: STATUSES[i % 5] as Status,
   priority: (i % 5) as Issue['priority'], assignee_id: i % 4 === 3 ? null : (USERS[i % 3]?.id ?? null), project_id: null, cycle_id: null,

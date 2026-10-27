@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { buildCsp, SECURITY_HEADERS } from '@/lib/csp';
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
   const csp = buildCsp(nonce);
   const headers = new Headers(req.headers);
