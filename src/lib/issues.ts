@@ -32,6 +32,7 @@ export interface Issue {
   sort_key: string;
   version: number;
   created_at: string;
+  deleted_at: string | null;
 }
 
 const TITLES = ['Set up CI', 'Cronkit parser port', 'Board drag and drop', 'Command palette', 'RLS review', 'CSP nonce middleware', 'Issue detail panel', 'Cycle view', 'Label picker', 'Empty states'];
@@ -39,13 +40,10 @@ export const MOCK_ISSUES: Issue[] = TITLES.map((title, i) => ({
   id: `DEL-${i + 1}`, title, description: '', status: STATUSES[i % 5] as Status,
   priority: (i % 5) as Issue['priority'], assignee_id: i % 4 === 3 ? null : (USERS[i % 3]?.id ?? null), project_id: null, cycle_id: null,
   label_ids: i % 3 === 2 ? [] : [LABELS[i % 3]?.id ?? 'l1'], parent_id: null, sort_key: String(i + 1).padStart(4, '0'), version: 1,
-  created_at: new Date(Date.UTC(2026, 9, 27 - i)).toISOString(),
+  created_at: new Date(Date.UTC(2026, 9, 27 - i)).toISOString(), deleted_at: null,
 }));
 
 export function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-export async function listIssues(): Promise<Issue[]> {
-  return MOCK_ISSUES;
-}

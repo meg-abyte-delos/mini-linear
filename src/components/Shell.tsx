@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, fmtDate, type Issue, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
+import { createStore } from '@/lib/mock-api';
 
 type View = 'list' | 'board';
 interface Cmd { id: string; label: string; hint?: string; run: () => void }
@@ -15,6 +16,10 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const [palette, setPalette] = useState(false);
   const [q, setQ] = useState('');
   const [pi, setPi] = useState(0);
+  const store = useRef(createStore(initialIssues));
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
 
   const ordered = useMemo(() => STATUSES.flatMap((s) => issues.filter((i) => i.status === s)), [issues]);
   const current = ordered[sel];
@@ -25,13 +30,11 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     setIssues((all) => all.map((i) => (i.id === current.id ? { ...i, status: next, version: i.version + 1 } : i)));
   }
   function create() {
-    const n = issues.length + 1;
-    setIssues((all) => [
-      ...all,
-      { id: `DEL-${n}`, title: `New issue ${n}`, description: '', status: 'todo', priority: 0, assignee_id: null, project_id: null, cycle_id: null, label_ids: [], parent_id: null, sort_key: String(n).padStart(4, '0'), version: 1, created_at: new Date().toISOString() },
-    ]);
+    const n = store.current.create({ title: 'New issue' });
+    setIssues((all) => [...all, { ...n, title: `New issue ${n.id.split('-')[1]}` }]);
   }
-  function openPalette() { setPalette(true); setQ(''); setPi(0); }
+  function openPalette() { returnFocus.current = document.activeElement as HTMLElement | null; setPalette(true); setQ(''); setPi(0); }
+  function closePalette() { setPalette(false); const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
 
   const commands: Cmd[] = [
     { id: 'create', label: 'Create issue', hint: 'C', run: create },
@@ -41,22 +44,30 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
   const results = fuzzyFilter(commands, q, (c) => c.label);
-  const actions = useRef({ create, cycleStatus });
-  useEffect(() => { actions.current = { create, cycleStatus }; });
+  const actions = useRef({ create, cycleStatus, closePalette, openPalette });
+  const paletteOpen = useRef(false);
+  useEffect(() => { actions.current = { create, cycleStatus, closePalette, openPalette }; paletteOpen.current = palette; });
+  // Roving focus: when focus is inside the issue collection, follow the selection.
+  useEffect(() => {
+    const root = mainRef.current;
+    if (!root || !current || !root.contains(document.activeElement) || document.activeElement === document.body) return;
+    const el = root.querySelector<HTMLElement>(`[data-id="${current.id}"]`);
+    if (el && el !== document.activeElement && (document.activeElement as HTMLElement).getAttribute('role') === 'option') el.focus();
+  }, [current]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault(); setPalette((p) => !p); setQ(''); setPi(0); return;
+        e.preventDefault(); if (paletteOpen.current) actions.current.closePalette(); else actions.current.openPalette(); return;
       }
       const t = e.target as HTMLElement;
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') {
-        if (e.key === 'Escape') setPalette(false);
+        if (e.key === 'Escape' && paletteOpen.current) actions.current.closePalette();
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (e.key === 'Escape') { setOpen(false); setPalette(false); }
+      if (e.key === 'Escape') { setOpen(false); if (paletteOpen.current) actions.current.closePalette(); }
       else if (k === 'j') setSel((s) => Math.min(s + 1, ordered.length - 1));
       else if (k === 'k') setSel((s) => Math.max(s - 1, 0));
       else if (e.key === 'Enter') { if (!t.closest('button, a, [role="button"], select')) setOpen(true); }
@@ -72,7 +83,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const select = (i: Issue, openPanel: boolean) => { setSel(ordered.findIndex((x) => x.id === i.id)); if (openPanel) setOpen(true); };
 
   const row = (i: Issue) => (
-    <div key={i.id} role='option' tabIndex={-1} aria-selected={current?.id === i.id} className='row' onClick={() => select(i, true)}>
+    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className='row' onClick={() => select(i, true)}>
       <PriorityIcon priority={i.priority} />
       <span className='id'>{i.id}</span>
       <StatusIcon status={i.status} />
@@ -83,7 +94,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
     </div>
   );
   const card = (i: Issue) => (
-    <div key={i.id} role='option' tabIndex={-1} aria-selected={current?.id === i.id} className='card' onClick={() => select(i, true)}>
+    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className='card' onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
       <div className='card-meta'><PriorityIcon priority={i.priority} /></div>
@@ -109,7 +120,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
           <a className='side-link sub' href='#projects' onClick={(e) => e.preventDefault()}><span>Projects</span></a>
         </nav>
       </aside>
-      <main className='main'>
+      <main className='main' ref={mainRef}>
         <header className='head'>
           <div className='crumbs'><span>Delos</span><span className='sep'>/</span><strong>Issues</strong><span className='count'>{issues.length}</span></div>
           <div className='switch' role='group' aria-label='View'>
@@ -120,24 +131,24 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
         {issues.length === 0 ? (
           <p className='empty'>No issues yet. Press C to create one.</p>
         ) : view === 'list' ? (
-          <div className='scroll' role='listbox' aria-label='Issue list'>
+          <div className='scroll'>
             {STATUSES.map((s) => {
               const items = issues.filter((i) => i.status === s);
               if (!items.length) return null;
               return (
-                <section key={s} className='group' aria-label={STATUS_LABEL[s]}>
-                  <h2><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{items.length}</span></h2>
-                  {items.map(row)}
+                <section key={s} className='group' aria-labelledby={`g-${s}`}>
+                  <h2 id={`g-${s}`}><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{items.length}</span></h2>
+                  <div role='listbox' aria-labelledby={`g-${s}`}>{items.map(row)}</div>
                 </section>
               );
             })}
           </div>
         ) : (
-          <div className='board' role='listbox' aria-label='Issue board'>
+          <div className='board'>
             {STATUSES.map((s) => (
-              <section key={s} className='col' aria-label={STATUS_LABEL[s]}>
-                <h2><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span></h2>
-                {issues.filter((i) => i.status === s).map(card)}
+              <section key={s} className='col' aria-labelledby={`c-${s}`}>
+                <h2 id={`c-${s}`}><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span></h2>
+                <div role='listbox' aria-labelledby={`c-${s}`}>{issues.filter((i) => i.status === s).map(card)}</div>
               </section>
             ))}
           </div>
@@ -155,22 +166,31 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
         </aside>
       )}
       {palette && (
-        <div className='overlay' onClick={() => setPalette(false)}>
-          <div className='palette' role='dialog' aria-modal='true' aria-label='Command palette' onClick={(e) => e.stopPropagation()}>
+        <div className='overlay' onClick={closePalette}>
+          <div className='palette' ref={dialogRef} role='dialog' aria-modal='true' aria-label='Command palette' onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key !== 'Tab') return;
+              const f = dialogRef.current?.querySelectorAll<HTMLElement>('input, button, [tabindex="0"]');
+              if (!f || f.length === 0) return;
+              const first = f[0] as HTMLElement; const last = f[f.length - 1] as HTMLElement;
+              if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+              else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+              else if (f.length === 1) e.preventDefault();
+            }}>
             <input
-              autoFocus aria-label='Search commands' placeholder='Type a command or search…' value={q}
+              autoFocus role='combobox' aria-expanded='true' aria-controls='palette-list' aria-activedescendant={results[pi] ? `pc-${results[pi].id}` : undefined} aria-autocomplete='list' aria-label='Search commands' placeholder='Type a command or search…' value={q}
               onChange={(e) => { setQ(e.target.value); setPi(0); }}
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') { e.preventDefault(); setPi((p) => Math.min(p + 1, results.length - 1)); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); setPi((p) => Math.max(p - 1, 0)); }
-                else if (e.key === 'Enter') { results[pi]?.run(); setPalette(false); }
+                else if (e.key === 'Enter') { const c = results[pi]; closePalette(); c?.run(); }
               }}
             />
-            <ul role='listbox' aria-label='Commands'>
+            <ul id='palette-list' role='listbox' aria-label='Commands'>
               {results.map((c, idx) => (
-                <li key={c.id} role='option' aria-selected={idx === pi} onClick={() => { c.run(); setPalette(false); }}><span>{c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
+                <li key={c.id} id={`pc-${c.id}`} role='option' aria-selected={idx === pi} onClick={() => { closePalette(); c.run(); }}><span>{c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
               ))}
-              {results.length === 0 && <li role='option' aria-selected='false'>No matching command</li>}
+              {results.length === 0 && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
             </ul>
             <div className='palette-foot'><kbd>↑↓</kbd> navigate <kbd>↵</kbd> run <kbd>esc</kbd> close</div>
           </div>

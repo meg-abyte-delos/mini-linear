@@ -1,4 +1,4 @@
-import { listIssues } from '@/lib/issues';
+import { listIssues } from '@/lib/mock-api';
 import { Shell } from '@/components/Shell';
 
 export default async function Home() {
