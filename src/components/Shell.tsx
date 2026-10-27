@@ -11,7 +11,7 @@ interface Cmd { id: string; label: string; hint?: string; run: () => void }
 export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const [issues, setIssues] = useState(initialIssues);
   const [view, setView] = useState<View>('list');
-  const [sel, setSel] = useState(0);
+  const [selId, setSelId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [palette, setPalette] = useState(false);
   const [q, setQ] = useState('');
@@ -22,7 +22,9 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const mainRef = useRef<HTMLElement>(null);
 
   const ordered = useMemo(() => STATUSES.flatMap((s) => issues.filter((i) => i.status === s)), [issues]);
-  const current = ordered[sel];
+  const current = ordered.find((i) => i.id === selId) ?? ordered[0];
+  const orderedRef = useRef(ordered);
+  const currentIdRef = useRef<string | undefined>(current?.id);
 
   function cycleStatus() {
     if (!current) return;
@@ -46,7 +48,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
   const results = fuzzyFilter(commands, q, (c) => c.label);
   const actions = useRef({ create, cycleStatus, closePalette, openPalette });
   const paletteOpen = useRef(false);
-  useEffect(() => { actions.current = { create, cycleStatus, closePalette, openPalette }; paletteOpen.current = palette; });
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { create, cycleStatus, closePalette, openPalette }; paletteOpen.current = palette; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -68,19 +70,23 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (e.key === 'Escape') { setOpen(false); if (paletteOpen.current) actions.current.closePalette(); }
-      else if (k === 'j') setSel((s) => Math.min(s + 1, ordered.length - 1));
-      else if (k === 'k') setSel((s) => Math.max(s - 1, 0));
+      else if (k === 'j' || k === 'k') {
+        const list = orderedRef.current; if (!list.length) return;
+        const idx = Math.max(0, list.findIndex((i) => i.id === currentIdRef.current));
+        const n = Math.min(Math.max(idx + (k === 'j' ? 1 : -1), 0), list.length - 1);
+        setSelId(list[n]!.id);
+      }
       else if (e.key === 'Enter') { if (!t.closest('button, a, [role="button"], select')) setOpen(true); }
       else if (k === 'c') { e.preventDefault(); actions.current.create(); }
       else if (k === 's') actions.current.cycleStatus();
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [ordered.length]);
+  }, []);
 
   const who = (id: string | null) => USERS.find((u) => u.id === id);
   const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />; };
-  const select = (i: Issue, openPanel: boolean) => { setSel(ordered.findIndex((x) => x.id === i.id)); if (openPanel) setOpen(true); };
+  const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
   const row = (i: Issue) => (
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className='row' onClick={() => select(i, true)}>
