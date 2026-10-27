@@ -12,9 +12,12 @@ export const db = () => (_sql ??= postgres(process.env.DATABASE_URL ?? ""));
  * replaces this default; M2 routes and tests only depend on the signature. The default accepts nothing.
  */
 export type SessionResolver = (req: Request) => Promise<string | null>;
-let resolver: SessionResolver = async () => null;
-export const setSessionResolver = (r: SessionResolver) => { resolver = r; };
-export const getSessionUser: SessionResolver = (req) => resolver(req);
+// Stored on globalThis: Next can load this module once per bundle (instrumentation vs route handlers),
+// so a module-level variable set in instrumentation.ts would be invisible to routes (401 in dev).
+const KEY = Symbol.for('mini-linear.sessionResolver');
+type G = typeof globalThis & { [KEY]?: SessionResolver };
+export const setSessionResolver = (r: SessionResolver) => { (globalThis as G)[KEY] = r; };
+export const getSessionUser: SessionResolver = (req) => ((globalThis as G)[KEY] ?? (async () => null))(req);
 
 const ORDER: Role[] = ["guest", "member", "admin", "owner"];
 export const atLeast = (role: Role, min: Role) => ORDER.indexOf(role) >= ORDER.indexOf(min);
