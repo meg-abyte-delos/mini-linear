@@ -1,5 +1,6 @@
 name: CI
 on: { pull_request: {}, push: { branches: [main] } }
+permissions: { contents: read }
 jobs:
   secrets:
     runs-on: ubuntu-latest
@@ -13,11 +14,13 @@ jobs:
     services:
       postgres:
         image: postgres:16
-        env: { POSTGRES_USER: owner, POSTGRES_PASSWORD: ci_only, POSTGRES_DB: mini_linear }
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: ci_super, POSTGRES_DB: mini_linear }
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-retries 10
     env:
+      PGSUPER_URL: postgres://postgres:ci_super@localhost:5432/mini_linear
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
+      DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -26,8 +29,26 @@ jobs:
       - run: pnpm install --no-frozen-lockfile  # switch to --frozen-lockfile once pnpm-lock.yaml is committed (S9)
       - run: pnpm audit --prod --audit-level=high
       - run: pnpm typecheck
-      - run: pnpm test
+      - name: Install psql
+        run: sudo apt-get install -y -qq postgresql-client >/dev/null
+      # Order (Rex review of #1+#3): superuser bootstrap -> app_user role -> raw SQL migration -> grants -> check:rls.
+      # Migrations are applied with psql (raw SQL, ON_ERROR_STOP), NOT drizzle-kit migrate: the drizzle journal
+      # is intentionally unused, so there is a single source of truth (db/migrations/*.sql in lexical order).
+      - name: Bootstrap roles (superuser only here; migrations run as a NON-superuser owner, like prod)
+        run: |
+          psql "$PGSUPER_URL" -v ON_ERROR_STOP=1 -c "CREATE ROLE owner LOGIN PASSWORD 'ci_only' NOSUPERUSER NOBYPASSRLS CREATEROLE"
+          psql "$PGSUPER_URL" -v ON_ERROR_STOP=1 -c "ALTER DATABASE mini_linear OWNER TO owner"
+          psql "$PGSUPER_URL" -v ON_ERROR_STOP=1 -v owner=owner -f db/bootstrap-roles.sql
+      - name: Create app_user (owner)
+        run: |
+          psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f db/roles/001_app_user.sql
+          psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -c "ALTER ROLE app_user PASSWORD 'ci_only_app'"
+      - name: Migrate (psql, as owner) then grants
+        run: |
+          for f in db/migrations/*.sql; do psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f "$f"; done
+          psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f db/roles/900_grants.sql
       - run: pnpm check:rls
+      - run: pnpm test
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e

@@ -1,5 +1,7 @@
 # Tables exempt from tenant RLS (Spec v1.1 Appendix A, S12). Adding a line requires Rex's sign-off.
+# check-rls fails on stale entries, so each table is listed by the migration that creates it.
 users
 sessions
-email_verifications
 password_resets
+email_verifications
+rate_limits
