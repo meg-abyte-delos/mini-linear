@@ -1,10 +1,11 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, LABELS, PROJECTS, CYCLES, fmtDate, type Issue, type Status } from '@/lib/issues';
+import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { createStore } from '@/lib/mock-api';
+import { createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { visibleWindow, scrollToIndex } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
@@ -47,13 +48,32 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
-export function Shell({ initialIssues, loadError = null, initialFilters = emptyFilters(), today }: { initialIssues: Issue[]; loadError?: string | null; initialFilters?: Filters; today: string }) {
+export function Shell({ initialIssues, loadError = null, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null }: { initialIssues: Issue[]; loadError?: string | null; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null }) {
   const router = useRouter();
+  const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
+  const [toast, setToast] = useState<string | null>(null);
+  // API mode: server versions by issue id, and one write chain per issue so If-Match never races our own PATCHes.
+  const versions = useRef(new Map<string, number>(initialIssues.map((i) => [i.id, i.version])));
+  const chains = useRef(new Map<string, Promise<unknown>>());
   const [storeInst] = useState(() => createStore(initialIssues));
   const store = useRef(storeInst);
   // The store is the single source of truth; React state is a snapshot refreshed after each mutation.
   const [allIssues, setIssues] = useState(() => store.current.list());
   const sync = () => setIssues(store.current.list());
+  // Push a change to the API (no-op in mock mode). Local state is already updated (optimistic); the server row then wins.
+  // 412 -> refetch the issue, toast "modified elsewhere", no automatic retry.
+  function push(id: string, patch: Record<string, unknown>) {
+    if (!api) return;
+    const prev = store.current.list().find((x) => x.id === id);
+    if (!prev) return;
+    const run = async () => {
+      const r = await apiPatch(api.slug, prev, versions.current.get(id) ?? prev.version, patch);
+      if (r.issue) { versions.current.set(id, r.issue.version); store.current.upsert({ ...r.issue, sort_key: prev.sort_key }); sync(); }
+      if (r.kind === 'conflict') setToast('Issue modified elsewhere. Reloaded the latest version.');
+      else if (r.kind === 'error') setToast('Could not save the change. Reloaded the latest version.');
+    };
+    chains.current.set(id, (chains.current.get(id) ?? Promise.resolve()).then(run, run));
+  }
   const [filters, setFiltersState] = useState<Filters>(initialFilters);
   const [filterPick, setFilterPick] = useState<{ kind: FilterKey; rect: DOMRect | null } | null>(null);
   const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
@@ -107,10 +127,14 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
     const next = STATUSES[(STATUSES.indexOf(current.status) + 1) % STATUSES.length] as Status;
     store.current.update(current.id, { status: next });
     sync();
+    push(current.id, { status: next });
   }
   // Drag and drop: drop on a section sets its status (appended); drop on a row/card inserts before it.
+  // TODO(M2 ticket): order is client-side only. Only the status change goes to the API until a position field exists.
   function moveTo(id: string, status: Status, beforeId: string | null) {
+    const was = store.current.list().find((x) => x.id === id)?.status;
     store.current.move(id, status, beforeId);
+    if (was && was !== status) push(id, { status });
     sync();
     setSelId(id);
   }
@@ -146,9 +170,9 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
   function applyPick(optId: string) {
     if (!pick) return;
     const cur = store.current.list().find((x) => x.id === pick.id); if (!cur) return;
-    if (pick.kind === 'priority') { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); sync(); closePick(); }
-    else if (pick.kind === 'assignee') { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); sync(); closePick(); }
-    else { store.current.update(cur.id, { label_ids: cur.label_ids.includes(optId) ? cur.label_ids.filter((l) => l !== optId) : [...cur.label_ids, optId] }); sync(); }
+    if (pick.kind === 'priority') { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); push(cur.id, { priority: Number(optId) }); sync(); closePick(); }
+    else if (pick.kind === 'assignee') { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); if (isUuid(optId)) push(cur.id, { assignee_id: optId }); else if (optId === 'none') push(cur.id, { assignee_id: null }); /* mock USERS ids are not UUIDs: local only until GET members exists */ sync(); closePick(); }
+    else { const label_ids = cur.label_ids.includes(optId) ? cur.label_ids.filter((l) => l !== optId) : [...cur.label_ids, optId]; store.current.update(cur.id, { label_ids }); push(cur.id, { label_ids }); sync(); }
   }
   function pickOptions(): PickOption[] {
     const cur = pick && allIssues.find((x) => x.id === pick.id);
@@ -158,6 +182,15 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
     return LABELS.map((l) => ({ id: l.id, label: l.name, checked: cur.label_ids.includes(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
   function create() {
+    if (api) {
+      void apiCreate(api.slug, api.teamId, 'New issue').then((row) => {
+        if (!row) { setToast('Could not create the issue.'); return; }
+        versions.current.set(row.id, row.version);
+        store.current.upsert({ ...row, sort_key: String(Date.now()) });
+        sync();
+      });
+      return;
+    }
     store.current.create({ title: 'New issue' });
     sync();
   }
@@ -228,7 +261,7 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
   const row = (i: Issue) => (
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <PriorityIcon priority={i.priority} />
-      <span className='id'>{i.id}</span>
+      <span className='id'>{i.identifier ?? i.id}</span>
       <StatusIcon status={i.status} />
       <span className='title'>{i.title}</span>
       <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</span>
@@ -238,7 +271,7 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
   );
   const card = (i: Issue, pos?: number, size?: number) => (
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
-      <div className='card-top'><span className='id'>{i.id}</span>{assignee(i)}</div>
+      <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
       <div className='card-meta'><PriorityIcon priority={i.priority} />{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
@@ -344,7 +377,7 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
       </main>
       {open && current && (
         <aside className='panel' aria-label='Issue detail'>
-          <div className='panel-head'><span className='id'>{current.id}</span><button onClick={() => setOpen(false)} aria-label='Close detail panel'>Esc</button></div>
+          <div className='panel-head'><span className='id'>{current.identifier ?? current.id}</span><button onClick={() => setOpen(false)} aria-label='Close detail panel'>Esc</button></div>
           <h2>{current.title}</h2>
           <dl>
             <dt>Status</dt><dd><StatusIcon status={current.status} />{STATUS_LABEL[current.status]}</dd>
@@ -354,6 +387,7 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
           </dl>
         </aside>
       )}
+      {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}</div>}
       {pick && <Picker title={pick.kind === 'priority' ? 'Set priority' : pick.kind === 'assignee' ? 'Set assignee' : 'Set labels'} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {filterPick && <Picker title={`Filter by ${FILTER_LABEL[filterPick.kind].toLowerCase()}`} multi anchor={filterPick.rect} options={filterOptions(filterPick.kind)} onPick={(id) => toggleFilter(filterPick.kind, id)} onClose={() => { const k = filterPick.kind; setFilterPick(null); setTimeout(() => document.getElementById(`fb-${k}`)?.focus(), 0); }} />}
       {palette && (

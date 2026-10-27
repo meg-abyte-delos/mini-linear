@@ -1,23 +1,24 @@
 // Pure filter + cycle helpers. Filter state lives in the URL (?status=todo,done&assignee=u1&label=l1&project=p1&cycle=c2).
-import { CYCLES, LABELS, PROJECTS, STATUSES, USERS, type Issue } from '@/lib/issues';
+import { MOCK_META, STATUSES, USERS, type Issue, type Meta } from '@/lib/issues';
 
 export const FILTER_KEYS = ['status', 'assignee', 'label', 'project', 'cycle'] as const;
 export type FilterKey = (typeof FILTER_KEYS)[number];
 export type Filters = Record<FilterKey, string[]>;
 export const NONE = 'none'; // Unassigned / No project / No cycle
 
-const KNOWN: Record<FilterKey, string[]> = {
+const known = (m: Meta): Record<FilterKey, string[]> => ({
   status: [...STATUSES],
   assignee: [NONE, ...USERS.map((u) => u.id)],
-  label: LABELS.map((l) => l.id),
-  project: [NONE, ...PROJECTS.map((p) => p.id)],
-  cycle: [NONE, ...CYCLES.map((c) => c.id)],
-};
+  label: m.labels.map((l) => l.id),
+  project: [NONE, ...m.projects.map((p) => p.id)],
+  cycle: [NONE, ...m.cycles.map((c) => c.id)],
+});
 
 export const emptyFilters = (): Filters => ({ status: [], assignee: [], label: [], project: [], cycle: [] });
 
 /** Unknown values are dropped, duplicates removed; order follows the known lists. */
-export function parseFilters(sp: URLSearchParams | Record<string, string | string[] | undefined>): Filters {
+export function parseFilters(sp: URLSearchParams | Record<string, string | string[] | undefined>, meta: Meta = MOCK_META): Filters {
+  const KNOWN = known(meta);
   const get = (k: string): string => {
     if (sp instanceof URLSearchParams) return sp.get(k) ?? '';
     const v = sp[k];
