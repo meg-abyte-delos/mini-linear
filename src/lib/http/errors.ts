@@ -10,6 +10,8 @@ export class ApiError extends Error {
 
 const pgCode = (e: unknown) => (e && typeof e === "object" && "code" in e ? String((e as { code: unknown }).code) : "");
 
+export const isDeadlock = (e: unknown) => pgCode(e) === "40P01";
+
 /** Map any thrown value to a JSON error response { error: { code, message, details? } }. Unknown errors never leak internals. */
 export function errorResponse(e: unknown): Response {
   let err: ApiError;
@@ -18,6 +20,7 @@ export function errorResponse(e: unknown): Response {
   else if (pgCode(e) === "23514") err = new ApiError("validation_failed", "constraint violated");
   else if (pgCode(e) === "23P01") err = new ApiError("conflict", "overlaps an existing entry");
   else if (pgCode(e) === "23505") err = new ApiError("conflict", "already exists");
+  else if (pgCode(e) === "40P01") err = new ApiError("conflict", "concurrent update, retry");
   else if (pgCode(e) === "23503") err = new ApiError("validation_failed", "referenced entity not found");
   else err = new ApiError("internal", "internal error");
   return Response.json({ error: { code: err.code, message: err.message, ...(err.details ? { details: err.details } : {}) } }, { status: err.status });

@@ -40,7 +40,7 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .board { display:flex; gap:10px; padding:12px; overflow-x:auto; overflow-y:hidden; flex:1; min-height:0; align-items:stretch; }
 .col { flex:none; width:272px; display:flex; flex-direction:column; min-height:0; background:var(--panel); border:1px solid var(--line-soft); border-radius:10px; padding-bottom:8px; }
 .col h2 { background:none; border:0; border-radius:10px 10px 0 0; }
-.card { box-sizing:border-box; height:86px; overflow:hidden; margin:0 8px 6px; background:var(--raised); border:1px solid var(--line); border-radius:8px; padding:10px; cursor:pointer; display:flex; flex-direction:column; gap:6px; }
+.card { box-sizing:border-box; min-height:86px; margin:6px 8px 0; background:var(--raised); border:1px solid var(--line); border-radius:8px; padding:10px; cursor:pointer; display:flex; flex-direction:column; gap:6px; }
 .card:hover { border-color:#34363b; }
 .card[aria-selected=true] { border-color:var(--accent); background:var(--sel); }
 .card-top { display:flex; align-items:center; justify-content:space-between; }
