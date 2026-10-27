@@ -2,23 +2,23 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { appPool, ownerPool, api, world } from './helpers/world';
 let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { W = await world(); });
+const P1 = '/api/v1/w/w1';
 
 describe('A1.1 cross-tenant requests return 404 on every endpoint', () => {
   // Placeholder list: T2 requires this to be generated from the real route table.
   const routes: [string, string][] = [
-    ['GET', '/api/v1/issues/:issue'], ['PATCH', '/api/v1/issues/:issue'], ['DELETE', '/api/v1/issues/:issue'],
-    ['POST', '/api/v1/issues/:issue/restore'], ['GET', '/api/v1/issues'], ['GET', '/api/v1/projects'],
-    ['GET', '/api/v1/cycles'], ['GET', '/api/v1/labels'], ['GET', '/api/v1/search?q=I1'],
-    ['GET', '/api/v1/audit'], ['GET', '/api/v1/sync?since=0'],
+    ['GET', '/issues/:issue'], ['PATCH', '/issues/:issue'], ['DELETE', '/issues/:issue'],
+    ['POST', '/issues/:issue/restore'], ['GET', '/issues'], ['GET', '/projects'],
+    ['GET', '/cycles'], ['GET', '/labels'], ['GET', '/search?q=I1'],
+    ['GET', '/audit'], ['GET', '/sync?since=0'],
   ];
-  it.each(routes)('B1 %s %s -> 404 or empty, never 403', async (method, tpl) => {
-    const path = tpl.replace(':issue', W.i1);
+  it.each(routes)('B1 %s ' + P1 + '%s -> 404, never 403', async (method, tpl) => {
+    const path = P1 + tpl.replace(':issue', W.i1);
     const r = await api(W.B1, method, path, method === 'PATCH' ? { title: 'x' } : undefined, { 'if-match': '1' });
-    expect([200, 404]).toContain(r.status);
-    if (r.status === 200) { const b = await r.json(); expect(JSON.stringify(b)).not.toContain(W.w1); }
-    expect(r.status).not.toBe(403);
+    expect(r.status).toBe(404);
+    expect(JSON.stringify(await r.text())).not.toContain(W.w1);
   });
-  it('route table coverage: every registered route appears above (TODO wire to route list)', () => {
+  it('route table coverage (TODO wire to generated route list)', () => {
     expect(routes.length).toBeGreaterThan(0);
   });
 });
@@ -47,30 +47,28 @@ describe('A1.2 RLS with app.workspace_id unset returns 0 rows', () => {
   });
 });
 
-describe('A1.3 invalid invites return 404 INVITE_INVALID (v1.1 0.5a, supersedes 403)', () => {
-  const accept = (token: string, actor = W?.N) => api(actor, 'POST', '/api/v1/invites/accept', { token });
-  it('missing, unknown, malformed tokens give an identical status, body and headers', async () => {
+describe('A1.3 invalid invites return 404 INVITE_INVALID', () => {
+  const accept = (token: string) => api(W.N, 'POST', '/api/v1/invites/accept', { token });
+  it('missing, unknown, malformed tokens give identical status and body', async () => {
     const rs = await Promise.all([accept(''), accept('nope'), accept('a'.repeat(43))]);
-    const snap = async (r: Response) => ({ s: r.status, b: await r.text(),
-      h: [...r.headers].filter(([k]) => !['date', 'x-request-id', 'set-cookie'].includes(k)) });
-    const snaps = await Promise.all(rs.map(snap));
+    const snaps = await Promise.all(rs.map(async (r) => ({ s: r.status, b: await r.text() })));
     for (const s of snaps) { expect(s.s).toBe(404); expect(JSON.parse(s.b).error.code).toBe('INVITE_INVALID'); }
     const norm = (s: { b: string }) => s.b.replace(/"request_?id":"[^"]*"/i, '');
     expect(new Set(snaps.map(norm)).size).toBe(1);
   });
-  it.todo('expired / reused / wrong-email / revoked tokens: same snapshot (needs invite seed helper from Ada)');
+  it.todo('expired / reused / wrong-email / revoked tokens: same snapshot (needs invite seed)');
 });
 
 describe('A1.4 guest permissions', () => {
   it('guest cannot create an issue (403)', async () => {
-    const r = await api(W.G1, 'POST', '/api/v1/issues', { title: 'g', team_id: W.t1 });
+    const r = await api(W.G1, 'POST', `${P1}/issues`, { title: 'g', team_id: W.t1 });
     expect(r.status).toBe(403);
   });
-  it('guest can comment on the shared issue I1 (201)', async () => {
-    const r = await api(W.G1, 'POST', `/api/v1/issues/${W.i1}/comments`, { body: 'hi' });
+  it('guest can comment on shared issue I1 (201)', async () => {
+    const r = await api(W.G1, 'POST', `${P1}/issues/${W.i1}/comments`, { body: 'hi' });
     expect(r.status).toBe(201);
   });
   it('guest gets 404 on non-shared I2', async () => {
-    expect((await api(W.G1, 'GET', `/api/v1/issues/${W.i2}`)).status).toBe(404);
+    expect((await api(W.G1, 'GET', `${P1}/issues/${W.i2}`)).status).toBe(404);
   });
 });

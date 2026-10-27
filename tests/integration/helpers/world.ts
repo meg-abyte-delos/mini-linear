@@ -26,6 +26,7 @@ export async function world() {
     `select (select id from workspaces where slug='w1') w1,
             (select id from workspaces where slug='w2') w2,
             (select id from teams where workspace_id=(select id from workspaces where slug='w1') limit 1) t1,
+            (select id from teams where workspace_id=(select id from workspaces where slug='w2') limit 1) t2,
             (select id from issues where title='I1' limit 1) i1,
             (select id from issues where title='I2' limit 1) i2`)).rows[0];
   return { A1, M1, M2, G1, B1, N, ...ids };
