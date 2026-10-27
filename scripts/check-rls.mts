@@ -7,7 +7,8 @@ const appUrl = process.env.DATABASE_URL;
 if (!ownerUrl || !appUrl) { console.error("S12: DATABASE_OWNER_URL and DATABASE_URL must be set"); process.exit(1); }
 
 const allow = new Set(readFileSync("db/rls-exempt-allowlist.txt", "utf8").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#")));
-const EXPR = "nullif(current_setting('app.workspace_id'::text, true), ''::text))::uuid";
+const norm = (e: string | null | undefined) => (e ?? "").toLowerCase().replace(/\s+/g, "").replace(/::text/g, "");
+const OK = /workspace_id=\(?nullif\(current_setting\('app\.workspace_id',true\),''\)\)?::uuid/;
 const errors: string[] = [];
 const sql = postgres(ownerUrl, { max: 1 });
 
@@ -45,8 +46,8 @@ try {
     for (const p of pols) {
       const q = (p.qual ?? "").replace(/\s+/g, " ");
       const w = (p.with_check ?? "").replace(/\s+/g, " ");
-      if (!q.includes(EXPR)) errors.push(`${t.relname}: policy USING must use nullif(current_setting('app.workspace_id', true), '')::uuid`);
-      if (p.cmd !== "SELECT" && p.cmd !== "DELETE" && !w.includes(EXPR)) errors.push(`${t.relname}: policy WITH CHECK missing or wrong`);
+      if (!OK.test(norm(q))) errors.push(`${t.relname}: policy USING must use nullif(current_setting('app.workspace_id', true), '')::uuid`);
+      if (p.cmd !== "SELECT" && p.cmd !== "DELETE" && !OK.test(norm(w))) errors.push(`${t.relname}: policy WITH CHECK missing or wrong`);
     }
   }
   for (const a of allow) if (!seen.has(a)) errors.push(`allowlist entry '${a}' has no table (stale)`);
