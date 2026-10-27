@@ -24,4 +24,9 @@ describe("startup check for setSocketAddrResolver", () => {
     setSocketAddrResolver(() => "1.1.1.1");
     expect(warnIfNoSocketResolver(() => {}, "production")).toBe(false);
   });
+  it("production with ML_ALLOW_SHARED_RATELIMIT_BUCKET=1 warns instead of throwing", () => {
+    const logs: string[] = [];
+    expect(warnIfNoSocketResolver((m) => logs.push(m), "production", "1")).toBe(true);
+    expect(() => warnIfNoSocketResolver(() => {}, "production", "0")).toThrow(/setSocketAddrResolver/);
+  });
 });

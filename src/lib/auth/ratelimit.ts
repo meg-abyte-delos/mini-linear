@@ -29,9 +29,11 @@ export const resetSocketAddrResolverForTests = () => { socketAddr = () => null; 
 export const warnIfNoSocketResolver = (
   log: (m: string) => void = (m) => console.warn(m),
   nodeEnv: string | undefined = process.env.NODE_ENV,
+  // Explicit escape hatch for the e2e harness (next start on localhost). Never set it in a real deployment.
+  allowShared: string | undefined = process.env.ML_ALLOW_SHARED_RATELIMIT_BUCKET,
 ): boolean => {
   if (socketResolverSet) return false;
-  if (nodeEnv === "production") {
+  if (nodeEnv === "production" && allowShared !== "1") {
     throw new Error("[mini-linear] setSocketAddrResolver is not set in production: all requests without a trusted X-Forwarded-For hop would share one rate-limit bucket. Refusing to start.");
   }
   log("[mini-linear] WARNING: setSocketAddrResolver is not set; requests without a trusted X-Forwarded-For hop share one 'unknown' rate-limit bucket. Not acceptable in production.");
