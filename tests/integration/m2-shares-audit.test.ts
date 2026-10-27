@@ -33,7 +33,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect((await send(S.shareIssue as Fn, seed.a.member, "POST", { guest_user_id: g }, seed.a.slug, issue)).status).toBe(200); // idempotent
     expect((await call(I.getIssue as Fn, g, {}, seed.a.slug, issue)).status).toBe(200);
     expect((await send(S.shareIssue as Fn, seed.b.member, "POST", { guest_user_id: g }, seed.a.slug, issue)).status).toBe(404); // non-member of A
-    const del = (u: string) => call(S.unshareIssue as Fn, u, { method: "DELETE", q: `?guest_user_id=${g}` }, seed.a.slug, issue);
+    const del = (u: string) => call(S.unshareIssue as Fn, u, { method: "DELETE" }, seed.a.slug, issue, g);
     expect((await del(g)).status).toBe(403);
     expect((await del(seed.a.member)).status).toBe(204);
     expect((await del(seed.a.member)).status).toBe(204);

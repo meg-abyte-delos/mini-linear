@@ -7,6 +7,7 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
-    env: { PERF_SEED: '1' }, // enables the ?seed=N perf fixture in the production build used by e2e
+    // PERF_SEED enables the ?seed=N perf fixture; ML_ALLOW_SHARED_RATELIMIT_BUCKET lets next start run without a socket resolver (see ratelimit.ts).
+    env: { PERF_SEED: '1', ML_ALLOW_SHARED_RATELIMIT_BUCKET: '1' },
   },
 });
