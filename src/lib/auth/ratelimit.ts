@@ -17,7 +17,17 @@ export async function hit(sql: postgres.Sql, key: string, limit: number, windowS
 /** Client address: first X-Forwarded-For hop (the app is assumed to run behind one trusted proxy), else a shared bucket. */
 /** Socket peer address seam: Next route handlers expose none on Request, so the host adapter may set it. Default is a shared "unknown" bucket (fails closed). */
 let socketAddr: (req: Request) => string | null = () => null;
-export const setSocketAddrResolver = (f: typeof socketAddr) => { socketAddr = f; };
+let socketResolverSet = false;
+export const setSocketAddrResolver = (f: typeof socketAddr) => { socketAddr = f; socketResolverSet = true; };
+/**
+ * TODO(prod): the shared "unknown" bucket must not reach production. The host adapter MUST call setSocketAddrResolver.
+ * Called at startup (src/instrumentation.ts); warns loudly when no resolver is set. Returns true if a warning was emitted.
+ */
+export const warnIfNoSocketResolver = (log: (m: string) => void = (m) => console.warn(m)): boolean => {
+  if (socketResolverSet) return false;
+  log("[mini-linear] WARNING: setSocketAddrResolver is not set; requests without a trusted X-Forwarded-For hop share one 'unknown' rate-limit bucket. Not acceptable in production.");
+  return true;
+};
 /**
  * Client IP for rate limiting. X-Forwarded-For is client-controlled on its left side, so the FIRST hop is never used:
  * walk the list from the right and take the first hop not in TRUSTED_PROXIES (comma-separated env); each trusted proxy
