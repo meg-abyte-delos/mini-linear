@@ -1,0 +1,42 @@
+import postgres from "postgres";
+import { ApiError, errorResponse } from "./errors";
+
+export type Role = "owner" | "admin" | "member" | "guest";
+export type Ctx = { tx: postgres.TransactionSql; userId: string; workspaceId: string; role: Role; req: Request };
+
+let _sql: postgres.Sql | undefined;
+export const db = () => (_sql ??= postgres(process.env.DATABASE_URL ?? ""));
+
+/**
+ * Seam for M1 sessions: resolves the signed-in user id from the request cookie, or null. The M1 handlers batch
+ * replaces this default; M2 routes and tests only depend on the signature. The default accepts nothing.
+ */
+export type SessionResolver = (req: Request) => Promise<string | null>;
+let resolver: SessionResolver = async () => null;
+export const setSessionResolver = (r: SessionResolver) => { resolver = r; };
+export const getSessionUser: SessionResolver = (req) => resolver(req);
+
+const ORDER: Role[] = ["guest", "member", "admin", "owner"];
+export const atLeast = (role: Role, min: Role) => ORDER.indexOf(role) >= ORDER.indexOf(min);
+export function requireRole(ctx: Ctx, min: Role) { if (!atLeast(ctx.role, min)) throw new ApiError("forbidden"); }
+
+/**
+ * Run a workspace-scoped handler: authenticate, resolve the workspace from the slug via resolve_workspace(slug, user)
+ * (non-member -> 404, never 403, so slugs are not enumerable), then run the handler in ONE transaction with
+ * app.workspace_id set (RLS). Client-supplied workspace ids are never read. Any throw rolls the tx back.
+ */
+export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx) => Promise<Response>, sql: postgres.Sql = db()): Promise<Response> {
+  try {
+    const userId = await getSessionUser(req);
+    if (!userId) throw new ApiError("unauthenticated");
+    return (await sql.begin(async (tx) => {
+      const rows = await tx<{ workspace_id: string; role: Role }[]>`select workspace_id, role from resolve_workspace(${slug}, ${userId})`;
+      if (rows.length === 0) throw new ApiError("not_found");
+      const { workspace_id, role } = rows[0]!;
+      await tx`select set_config('app.workspace_id', ${workspace_id}, true)`;
+      return fn({ tx, userId, workspaceId: workspace_id, role, req });
+    })) as Response;
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
