@@ -112,7 +112,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
       <aside className='side' aria-label='Sidebar'>
         <div className='ws'><span className='ws-logo' aria-hidden='true'>D</span><span className='ws-name'>Delos</span></div>
         <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>
-        <button className='side-btn' onClick={openPalette} aria-label='Open command palette'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
+        <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
         <nav aria-label='Primary'>
           <a className='side-link' href='#inbox' onClick={(e) => e.preventDefault()}><Icon name='inbox' /><span>Inbox</span></a>
           <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><Icon name='issues' /><span>My issues</span></a>
@@ -128,7 +128,7 @@ export function Shell({ initialIssues }: { initialIssues: Issue[] }) {
       </aside>
       <main className='main' ref={mainRef}>
         <header className='head'>
-          <div className='crumbs'><span>Delos</span><span className='sep'>/</span><strong>Issues</strong><span className='count'>{issues.length}</span></div>
+          <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>Issues</h1><span className='count'>{issues.length}</span></div>
           <div className='switch' role='group' aria-label='View'>
             <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
             <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>

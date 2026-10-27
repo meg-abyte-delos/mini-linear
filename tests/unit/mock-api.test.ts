@@ -24,4 +24,10 @@ describe('mock api', () => {
     s.remove(a.id);
     expect(s.update(a.id, { title: 'z' })).toBeNull();
   });
+  it('update keeps unrelated fields', () => {
+    const s = createStore();
+    const a = s.create({ title: 'a', description: 'd', status: 'in_progress', priority: 2, assignee_id: 'u1' });
+    const u = s.update(a.id, { title: 'b' })!;
+    expect(u).toMatchObject({ title: 'b', description: 'd', status: 'in_progress', priority: 2, assignee_id: 'u1' });
+  });
 });

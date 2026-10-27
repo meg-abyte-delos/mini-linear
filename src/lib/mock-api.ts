@@ -9,6 +9,14 @@ export const issueInput = z.object({
   priority: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).default(0),
   assignee_id: z.string().nullable().default(null),
 });
+// Patch schema: no defaults, so omitted fields stay untouched on update.
+export const issuePatch = z.object({
+  title: issueInput.shape.title.optional(),
+  description: z.string().max(100_000).optional(),
+  status: z.enum(STATUSES).optional(),
+  priority: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
+  assignee_id: z.string().nullable().optional(),
+}).strict();
 export type IssueInput = z.input<typeof issueInput>;
 
 export function createStore(seed: Issue[] = []) {
@@ -30,7 +38,7 @@ export function createStore(seed: Issue[] = []) {
     update(id: string, patch: Partial<IssueInput>): Issue | null {
       const cur = all.find((i) => i.id === id && i.deleted_at === null);
       if (!cur) return null;
-      const v = issueInput.partial().parse(patch);
+      const v = issuePatch.parse(patch);
       Object.assign(cur, v, { version: cur.version + 1 });
       return { ...cur };
     },
