@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
+import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/mock-api';
 import { createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
@@ -242,12 +243,27 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   function openPalette() { returnFocus.current = document.activeElement as HTMLElement | null; setPalette(true); setQ(''); setPi(0); }
   function closePalette() { setPalette(false); const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
 
+  const [help, setHelp] = useState(false);
+  const [multi, setMulti] = useState<string[]>([]);
+  function toggleSelect(id: string | undefined) { if (id) setMulti((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id])); }
+  // Shift+J/K: move the cursor and add both ends to the selection.
+  function extend(dir: 1 | -1) {
+    const list = orderedRef.current; if (!list.length) return;
+    const idx = Math.max(0, list.findIndex((i) => i.id === currentIdRef.current));
+    const n = Math.min(Math.max(idx + dir, 0), list.length - 1);
+    setMulti((m) => Array.from(new Set([...m, list[idx]!.id, list[n]!.id])));
+    setSelId(list[n]!.id);
+  }
+  const hint = (id: string) => { const d = SHORTCUTS.find((x) => x.id === id); return d ? formatKeys(d.keys).replace(' then ', ' ') : undefined; };
   const commands: Cmd[] = [
-    { id: 'create', label: 'Create issue', hint: 'C', run: create },
-    { id: 'list', label: 'Go to list view', run: () => setView('list') },
-    { id: 'board', label: 'Go to board view', run: () => setView('board') },
+    { id: 'help', label: 'Keyboard shortcuts', hint: '?', run: () => setHelp(true) },
+    { id: 'toggle-select', label: 'Select / unselect issue', hint: hint('toggle-select'), run: () => toggleSelect(currentIdRef.current) },
+    { id: 'clear-select', label: 'Clear selection', run: () => setMulti([]) },
+    { id: 'create', label: 'Create issue', hint: hint('create'), run: create },
+    { id: 'list', label: 'Go to issues', hint: hint('go-issues'), run: () => setView('list') },
+    { id: 'board', label: 'Go to board view', hint: hint('go-views'), run: () => setView('board') },
     { id: 'cycles', label: 'Go to cycles', run: () => setView('cycles') },
-    { id: 'projects', label: 'Go to projects', run: () => setView('projects') },
+    { id: 'projects', label: 'Go to projects', hint: hint('go-projects'), run: () => setView('projects') },
     { id: 'go-project', label: 'Go to project…', run: () => setTimeout(() => setProjPick(null), 0) },
     { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
     ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => { if (view === 'cycles' || view === 'projects') setView('list'); setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0); } })),
@@ -261,9 +277,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
   const results = fuzzyFilter(commands, q, (c) => c.label);
-  const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick });
+  const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick }; paletteOpen.current = palette; });
+  const helpOpen = useRef(false);
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -273,31 +290,45 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }, [current]);
 
   useEffect(() => {
+    const matcher = createMatcher();
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault(); if (paletteOpen.current) actions.current.closePalette(); else actions.current.openPalette(); return;
       }
       const t = e.target as HTMLElement;
-      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') {
+      if (isTypingTarget(t)) {
         if (e.key === 'Escape' && paletteOpen.current) actions.current.closePalette();
         return;
       }
       if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); actions.current.reorder(e.key === 'ArrowUp' ? -1 : 1); return; }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const k = e.key.toLowerCase();
-      if (e.key === 'Escape') { setOpen(false); if (paletteOpen.current) actions.current.closePalette(); }
-      else if (k === 'j' || k === 'k') {
-        const list = orderedRef.current; if (!list.length) return;
-        const idx = Math.max(0, list.findIndex((i) => i.id === currentIdRef.current));
-        const n = Math.min(Math.max(idx + (k === 'j' ? 1 : -1), 0), list.length - 1);
-        setSelId(list[n]!.id);
+      if (helpOpen.current && e.key !== 'Escape') return;
+      const key = keyOf(e); if (!key) return;
+      if (key === 'Enter' && t.closest('button, a, [role="button"], select')) { matcher.reset(); return; }
+      const id = matcher.feed(key);
+      if (!id) return;
+      if (id === 'pending') { e.preventDefault(); return; }
+      switch (id) {
+        case 'escape': setOpen(false); actions.current.setHelp(false); actions.current.clearMulti(); if (paletteOpen.current) actions.current.closePalette(); break;
+        case 'next': case 'prev': {
+          const list = orderedRef.current; if (!list.length) break;
+          const idx = Math.max(0, list.findIndex((i) => i.id === currentIdRef.current));
+          setSelId(list[Math.min(Math.max(idx + (id === 'next' ? 1 : -1), 0), list.length - 1)]!.id); break;
+        }
+        case 'extend-next': e.preventDefault(); actions.current.extend(1); break;
+        case 'extend-prev': e.preventDefault(); actions.current.extend(-1); break;
+        case 'toggle-select': actions.current.toggleSelect(currentIdRef.current); break;
+        case 'open': setOpen(true); break;
+        case 'create': e.preventDefault(); actions.current.create(); break;
+        case 'status': actions.current.cycleStatus(); break;
+        case 'priority': e.preventDefault(); actions.current.openPick('priority'); break;
+        case 'assignee': e.preventDefault(); actions.current.openPick('assignee'); break;
+        case 'label': e.preventDefault(); actions.current.openPick('label'); break;
+        case 'go-issues': actions.current.setView('list'); break;
+        case 'go-views': actions.current.setView('board'); break;
+        case 'go-projects': actions.current.setView('projects'); break;
+        case 'help': e.preventDefault(); actions.current.setHelp(true); break;
       }
-      else if (e.key === 'Enter') { if (!t.closest('button, a, [role="button"], select')) setOpen(true); }
-      else if (k === 'c') { e.preventDefault(); actions.current.create(); }
-      else if (k === 's') actions.current.cycleStatus();
-      else if (k === 'p') { e.preventDefault(); actions.current.openPick('priority'); }
-      else if (k === 'a') { e.preventDefault(); actions.current.openPick('assignee'); }
-      else if (k === 'l') { e.preventDefault(); actions.current.openPick('label'); }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -308,7 +339,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
   const row = (i: Issue) => (
-    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
+    <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <PriorityIcon priority={i.priority} />
       <span className='id'>{i.identifier ?? i.id}</span>
       <StatusIcon status={i.status} />
@@ -319,7 +350,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     </div>
   );
   const card = (i: Issue, pos?: number, size?: number) => (
-    <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
+    <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
       <div className='card-meta'><PriorityIcon priority={i.priority} />{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
@@ -456,6 +487,16 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             <dt>Assignee</dt><dd>{assignee(current)}{who(current.assignee_id)?.name ?? 'Unassigned'}</dd>
           </dl>
         </aside>
+      )}
+      {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
+      {help && (
+        <div className='overlay' onClick={() => setHelp(false)}>
+          <div className='palette' role='dialog' aria-modal='true' aria-label='Keyboard shortcuts' onClick={(e) => e.stopPropagation()} ref={(el) => el?.focus()} tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setHelp(false); } }}>
+            {(['Issues', 'Navigation', 'Selection', 'General'] as const).map((g) => (
+              <section key={g}><h3>{g}</h3><ul>{SHORTCUTS.filter((d) => d.group === g).map((d) => <li key={d.id}><span>{d.label}</span><kbd>{formatKeys(d.keys)}</kbd></li>)}</ul></section>
+            ))}
+          </div>
+        </div>
       )}
       {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}</div>}
       {pick && <Picker title={pick.kind === 'priority' ? 'Set priority' : pick.kind === 'assignee' ? 'Set assignee' : 'Set labels'} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}

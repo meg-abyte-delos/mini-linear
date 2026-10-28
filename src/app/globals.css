@@ -129,3 +129,4 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .cycle button { height:24px; padding:0 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--fg); cursor:pointer; font:inherit; font-size:var(--fs-sm); }
 
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--bg-elev,#1c1c22);color:var(--fg,#eee);border:1px solid var(--border,#333);padding:8px 14px;border-radius:8px;font-size:13px;z-index:50;cursor:pointer}
+[data-multi] { background: rgba(94,106,210,.18); }
