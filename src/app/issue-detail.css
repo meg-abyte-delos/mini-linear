@@ -52,3 +52,7 @@
 .branch{font-size:var(--fs-xs);color:var(--muted-strong);word-break:break-all}
 .idp .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--raised);border:1px solid var(--line);border-radius:var(--r-md);padding:8px 14px}
 @media (max-width:860px){.idp{grid-template-columns:1fr}.idp-side{border-left:0;border-top:1px solid var(--line)}}
+
+.feed .ev{position:relative;padding-left:16px}.feed .ev .dot{position:absolute;left:3px;top:11px;width:6px;height:6px;border-radius:50%;background:var(--line)}
+.feed .tl-cmt{margin:var(--sp-2) 0;color:var(--fg)}
+.cmt-actions{float:right;display:inline-flex;gap:4px;opacity:0}.cmt:hover .cmt-actions,.cmt:focus-within .cmt-actions{opacity:1}.cmt-actions button{border:0;background:none;color:var(--muted);padding:0 6px;font-size:12px}.cmt-actions button:hover{color:var(--fg)}

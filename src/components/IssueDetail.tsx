@@ -184,6 +184,21 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
     setComments((c) => [...c, r && r.ok ? r.data : { id: lid('c'), body, author_id: ME, parent_comment_id: parentId, created_at: now(), reactions: [] }]);
     return true;
   }
+  async function editComment(c: Comment, body: string) {
+    const r = client ? await client.editComment(c.id, body, c.version ?? 1) : null;
+    if (r && !r.ok && !r.unsupported) { setToast(r.status === 412 ? 'Comment changed elsewhere. Reload to edit.' : r.status === 403 ? 'Only the author can edit this comment' : 'Could not edit the comment'); return false; }
+    setComments((cs) => cs.map((x) => (x.id === c.id ? (r && r.ok ? { ...x, ...r.data, reactions: x.reactions } : { ...x, body, edited_at: now(), version: (x.version ?? 1) + 1 }) : x)));
+    if (!client) log('edited a comment');
+    return true;
+  }
+  async function removeComment(c: Comment) {
+    if (!window.confirm('Delete this comment? Replies are deleted with it.')) return;
+    const r = client ? await client.deleteComment(c.id, c.version ?? 1) : null;
+    if (r && !r.ok && !r.unsupported) { setToast(r.status === 403 ? 'Only the author or an admin can delete this comment' : 'Could not delete the comment'); return; }
+    setComments((cs) => cs.filter((x) => x.id !== c.id && x.parent_comment_id !== c.id));
+    if (!client) log('deleted a comment');
+    else void client.activity(issue.id).then((a) => a.ok && a.data.items.length && setActivity(a.data.items));
+  }
   async function toggleReaction(c: Comment, emoji: string) {
     const cur = c.reactions?.find((x) => x.emoji === emoji);
     const on = !reactedBy(cur, ME);
@@ -200,6 +215,11 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
 
   const roots = comments.filter((c) => !c.parent_comment_id);
   const replies = (id: string) => comments.filter((c) => c.parent_comment_id === id);
+  // One chronological timeline: thread roots interleave with change events (comment events are shown by the comment itself).
+  const timeline = [
+    ...activity.filter((a) => !/^(commented|edited a comment)$/.test(a.summary ?? a.action)).map((at) => ({ kind: 'event' as const, at, ts: Date.parse(at.created_at) || 0 })),
+    ...roots.map((c) => ({ kind: 'comment' as const, c, ts: Date.parse(c.created_at) || 0 })),
+  ].sort((a, b) => a.ts - b.ts);
   const pr = progress(children);
   const due = dueState(issue.due_date, today);
   const pickTitle: Record<PickKind, string> = { status: 'Change status', priority: 'Set priority', assignee: 'Assign to', labels: 'Change labels', project: 'Move to project', cycle: 'Move to cycle', parent: 'Set parent issue', relation: `Add relation: ${pick?.relType ? REL_LABEL[pick.relType] : ''}` };
@@ -268,11 +288,10 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
         <section className='idp-sec' aria-labelledby='h-act'>
           <h2 id='h-act'>Activity</h2>
           <ol className='feed' aria-label='Activity'>
-            {activity.map((a) => <li key={a.id} className='ev'><span className='who'>{who(a.actor_id)?.name ?? 'Someone'}</span> {a.summary ?? a.action} <time dateTime={a.created_at}>{fmtTime(a.created_at)}</time></li>)}
+            {timeline.map((t) => t.kind === 'event'
+              ? <li key={t.at.id} className='ev'><span className='dot' aria-hidden='true' /><span className='who'>{who(t.at.actor_id)?.name ?? 'Someone'}</span> {t.at.summary ?? t.at.action} <time dateTime={t.at.created_at}>{fmtTime(t.at.created_at)}</time></li>
+              : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canManage={(x) => !!client || x.author_id === ME} readOnly={readOnly} /></li>)}
           </ol>
-          <ul className='threads' aria-label='Comments'>
-            {roots.map((c) => <CommentItem key={c.id} c={c} replies={replies(c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, c.id)} readOnly={readOnly} />)}
-          </ul>
           {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} />}
         </section>
       </main>
@@ -297,12 +316,14 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
   );
 }
 
-function CommentItem({ c, replies, onReact, onReply, readOnly }: { c: Comment; replies: Comment[]; onReact: (c: Comment, e: string) => void; onReply: (b: string) => Promise<boolean>; readOnly: boolean }) {
+function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canManage, readOnly }: { c: Comment; replies: Comment[]; onReact: (c: Comment, e: string) => void; onReply: (b: string) => Promise<boolean>; onEdit: (c: Comment, b: string) => Promise<boolean>; onDelete: (c: Comment) => void; canManage: (c: Comment) => boolean; readOnly: boolean }) {
   const [replying, setReplying] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
   const one = (x: Comment) => (
     <article className='cmt' aria-label={`Comment by ${who(x.author_id)?.name ?? 'Someone'}`}>
-      <header><span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time></header>
-      <Markdown source={x.body} empty='' />
+      <header><span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time>{x.edited_at && <span className='dim'> (edited)</span>}
+        {!readOnly && canManage(x) && editing !== x.id && <span className='cmt-actions'><button aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</button><button aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</button></span>}</header>
+      {editing === x.id ? <Composer label='Edit comment' initial={x.body} autoFocus submitLabel='Save' onSubmit={async (b) => { const ok = await onEdit(x, b); if (ok) setEditing(null); return ok; }} onCancel={() => setEditing(null)} /> : <Markdown source={x.body} empty='' />}
       <div className='reacts' role='group' aria-label='Reactions'>
         {EMOJIS.map((e) => { const r = x.reactions?.find((y) => y.emoji === e); return (r || !readOnly) && <button key={e} className={reactedBy(r, ME) ? 'on' : ''} aria-pressed={reactedBy(r, ME)} aria-label={`React ${e}${r ? `, ${r.count}` : ''}`} disabled={readOnly} onClick={() => onReact(x, e)}>{e}{r && <span>{r.count}</span>}</button>; })}
       </div>
@@ -317,9 +338,9 @@ function CommentItem({ c, replies, onReact, onReply, readOnly }: { c: Comment; r
   );
 }
 
-function Composer({ label, onSubmit, onCancel, autoFocus }: { label: string; onSubmit: (b: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean }) {
-  const [text, setText] = useState('');
-  const [caret, setCaret] = useState(0);
+function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLabel }: { label: string; onSubmit: (b: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean; initial?: string; submitLabel?: string }) {
+  const [text, setText] = useState(initial);
+  const [caret, setCaret] = useState(initial.length);
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
   const at = activeMention(text, caret);
@@ -332,7 +353,7 @@ function Composer({ label, onSubmit, onCancel, autoFocus }: { label: string; onS
     setText(r.text); setCaret(r.caret);
     requestAnimationFrame(() => { ref.current?.setSelectionRange(r.caret, r.caret); ref.current?.focus(); });
   }
-  async function submit() { const b = text.trim(); if (!b) return; if (await onSubmit(b)) { setText(''); setCaret(0); } }
+  async function submit() { const b = text.trim(); if (!b) return; if (await onSubmit(b)) { if (!initial) { setText(''); setCaret(0); } } }
   return (
     <div className='composer'>
       <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}… (@ to mention, ⌘↵ to send)`} rows={3} value={text}
@@ -350,7 +371,7 @@ function Composer({ label, onSubmit, onCancel, autoFocus }: { label: string; onS
           if (e.key === 'Escape' && onCancel) onCancel();
         }} />
       {list.length > 0 && <ul id={listId} role='listbox' aria-label='Mention a teammate' className='mention-list'>{list.map((u, k) => <li key={u.id} id={`${listId}-${u.id}`} role='option' aria-selected={k === idx} onMouseDown={(e) => { e.preventDefault(); choose(u); }}>{u.name} <span className='dim'>@{u.handle}</span></li>)}</ul>}
-      <div className='composer-actions'>{onCancel && <button onClick={onCancel}>Cancel</button>}<button className='primary' disabled={!text.trim()} onClick={() => void submit()}>{label === 'Reply' ? 'Reply' : 'Comment'}</button></div>
+      <div className='composer-actions'>{onCancel && <button onClick={onCancel}>Cancel</button>}<button className='primary' disabled={!text.trim()} onClick={() => void submit()}>{submitLabel ?? (label === 'Reply' ? 'Reply' : 'Comment')}</button></div>
     </div>
   );
 }
