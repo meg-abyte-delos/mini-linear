@@ -67,6 +67,8 @@ export const clientIp = (req: Request): string => {
 };
 
 /** Housekeeping: drop windows older than a day. Safe to call from anywhere. */
+/** Retention of the realtime change feed (sync_events, presence): SECURITY DEFINER function, 7 days by default. */
+export const purgeSync = (sql: postgres.Sql) => sql`select purge_sync_events()`;
 export const purgeOld = (sql: postgres.Sql) => sql`delete from rate_limits where window_start < now() - interval '1 day'`;
 
 
@@ -81,7 +83,11 @@ export const startPurgeScheduler = (
   opts: { intervalMs?: number; log?: (m: string) => void } = {},
 ): (() => void) => {
   const log = opts.log ?? ((m: string) => console.error(m));
-  const run = () => { void Promise.resolve(purgeOld(sql)).catch((e: unknown) => log(`[mini-linear] rate_limits purge failed: ${e instanceof Error ? e.message : String(e)}`)); };
+  const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+  const run = () => {
+    void Promise.resolve(purgeOld(sql)).catch((e: unknown) => log(`[mini-linear] rate_limits purge failed: ${msg(e)}`));
+    void Promise.resolve(purgeSync(sql)).catch((e: unknown) => log(`[mini-linear] sync_events purge failed: ${msg(e)}`));
+  };
   run();
   const timer = setInterval(run, opts.intervalMs ?? PURGE_INTERVAL_MS);
   timer.unref?.();
