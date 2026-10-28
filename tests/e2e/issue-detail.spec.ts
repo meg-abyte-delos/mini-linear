@@ -105,3 +105,37 @@ test('copy branch shortcut, archive, delete and restore', async ({ page, context
   await page.getByRole('button', { name: 'Restore' }).click();
   await expect(page.locator('.idp-banner')).toHaveCount(0);
 });
+
+test('comments: edit, delete, and one chronological timeline with change events', async ({ page }) => {
+  await ready(page);
+  const feed = page.getByRole('list', { name: 'Activity' });
+  const box = page.getByRole('combobox', { name: 'Leave a comment' });
+  await box.fill('first **draft**');
+  await page.getByRole('button', { name: 'Comment', exact: true }).click();
+  const c = page.getByRole('article', { name: /Comment by/ }).first();
+  await expect(c.locator('strong')).toHaveText('draft');
+  await c.hover();
+  await c.getByRole('button', { name: 'Edit comment' }).click();
+  const ed = page.getByRole('combobox', { name: 'Edit comment' });
+  await expect(ed).toHaveValue('first **draft**');
+  await ed.fill('final _text_');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(c.locator('em')).toHaveText('text');
+  await expect(c).toContainText('(edited)');
+  // change events (assignee, label) interleave with the comment, in time order
+  const side = page.getByRole('complementary', { name: 'Properties' });
+  await side.getByRole('button', { name: /unassigned|[A-Z][a-z]+ [A-Z]/ }).first().click();
+  await page.keyboard.press('Enter');
+  await expect(feed).toContainText(/assigned to|removed the assignee/);
+  await page.getByLabel('Estimate').selectOption('3');
+  const items = await feed.locator('> li').allTextContents();
+  const ci = items.findIndex((t) => t.includes('final'));
+  const ei = items.findIndex((t) => t.includes('set estimate to 3'));
+  expect(ci).toBeGreaterThan(-1);
+  expect(ei).toBeGreaterThan(ci);
+  page.once('dialog', (d) => void d.accept());
+  await c.hover();
+  await c.getByRole('button', { name: 'Delete comment' }).click();
+  await expect(page.getByRole('article', { name: /Comment by/ })).toHaveCount(0);
+  await expect(feed).toContainText('deleted a comment');
+});
