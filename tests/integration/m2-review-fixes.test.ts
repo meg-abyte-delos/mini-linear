@@ -28,15 +28,17 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
   });
   afterAll(async () => { await db().end(); await owner.end(); });
 
+  // request_id is per-request (S11), exclude it from body equality
+  const noReq = (b: any) => { if (b?.error) { const { request_id: _r, ...e } = b.error; return { ...b, error: e }; } const { request_id: _q, ...rest } = b ?? {}; return rest; };
   it("assignee_id: non-guest member of this workspace only; same 422 for unknown, cross-tenant and guest (create + PATCH)", async () => {
     const create = (assignee_id: string) => send(I.createIssue as Fn, seed.a.member, "POST", { team_id: teamA, title: "x", assignee_id }, seed.a.slug);
     const bodies = [];
-    for (const bad of [randomUUID(), seed.b.member, seed.a.guest]) { const r = await create(bad); expect(r.status).toBe(422); bodies.push(await r.json()); }
+    for (const bad of [randomUUID(), seed.b.member, seed.a.guest]) { const r = await create(bad); expect(r.status).toBe(422); bodies.push(noReq(await r.json())); }
     expect(bodies[1]).toEqual(bodies[0]); expect(bodies[2]).toEqual(bodies[0]); // no existence oracle
     const ok = await create(seed.a.admin); expect(ok.status).toBe(201);
     const issue = await ok.json(); expect(issue.assignee_id).toBe(seed.a.admin);
     for (const bad of [randomUUID(), seed.b.member, seed.a.guest]) {
-      const r = await patch(seed.a.member, issue.id, 1, { assignee_id: bad }); expect(r.status).toBe(422); expect(await r.json()).toEqual(bodies[0]);
+      const r = await patch(seed.a.member, issue.id, 1, { assignee_id: bad }); expect(r.status).toBe(422); expect(noReq(await r.json())).toEqual(bodies[0]);
     }
     expect((await patch(seed.a.member, issue.id, 1, { assignee_id: seed.a.owner })).status).toBe(200);
     expect((await patch(seed.a.member, issue.id, 2, { assignee_id: null })).status).toBe(200); // unassign still fine

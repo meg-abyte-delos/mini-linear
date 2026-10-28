@@ -46,7 +46,8 @@ export async function world() {
   };
   const issue = (c: pg.PoolClient, ws: string, team: string, n: number, by: string) => {
     const id = randomUUID();
-    return c.query('insert into issues (id, workspace_id, team_id, number, title, sort_key, created_by) values ($1,$2,$3,$4,$5,$6,$7)', [id, ws, team, n, `seed ${n}`, `a${n}`, by]).then(() => id);
+    return c.query('insert into issues (id, workspace_id, team_id, number, title, sort_key, created_by) values ($1,$2,$3,$4,$5,$6,$7)', [id, ws, team, n, `seed ${n}`, `a${n}`, by])
+      .then(() => c.query('update teams set issue_seq = greatest(issue_seq, $2) where id = $1', [team, n])).then(() => id);
   };
   // slugs w1/w2 are what the suites address (`/api/v1/w/w1`): reuse them if a previous file already seeded them.
   await freeSlug('w1'); await freeSlug('w2');

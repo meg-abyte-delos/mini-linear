@@ -102,7 +102,7 @@ describe.runIf(runIntegration)('S12 migrations', () => {
       const pol = (await p.query(`select qual, with_check from pg_policies where tablename=$1`, [x.relname])).rows;
       expect(pol.length, x.relname + ' policy').toBeGreaterThan(0);
       for (const o of pol) {
-        expect(o.qual).toMatch(/current_setting\('app\.workspace_id'(, true)?\)/);
+        expect(String(o.qual).replace(/[()\s]/g, '').toLowerCase()).toContain("workspace_id=nullifcurrent_setting'app.workspace_id'");
         expect(o.with_check).toMatch(/app\.workspace_id/);
       }
     }
