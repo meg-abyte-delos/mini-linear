@@ -5,7 +5,7 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, fmtDate, type Issue, typ
 import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
 import { Picker, type PickOption } from '@/components/Picker';
 import { Markdown } from '@/components/Markdown';
-import { patchIssue } from '@/lib/api-client';
+import { createIssue, patchIssue } from '@/lib/api-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
 import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
 import { activeMention, insertMention, suggest, type MentionUser } from '@/lib/detail/mentions';
@@ -13,6 +13,8 @@ import { safeHref } from '@/lib/detail/markdown';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
 type PickKind = 'status' | 'priority' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent' | 'relation';
+const REL_GROUP: Record<Relation['type'], string> = { blocks: 'Blocks', blocked_by: 'Blocked by', related: 'Related', duplicate: 'Duplicate of' };
+const REL_ORDER: Relation['type'][] = ['blocks', 'blocked_by', 'related', 'duplicate'];
 const REL_LABEL: Record<Relation['type'], string> = { blocks: 'Blocks', blocked_by: 'Blocked by', related: 'Related to', duplicate: 'Duplicate of' };
 const ESTIMATES = [0, 1, 2, 3, 5, 8, 13];
 const EMOJIS = ['👍', '🎉', '❤️', '👀'];
@@ -30,7 +32,7 @@ function wrapSel(el: HTMLTextAreaElement, before: string, after = before, placeh
   return value.slice(0, s) + before + sel + after + value.slice(e);
 }
 
-export function IssueDetail({ slug, initial, all, meta, api, today, viewer = null }: { slug: string; initial: DetailIssue; all: DetailIssue[]; meta: Meta; api: boolean; today: string; viewer?: { userId: string | null; role: string } | null }) {
+export function IssueDetail({ slug, initial, all, meta, api, today, viewer = null, teamId }: { teamId?: string; slug: string; initial: DetailIssue; all: DetailIssue[]; meta: Meta; api: boolean; today: string; viewer?: { userId: string | null; role: string } | null }) {
   const [issue, setIssue] = useState<DetailIssue>(initial);
   const [others, setOthers] = useState<DetailIssue[]>(all.filter((i) => i.id !== initial.id));
   const [title, setTitle] = useState(initial.title);
@@ -44,6 +46,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
   const [toast, setToast] = useState<string | null>(null);
   const [linkForm, setLinkForm] = useState<{ url: string; title: string } | null>(null);
   const [relMenu, setRelMenu] = useState(false);
+  const [adding, setAdding] = useState(false);
   const descRef = useRef<HTMLTextAreaElement>(null);
   const version = useRef(initial.version);
   const client = useMemo(() => (api ? detailApi(slug) : null), [api, slug]);
@@ -116,7 +119,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
       case 'project': return [{ id: '', label: 'No project', checked: !issue.project_id }, ...meta.projects.map((p) => ({ id: p.id, label: p.name, checked: issue.project_id === p.id }))];
       case 'cycle': return [{ id: '', label: 'No cycle', checked: !issue.cycle_id }, ...meta.cycles.map((c) => ({ id: c.id, label: c.name, checked: issue.cycle_id === c.id }))];
       case 'parent': return [{ id: '', label: 'No parent', checked: !issue.parent_id }, ...others.filter((o) => o.parent_id !== issue.id && !o.deleted_at).map((o) => ({ id: o.id, label: `${identifierOf(o)} ${o.title}`, checked: issue.parent_id === o.id }))];
-      case 'relation': return others.filter((o) => !o.deleted_at && !relations.some((r) => r.related_issue_id === o.id)).map((o) => ({ id: o.id, label: `${identifierOf(o)} ${o.title}` }));
+      case 'relation': return others.filter((o) => !o.deleted_at && !relations.some((r) => r.related_issue_id === o.id)).map((o) => ({ id: o.id, label: `${identifierOf(o)} ${o.title}`, lead: <StatusIcon status={o.status} /> }));
     }
   }
   async function onPick(id: string) {
@@ -146,7 +149,14 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
     log('removed a relation');
   }
 
-  function addSubIssue(t: string) {
+  async function addSubIssue(t: string) {
+    if (api && teamId) {
+      const row = await createIssue(slug, teamId, t, undefined, issue.id);
+      if (!row) { setToast('Could not create the sub-issue'); return; }
+      setOthers((o) => [...o, { ...row, parent_id: issue.id } as DetailIssue]);
+      log(`added sub-issue ${identifierOf(row)}`);
+      return;
+    }
     const n = others.length + 2000;
     const child: DetailIssue = { ...issue, id: `${ident.split('-')[0] ?? 'DEL'}-${n}`, identifier: undefined, title: t, description: '', status: 'todo', parent_id: issue.id, label_ids: [], version: 1, created_at: now(), deleted_at: null, archived_at: null };
     setOthers((o) => [...o, child]);
@@ -242,6 +252,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
           </div>
         </header>
         {(issue.archived_at || issue.deleted_at) && <p className='idp-banner' role='status'>{issue.deleted_at ? 'This issue is in the trash. Restore it to edit.' : `Archived ${fmtDate(issue.archived_at as string)}.`}</p>}
+        {parent && <Link className='parent-crumb' href={`/w/${slug}/issue/${identifierOf(parent)}`}><span className='id'>{identifierOf(parent)}</span> {parent.title}</Link>}
         <label className='sr-only' htmlFor='idp-title'>Title</label>
         <input id='idp-title' className='idp-title' value={title} maxLength={255} readOnly={readOnly} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } if (e.key === 'Escape') { setTitle(issue.title); e.currentTarget.blur(); } }} />
 
@@ -268,15 +279,24 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
         </section>
 
         <section className='idp-sec' aria-labelledby='h-sub'>
-          <h2 id='h-sub'>Sub-issues {pr.total > 0 && <span className='count'>{pr.done}/{pr.total}</span>}</h2>
-          <ul className='idp-rows'>{children.map((c) => <li key={c.id}><StatusIcon status={c.status} /><Link href={`/w/${slug}/issue/${identifierOf(c)}`}><span className='id'>{identifierOf(c)}</span> {c.title}</Link></li>)}</ul>
-          {!readOnly && <form className='inline-add' onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (new FormData(f).get('t') as string ?? '').trim(); if (t) { addSubIssue(t); f.reset(); } }}><label className='sr-only' htmlFor='sub-t'>New sub-issue title</label><input id='sub-t' name='t' placeholder='Add sub-issue…' maxLength={255} /><button type='submit'>Add</button></form>}
+          <h2 id='h-sub'>Sub-issues {pr.total > 0 && <><span className='count'>{pr.done}/{pr.total}</span><span className='sub-bar' role='img' aria-label={`${pr.done} of ${pr.total} sub-issues done`}><span style={{ width: `${Math.round((pr.done / pr.total) * 100)}%` }} /></span></>}
+            {!readOnly && <button className='sec-add' aria-label='Add sub-issue' onClick={() => setAdding(true)}>+</button>}</h2>
+          {children.length > 0 && <ul className='idp-rows'>{children.map((c) => <li key={c.id} className={c.status === 'done' ? 'is-done' : undefined}><Link className='row-link' href={`/w/${slug}/issue/${identifierOf(c)}`}><StatusIcon status={c.status} /><span className='id'>{identifierOf(c)}</span><span className='t'>{c.title}</span>{(() => { const u = who(c.assignee_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}</Link></li>)}</ul>}
+          {!readOnly && adding && <form className='inline-add' onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (new FormData(f).get('t') as string ?? '').trim(); if (t) { void addSubIssue(t); f.reset(); } }}><label className='sr-only' htmlFor='sub-t'>New sub-issue title</label><input id='sub-t' name='t' autoFocus placeholder='Sub-issue title, Enter to create' maxLength={255} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAdding(false); } }} /><button type='submit'>Add</button></form>}
+          {!readOnly && !adding && children.length > 0 && <button className='add-row' onClick={() => setAdding(true)}>+ Add sub-issue</button>}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-rel'>
-          <h2 id='h-rel'>Relations</h2>
-          <ul className='idp-rows'>{relations.map((r) => { const o = byId(r.related_issue_id); return <li key={r.id}><span className='rel-type'>{REL_LABEL[r.type]}</span>{o ? <Link href={`/w/${slug}/issue/${identifierOf(o)}`}><span className='id'>{identifierOf(o)}</span> {o.title}</Link> : <span>{r.related_issue_id}</span>}{!readOnly && <button className='x' aria-label={`Remove relation ${REL_LABEL[r.type]} ${o ? identifierOf(o) : ''}`} onClick={() => void removeRelation(r)}>×</button>}</li>; })}</ul>
-          {!readOnly && <div className='rel-add'><button aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}>Add relation</button>{relMenu && <div role='menu' className='menu'>{(Object.keys(REL_LABEL) as Relation['type'][]).map((t) => <button role='menuitem' key={t} onClick={(e) => { setRelMenu(false); setPick({ kind: 'relation', relType: t, rect: e.currentTarget.getBoundingClientRect() }); }}>{REL_LABEL[t]}…</button>)}</div>}</div>}
+          <h2 id='h-rel'>Relations
+            {!readOnly && <span className='rel-add'><button className='sec-add' aria-label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}>+</button>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') setRelMenu(false); }}>{REL_ORDER.map((t) => <button role='menuitem' key={t} onClick={(e) => { setRelMenu(false); setPick({ kind: 'relation', relType: t, rect: e.currentTarget.getBoundingClientRect() }); }}>{REL_LABEL[t]}…</button>)}</div>}</span>}
+          </h2>
+          {REL_ORDER.map((t) => { const rs = relations.filter((r) => r.type === t); if (!rs.length) return null; return (
+            <div key={t} className='rel-group'><div className='rel-type' id={`rg-${t}`}>{REL_GROUP[t]}</div>
+              <ul className='idp-rows' aria-labelledby={`rg-${t}`}>{rs.map((r) => { const o = byId(r.related_issue_id); const open = t === 'blocked_by' && !!o && o.status !== 'done'; const u = who(o?.assignee_id); return (
+                <li key={r.id} className={o?.status === 'done' ? 'is-done' : undefined}>
+                  {o ? <Link className='row-link' href={`/w/${slug}/issue/${identifierOf(o)}`}><StatusIcon status={o.status} /><span className='id'>{identifierOf(o)}</span><span className='t'>{o.title}</span>{open && <span className='blocked-flag' title='Still blocking'>Blocked</span>}{u && <Avatar initials={u.initials} hue={u.hue} />}</Link> : <span className='row-link'>{r.related_issue_id}</span>}
+                  {!readOnly && <button className='x' aria-label={`Remove relation ${REL_LABEL[r.type]} ${o ? identifierOf(o) : ''}`} onClick={() => void removeRelation(r)}>×</button>}
+                </li>); })}</ul></div>); })}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-att'>

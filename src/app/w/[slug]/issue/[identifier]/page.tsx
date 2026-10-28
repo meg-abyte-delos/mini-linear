@@ -30,5 +30,5 @@ export default async function IssuePage({ params, searchParams }: { params: Prom
   if (!issue) notFound();
   const testDay = process.env.NODE_ENV !== 'production' || process.env.PERF_SEED === '1' ? (Array.isArray(sp.today) ? sp.today[0] : sp.today) : undefined;
   const today = testDay && /^\d{4}-\d{2}-\d{2}$/.test(testDay) ? testDay : new Date().toISOString().slice(0, 10);
-  return <IssueDetail slug={slug} initial={issue} all={issues} meta={meta} api={!!api} today={today} viewer={viewer} />;
+  return <IssueDetail slug={slug} initial={issue} all={issues} meta={meta} api={!!api} today={today} viewer={viewer} teamId={api?.teamId} />;
 }
