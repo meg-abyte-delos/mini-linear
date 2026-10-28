@@ -125,7 +125,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const returnFocus = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
-  const [pick, setPick] = useState<{ kind: PickKind; id: string; rect: DOMRect | null } | null>(null);
+  const [pick, setPick] = useState<{ kind: PickKind; id: string; ids: string[]; rect: DOMRect | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -145,12 +145,23 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const orderedRef = useRef(ordered);
   const currentIdRef = useRef<string | undefined>(current?.id);
 
+  // Bulk: with a multi-selection, an action applies to every selected issue; otherwise to the current one.
+  const targetIds = () => (multiRef.current.length ? multiRef.current : currentIdRef.current ? [currentIdRef.current] : []);
   function cycleStatus() {
-    if (!current) return;
-    const next = STATUSES[(STATUSES.indexOf(current.status) + 1) % STATUSES.length] as Status;
-    store.current.update(current.id, { status: next });
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
+    for (const id of targetIds()) {
+      const it = store.current.list().find((x) => x.id === id); if (!it) continue;
+      const next = STATUSES[(STATUSES.indexOf(it.status) + 1) % STATUSES.length] as Status;
+      store.current.update(id, { status: next });
+      push(id, { status: next });
+    }
     sync();
-    push(current.id, { status: next });
+  }
+  function setStatusBulk(st: Status) {
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
+    const ids = targetIds();
+    if (ids.length > 1) { for (const id of ids) { const was = store.current.list().find((x) => x.id === id)?.status; store.current.move(id, st, null); if (was && was !== st) push(id, { status: st }); } sync(); setToast(`Moved ${ids.length} issues to ${STATUS_LABEL[st]}`); }
+    else if (ids[0]) moveTo(ids[0], st, null);
   }
   // Drag and drop: drop on a section sets its status (appended); drop on a row/card inserts before it.
   // TODO(M2 ticket): order is client-side only. Only the status change goes to the API until a position field exists.
@@ -182,11 +193,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveTo(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
   function openPick(kind: PickKind) {
-    const id = currentIdRef.current; if (!id) return;
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
+    const ids = targetIds(); const id = ids[0]; if (!id) return;
     // Mock USERS ids are not UUIDs, so an assignment would be local-only: disabled in API mode until GET members exists.
     if (kind === 'assignee' && api) { setToast('Assignee picker needs the members API (not available yet).'); return; }
     const rect = document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.getBoundingClientRect() ?? null;
-    setPick({ kind, id, rect });
+    setPick({ kind, id, ids, rect });
   }
   function closePick() {
     const id = pick?.id; setPick(null);
@@ -194,17 +206,23 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }
   function applyPick(optId: string) {
     if (!pick) return;
-    const cur = store.current.list().find((x) => x.id === pick.id); if (!cur) return;
-    if (pick.kind === 'priority') { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); push(cur.id, { priority: Number(optId) }); sync(); closePick(); }
-    else if (pick.kind === 'assignee') { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); if (isUuid(optId)) push(cur.id, { assignee_id: optId }); else if (optId === 'none') push(cur.id, { assignee_id: null }); /* mock USERS ids are not UUIDs: local only until GET members exists */ sync(); closePick(); }
-    else { const label_ids = cur.label_ids.includes(optId) ? cur.label_ids.filter((l) => l !== optId) : [...cur.label_ids, optId]; store.current.update(cur.id, { label_ids }); push(cur.id, { label_ids }); sync(); }
+    const items = pick.ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x); if (!items.length) return;
+    if (pick.kind === 'priority') { for (const cur of items) { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); push(cur.id, { priority: Number(optId) }); } sync(); closePick(); }
+    else if (pick.kind === 'assignee') { for (const cur of items) { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); if (isUuid(optId)) push(cur.id, { assignee_id: optId }); else if (optId === 'none') push(cur.id, { assignee_id: null }); /* mock USERS ids are not UUIDs: local only until GET members exists */ } sync(); closePick(); }
+    else {
+      // Label toggle on a selection: if every issue has it, remove it from all; otherwise add it to all.
+      const all = items.every((c) => c.label_ids.includes(optId));
+      for (const cur of items) { const label_ids = all ? cur.label_ids.filter((l) => l !== optId) : cur.label_ids.includes(optId) ? cur.label_ids : [...cur.label_ids, optId]; store.current.update(cur.id, { label_ids }); push(cur.id, { label_ids }); }
+      sync();
+    }
   }
   function pickOptions(): PickOption[] {
-    const cur = pick && allIssues.find((x) => x.id === pick.id);
+    const sel = pick ? allIssues.filter((x) => pick.ids.includes(x.id)) : [];
+    const cur = sel[0];
     if (!pick || !cur) return [];
-    if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: cur.priority === n, lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: cur.assignee_id === null, lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: cur.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
-    return LABELS.map((l) => ({ id: l.id, label: l.name, checked: cur.label_ids.includes(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
+    if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: sel.every((x) => x.priority === n), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
+    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    return LABELS.map((l) => ({ id: l.id, label: l.name, checked: sel.every((x) => x.label_ids.includes(l.id)), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
   // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
   function create() {
@@ -272,8 +290,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'go-project', label: 'Go to project…', run: () => setTimeout(() => setProjPick(null), 0) },
     { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
     ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => { if (view === 'cycles' || view === 'projects') setView('list'); setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0); } })),
-    { id: 'status', label: 'Change status of selected issue', hint: 'S', run: cycleStatus },
-    ...STATUSES.map((st) => ({ id: `move-${st}`, label: `Move to ${STATUS_LABEL[st]}`, run: () => { if (currentIdRef.current) moveTo(currentIdRef.current, st, null); } })),
+    { id: 'status', label: multi.length > 1 ? `Cycle status of ${multi.length} selected` : 'Change status of selected issue', hint: 'S', run: cycleStatus },
+    ...STATUSES.map((st) => ({ id: `move-${st}`, label: multi.length > 1 ? `Move ${multi.length} selected to ${STATUS_LABEL[st]}` : `Move to ${STATUS_LABEL[st]}`, run: () => setStatusBulk(st) })),
     { id: 'set-priority', label: 'Set priority…', hint: 'P', run: () => setTimeout(() => openPick('priority'), 0) },
     { id: 'set-assignee', label: 'Set assignee…', hint: 'A', run: () => setTimeout(() => openPick('assignee'), 0) },
     { id: 'set-label', label: 'Set label…', hint: 'L', run: () => setTimeout(() => openPick('label'), 0) },

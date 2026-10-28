@@ -89,3 +89,29 @@ test('? overlay screenshot', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
   await page.screenshot({ path: '/workspace/a5-help-overlay.png' });
 });
+
+test('bulk: palette moves every selected issue, one toast', async ({ page }) => {
+  await page.keyboard.press('x'); await page.keyboard.press('Shift+J');
+  await expect(page.locator('[data-multi]')).toHaveCount(2);
+  await page.keyboard.press('Control+k');
+  await page.getByRole('combobox', { name: 'Search commands' }).fill('selected to done');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Moved 2 issues to Done')).toBeVisible();
+});
+
+test('bulk: priority picker applies to all selected', async ({ page }) => {
+  await page.keyboard.press('x'); await page.keyboard.press('Shift+J');
+  await expect(page.locator('[data-multi]')).toHaveCount(2);
+  const ids = await page.locator('[data-multi]').evaluateAll((els) => els.map((e) => e.getAttribute('data-id')));
+  await page.keyboard.press('p');
+  await page.getByRole('option', { name: /Urgent/ }).click();
+  for (const id of ids) await expect(page.locator(`[data-id="${id}"] .pi-urgent`)).toHaveCount(1);
+});
+
+test('bulk: guests cannot bulk-edit', async ({ page }) => {
+  await page.goto('/?role=guest');
+  await page.waitForSelector('html[data-ready]');
+  await page.keyboard.press('x');
+  await page.keyboard.press('s');
+  await expect(page.getByText('Guests have read-only access.')).toBeVisible();
+});

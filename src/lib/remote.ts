@@ -4,6 +4,7 @@
 import { listIssues } from '@/lib/issues/handlers';
 import { listLabels, listCycles } from '@/lib/resources/labels-cycles';
 import { listProjects } from '@/lib/resources/projects-comments';
+import { getWorkspace } from '@/lib/resources/tenancy';
 import { installDevAuth } from '@/lib/dev-auth';
 import type { Issue, Meta } from '@/lib/issues';
 
@@ -60,4 +61,16 @@ export async function loadRemote(cfg: ApiConfig): Promise<{ issues: Issue[]; met
       projects,
     },
   };
+}
+
+/** Session role in the workspace, from the same handler as GET /w/:slug. Fails closed: anything unknown is a guest (read-only). */
+export type WsRole = 'owner' | 'admin' | 'member' | 'guest';
+export async function loadRole(cfg: ApiConfig): Promise<WsRole> {
+  installDevAuth();
+  try {
+    const res = await getWorkspace(new Request(`http://localhost/api/v1/w/${cfg.slug}`), cfg.slug);
+    if (!res.ok) return 'guest';
+    const r = (await res.json()) as { role?: string };
+    return r.role === 'owner' || r.role === 'admin' || r.role === 'member' ? r.role : 'guest';
+  } catch { return 'guest'; }
 }
