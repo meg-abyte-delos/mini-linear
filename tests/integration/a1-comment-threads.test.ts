@@ -107,7 +107,11 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect([...c.mention_ids].sort()).toEqual([seed.a.admin, seed.a.owner].sort()); // cross-tenant id, unknown handle, code span and self dropped
     const s = await subs(issue);
     expect(s.find((r) => r.user_id === seed.a.owner)?.reason).toBe("mention");
-    const e = await (await mut(P.patchComment as Fn, seed.a.member, "PATCH", 1, { body: "only @guest now" }, seed.a.slug, c.id)).json();
+    // a guest is only mentionable when the issue is shared with them (mention visibility filter); unshared guests are dropped
+    const dropped = await (await mut(P.patchComment as Fn, seed.a.member, "PATCH", 1, { body: "only @guest now" }, seed.a.slug, c.id)).json();
+    expect(dropped.mention_ids).toEqual([]);
+    await asOwner(seed.a.id, (tx) => tx`insert into issue_shares (workspace_id, issue_id, guest_user_id, shared_by) values (${seed.a.id}, ${issue}, ${seed.a.guest}, ${seed.a.admin})`);
+    const e = await (await mut(P.patchComment as Fn, seed.a.member, "PATCH", 2, { body: "only @guest now" }, seed.a.slug, c.id)).json();
     expect(e.mention_ids).toEqual([seed.a.guest]); // mention row kept for a guest...
     expect((await subs(issue)).some((r) => r.user_id === seed.a.guest)).toBe(false); // ...but guests are never auto-subscribed
   });

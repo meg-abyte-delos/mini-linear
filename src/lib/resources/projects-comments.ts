@@ -6,6 +6,7 @@ import { diffOf } from "../audit";
 import { uuidv7 } from "../uuid7";
 import { type Row, stale, out, audit, listPage, afterId, assertAssignee } from "./common";
 import { subscribe } from "./subscriptions";
+import { emit } from "../notifications";
 import { parseMentions, normalizeEmoji, MAX_MENTIONS } from "../comments/mentions";
 
 // ------------------------------------------------ projects (span teams)
@@ -124,25 +125,36 @@ const getComment = async (ctx: Ctx, id: string) => {
   await issueVisible(ctx, r[0].issue_id as string); // hidden issue => hidden comment
   return r[0];
 };
-/** Resolve @mentions to workspace members (RLS-scoped). Ambiguous handles are dropped; unknown ones ignored (no oracle). */
-async function resolveMentions(ctx: Ctx, body: string): Promise<string[]> {
+/**
+ * Resolve @mentions to workspace members who can SEE the issue (admin+: all; member: a team of the issue; guest: active share).
+ * Anyone else is dropped silently (no oracle, and an invisible member must never be subscribed or notified).
+ * Ambiguous handles are dropped; unknown ones ignored.
+ */
+async function resolveMentions(ctx: Ctx, issueId: string, body: string): Promise<string[]> {
   const { ids, handles } = parseMentions(body);
   const found = new Set<string>();
-  if (ids.length) for (const r of await ctx.tx`select user_id from memberships where user_id in ${ctx.tx(ids)}`) found.add(r.user_id as string);
+  const t = ctx.tx;
+  const sees = t`(m.role in ('owner','admin')
+    or (m.role = 'guest' and exists (select 1 from issue_shares s where s.issue_id = ${issueId} and s.guest_user_id = m.user_id and s.revoked_at is null))
+    or (m.role = 'member' and exists (select 1 from issues i join team_memberships tm on tm.team_id = i.team_id and tm.workspace_id = i.workspace_id
+        where i.id = ${issueId} and i.deleted_at is null and tm.user_id = m.user_id)))`;
+  if (ids.length) for (const r of await t`select m.user_id from memberships m where m.user_id in ${t(ids)} and ${sees}`) found.add(r.user_id as string);
   if (handles.length) {
-    const rows = await ctx.tx`select split_part(lower(u.email), '@', 1) as h, array_agg(u.id) as ids from memberships m join users u on u.id = m.user_id
-      where split_part(lower(u.email), '@', 1) in ${ctx.tx(handles)} group by 1`;
+    const rows = await t`select split_part(lower(u.email), '@', 1) as h, array_agg(u.id) as ids from memberships m join users u on u.id = m.user_id
+      where split_part(lower(u.email), '@', 1) in ${t(handles)} and ${sees} group by 1`;
     for (const r of rows) if ((r.ids as string[]).length === 1) found.add((r.ids as string[])[0]!);
   }
   found.delete(ctx.userId); // self-mention is a no-op
   return [...found].slice(0, MAX_MENTIONS);
 }
+/** Stores the comment's mentions and subscribes them. Returns all mentioned ids and the ones added by this call. */
 async function syncMentions(ctx: Ctx, commentId: string, issueId: string, body: string) {
-  const ids = await resolveMentions(ctx, body);
+  const ids = await resolveMentions(ctx, issueId, body);
+  const prev = new Set((await ctx.tx`select user_id from comment_mentions where comment_id = ${commentId}`).map((r) => r.user_id as string));
   await ctx.tx`delete from comment_mentions where comment_id = ${commentId} ${ids.length ? ctx.tx`and user_id not in ${ctx.tx(ids)}` : ctx.tx``}`;
   for (const u of ids) await ctx.tx`insert into comment_mentions (workspace_id, comment_id, user_id) values (${ctx.workspaceId}, ${commentId}, ${u}) on conflict do nothing`;
   await subscribe(ctx, issueId, ids, "mention");
-  return ids;
+  return { ids, added: ids.filter((u) => !prev.has(u)) };
 }
 export const listComments = (req: Request, slug: string, rawIssue: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const issueId = parseId(rawIssue), q = parseQuery(req, listQuery), scope = `comments:${issueId}`, c = afterId(ctx, scope, q);
@@ -163,10 +175,11 @@ export const createComment = (req: Request, slug: string, rawIssue: string) => w
   await ctx.tx`insert into comments (id, workspace_id, issue_id, parent_comment_id, author_id, body) values (${id}, ${ctx.workspaceId}, ${issueId}, ${parent}, ${ctx.userId}, ${b.body})`;
   if (parent) await ctx.tx`update comments set resolved_at = null, resolved_by = null where id = ${parent} and resolved_at is not null`; // a reply reopens the thread
   await subscribe(ctx, issueId, [ctx.userId], "commenter");
-  const mentioned = await syncMentions(ctx, id, issueId, b.body);
+  const { ids: mentioned } = await syncMentions(ctx, id, issueId, b.body);
   const row = await getComment(ctx, id);
   await audit(ctx, "comment", id, "create", { ...diffOf(null, row, COMMENT_F), issue_id: { before: null, after: issueId },
     ...(mentioned.length ? { mention_ids: { before: [], after: mentioned } } : {}) });
+  await emit(ctx, { kind: "comment_created", issueId, commentId: id, mentioned });
   return out(row, 201);
 });
 export const getCommentH = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => out(await getComment(ctx, parseId(rawId))));
@@ -178,9 +191,10 @@ export const patchComment = (req: Request, slug: string, rawId: string) => withW
   if (Number(before.version) !== want) throw stale(before);
   const u = await ctx.tx`update comments set body = ${b.body}, version = version + 1, updated_at = now(), edited_at = now() where id = ${id} and version = ${want} returning id`;
   if (!u.length) throw stale(before);
-  await syncMentions(ctx, id, before.issue_id as string, b.body);
+  const { added } = await syncMentions(ctx, id, before.issue_id as string, b.body);
   const row = await getComment(ctx, id);
   await audit(ctx, "comment", id, "update", diffOf(before, row, ["body"]));
+  await emit(ctx, { kind: "comment_updated", issueId: before.issue_id as string, commentId: id, mentioned: added });
   return out(row);
 });
 export const deleteComment = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {

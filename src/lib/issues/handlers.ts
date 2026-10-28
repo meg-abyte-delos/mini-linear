@@ -9,6 +9,7 @@ import { uuidv7 } from "../uuid7";
 import { assertAssignee, assertTeamVisible, assertTeamWrite, teamVisible } from "../resources/common";
 import { subscribe } from "../resources/subscriptions";
 import { getTemplateRow } from "../resources/templates";
+import { emit } from "../notifications";
 
 const STATUS = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 const FIELDS = ["title", "description", "status", "priority", "assignee_id", "project_id", "cycle_id", "parent_id", "state_id", "estimate", "due_date"];
@@ -160,6 +161,7 @@ export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req,
   const diff = diffOf(null, row, FIELDS);
   if (b.label_ids.length) diff.label_ids = { before: [], after: row.label_ids };
   await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "create", diff });
+  await emit(ctx, { kind: "issue_created", issueId: id, assigneeId: b.assignee_id ?? null });
   const res = await out(ctx, slug, row, 201);
   res.headers.set("Location", `/api/v1/w/${slug}/issues/${id}`);
   return res;
@@ -192,6 +194,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
   const diff = diffOf(before, after, FIELDS);
   if (b.label_ids && JSON.stringify(before.label_ids) !== JSON.stringify(after.label_ids)) diff.label_ids = { before: before.label_ids, after: after.label_ids };
   await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff });
+  await emit(ctx, { kind: "issue_updated", issueId: id, before: { assignee_id: before.assignee_id, status: before.status }, after: { assignee_id: after.assignee_id, status: after.status } });
   return out(ctx, slug, after);
 });
 

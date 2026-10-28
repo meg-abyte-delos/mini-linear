@@ -1,7 +1,7 @@
 // M1 schema (auth/tenancy). Spec v1.1 + Appendix A. Tenant tables carry workspace_id NOT NULL + ENABLE/FORCE RLS
 // with USING + WITH CHECK (see db/migrations/0000_m1_auth_tenancy.sql). IDs are UUIDv7 generated app-side.
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, timestamp, integer, smallint, bigint, date, doublePrecision, jsonb, pgEnum, primaryKey, uniqueIndex, index, unique, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, smallint, bigint, date, doublePrecision, jsonb, boolean, pgEnum, primaryKey, uniqueIndex, index, unique, foreignKey } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("workspace_role", ["owner", "admin", "member", "guest"]);
 
@@ -149,7 +149,7 @@ export const commentMentions = pgTable("comment_mentions", {
 }, (t) => [primaryKey({ columns: [t.commentId, t.userId] })]);
 export const issueSubscribers = pgTable("issue_subscribers", {
   workspaceId: wsId(), issueId: uuid("issue_id").notNull(), userId: uuid("user_id").notNull().references(() => users.id),
-  reason: text("reason").notNull(), createdAt: ts("created_at").notNull().defaultNow(),
+  reason: text("reason").notNull(), muted: boolean("muted").notNull().default(false), createdAt: ts("created_at").notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.issueId, t.userId] })]);
 export const issueShares = pgTable("issue_shares", {
   workspaceId: wsId(), issueId: uuid("issue_id").notNull(), guestUserId: uuid("guest_user_id").notNull().references(() => users.id),
@@ -172,3 +172,16 @@ export const workflowStates = pgTable("workflow_states", {
   position: doublePrecision("position").notNull(), legacyStatus: issueStatusEnum("legacy_status"),
   version: integer("version").notNull().default(1), createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
 });
+
+// --- Area 7 inbox (db/migrations/0700_m7_inbox.sql): RLS = workspace tenant + restrictive per-user policy (app.user_id) ---
+export const notificationTypeEnum = pgEnum("notification_type", ["assigned", "mention", "comment", "status_change", "due_soon"]);
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey(), workspaceId: wsId(), userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }), type: notificationTypeEnum("type").notNull(),
+  issueId: uuid("issue_id").notNull(), commentId: uuid("comment_id"),
+  readAt: ts("read_at"), archivedAt: ts("archived_at"), snoozedUntil: ts("snoozed_until"), createdAt: ts("created_at").notNull().defaultNow(),
+});
+export const notificationPreferences = pgTable("notification_preferences", {
+  workspaceId: wsId(), userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(), inApp: boolean("in_app").notNull().default(true), email: boolean("email").notNull().default(false),
+}, (t) => [primaryKey({ columns: [t.workspaceId, t.userId, t.type] })]);

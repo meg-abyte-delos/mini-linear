@@ -144,3 +144,19 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .search-kind { color:var(--muted); font-size:12px; text-transform:capitalize; }
 .search-snippet { color:var(--muted); font-size:12px; max-width:40%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .search-more { width:auto; margin:12px var(--sp-4); }
+
+/* Inbox */
+.inbox-bar { display:flex; justify-content:space-between; align-items:center; padding:8px 16px; color:var(--muted); font-size:12px; }
+.inbox ul { list-style:none; margin:0; padding:0; }
+.nrow { display:flex; align-items:center; gap:10px; height:36px; padding:0 16px; cursor:default; }
+.nrow:hover, .nrow.sel { background:var(--hover); }
+.nrow.sel { outline:1px solid var(--sel); outline-offset:-1px; }
+.ndot { width:8px; height:8px; border-radius:50%; background:transparent; flex:none; }
+.nrow.unread .ndot { background:#28aba5; }
+.nrow.unread .ntitle { font-weight:600; color:var(--fg); }
+.nid { color:var(--muted); font-size:12px; width:64px; flex:none; }
+.ntitle { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nwho, .ntime { color:var(--muted); font-size:12px; white-space:nowrap; }
+.nact { display:none; gap:4px; }
+.nrow:hover .nact, .nrow.sel .nact, .nrow:focus-within .nact { display:flex; }
+.badge { margin-left:auto; min-width:18px; padding:0 5px; border-radius:9px; background:#28aba5; color:#fff; font-size:11px; line-height:18px; text-align:center; }

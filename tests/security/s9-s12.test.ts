@@ -100,9 +100,14 @@ describe.runIf(runIntegration)('S12 migrations', () => {
       expect((await p.query(`select 1 from pg_constraint where conrelid=$1 and contype='f' and conkey @> array[(select attnum from pg_attribute where attrelid=$1 and attname='workspace_id')]`, [x.oid])).rowCount, x.relname + ' FK').toBeGreaterThan(0);
       if (!['team_memberships', 'invites', 'projects', 'project_teams', 'cycles', 'issue_labels', 'comments'].includes(x.relname)) // known gaps #53, #57 (projects + project_teams), #60 (cycles, issue_labels, comments)
       expect((await p.query(`select 1 from pg_index i where i.indrelid=$1 and i.indkey[0]=(select attnum from pg_attribute where attrelid=$1 and attname='workspace_id')`, [x.oid])).rowCount, x.relname + ' index').toBeGreaterThan(0);
-      const pol = (await p.query(`select qual, with_check from pg_policies where tablename=$1`, [x.relname])).rows;
+      const pol = (await p.query(`select qual, with_check, permissive from pg_policies where tablename=$1`, [x.relname])).rows;
       expect(pol.length, x.relname + ' policy').toBeGreaterThan(0);
+      expect(pol.some((o) => o.permissive === 'PERMISSIVE'), x.relname + ' has a permissive tenant policy').toBe(true);
       for (const o of pol) {
+        if (o.permissive === 'RESTRICTIVE') { // extra per-user narrowing (e.g. inbox recipient_only): must key on app.user_id
+          expect(String(o.qual), x.relname + ' restrictive policy').toMatch(/app\.(user_id|workspace_id)/);
+          continue;
+        }
         expect(String(o.qual).replace(/[()\s]/g, '').toLowerCase()).toContain("workspace_id=nullifcurrent_setting'app.workspace_id'");
         expect(o.with_check).toMatch(/app\.workspace_id/);
       }

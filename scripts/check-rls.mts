@@ -12,6 +12,8 @@ const norm = (e: string | null | undefined) => (e ?? "").toLowerCase().replace(/
 const ID_KEYED = new Set(["workspaces"]);
 const OK_ID = /^\(?id=\(?nullif\(current_setting\('app\.workspace_id',true\),''\)\)?::uuid\)?$/;
 const OK = /workspace_id=\(?nullif\(current_setting\('app\.workspace_id',true\),''\)\)?::uuid/;
+// Per-user RESTRICTIVE policies (Area 7 inbox) AND with tenant_isolation; they may key on app.user_id instead.
+const OK_USER = /user_id=\(?nullif\(current_setting\('app\.user_id',true\),''\)\)?::uuid/;
 const errors: string[] = [];
 const sql = postgres(ownerUrl, { max: 1 });
 
@@ -55,11 +57,12 @@ try {
     }
     if (!t.has_ws) { errors.push(`${t.relname}: no workspace_id and not in allowlist`); continue; }
     if (!t.rls || !t.force) errors.push(`${t.relname}: ENABLE + FORCE RLS required`);
-    const pols = await sql`select qual, with_check, cmd from pg_policies where schemaname='public' and tablename=${t.relname}`;
+    const pols = await sql`select qual, with_check, cmd, permissive from pg_policies where schemaname='public' and tablename=${t.relname}`;
     if (pols.length === 0) errors.push(`${t.relname}: no policy`);
     for (const p of pols) {
       const q = (p.qual ?? "").replace(/\s+/g, " ");
       const w = (p.with_check ?? "").replace(/\s+/g, " ");
+      if (p.permissive === "RESTRICTIVE" && OK_USER.test(norm(q))) { if (p.cmd !== "SELECT" && p.cmd !== "DELETE" && !OK_USER.test(norm(w))) errors.push(`${t.relname}: user policy WITH CHECK missing or wrong`); continue; }
       if (!OK.test(norm(q))) errors.push(`${t.relname}: policy USING must use nullif(current_setting('app.workspace_id', true), '')::uuid`);
       if (p.cmd !== "SELECT" && p.cmd !== "DELETE" && !OK.test(norm(w))) errors.push(`${t.relname}: policy WITH CHECK missing or wrong`);
     }
