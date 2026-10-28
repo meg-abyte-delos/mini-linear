@@ -41,6 +41,16 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect(await u.json()).toMatchObject({ lead_id: null, target_date: null, start_date: "2026-11-01", icon: "rocket", status: "in_progress", version: 2 });
   });
 
+  it("P-5 member_ids is lead/admin only; guests never members", async () => {
+    const p = await (await send(P.createProject as Fn, seed.a.admin, "POST", { name: "P5", team_ids: [teamA], lead_id: seed.a.member }, seed.a.slug)).json();
+    expect((await send(P.createProject as Fn, seed.a.admin, "POST", { name: "x", member_ids: [seed.a.guest] }, seed.a.slug)).status).toBe(422);
+    expect((await mut(P.patchProject as Fn, seed.a.admin, "PATCH", 1, { member_ids: [seed.a.guest] }, seed.a.slug, p.id)).status).toBe(422);
+    const ok = await mut(P.patchProject as Fn, seed.a.member, "PATCH", 1, { member_ids: [seed.a.member] }, seed.a.slug, p.id); // the lead may
+    expect(ok.status).toBe(200); expect((await ok.json()).member_ids).toEqual([seed.a.member]);
+    expect((await mut(P.patchProject as Fn, seed.a.admin, "PATCH", 2, { lead_id: null }, seed.a.slug, p.id)).status).toBe(200); // admin removes the lead
+    expect((await mut(P.patchProject as Fn, seed.a.member, "PATCH", 3, { member_ids: [] }, seed.a.slug, p.id)).status).toBe(403); // ex-lead no longer may
+    expect((await mut(P.patchProject as Fn, seed.a.admin, "PATCH", 3, { member_ids: [] }, seed.a.slug, p.id)).status).toBe(200);
+  });
   it("progress_pct counts done / non-canceled issues; issue assignment to a project", async () => {
     const p = await (await send(P.createProject as Fn, seed.a.admin, "POST", { name: "Prog", team_ids: [teamA] }, seed.a.slug)).json();
     const mk = async (status: string) => (await (await send(I.createIssue as Fn, seed.a.member, "POST", { team_id: teamA, title: status, project_id: p.id, status }, seed.a.slug)).json()).id;
