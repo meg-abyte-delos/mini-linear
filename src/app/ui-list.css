@@ -1,0 +1,11 @@
+/* List view parity with Linear: denser rows, no per-row borders, quiet group headers. Tokens only. */
+.group h2 { height:36px; padding:0 var(--sp-4); font-size:13px; font-weight:500; color:var(--fg); background:color-mix(in srgb, var(--fg) 3%, transparent); border-bottom:0; }
+.group h2 .count { font-size:12px; margin-left:0; }
+.row { gap:8px; border-bottom:0; }
+.row:hover { background:color-mix(in srgb, var(--fg) 4%, transparent); }
+.row[aria-selected=true] { background:color-mix(in srgb, var(--fg) 7%, transparent); box-shadow:none; }
+.row .id { width:56px; flex:none; font-size:12px; color:var(--muted); }
+.row .si, .row .pi { width:14px; height:14px; }
+.row .title { font-weight:500; }
+.row .labels .chip { border-radius:10px; line-height:18px; color:var(--muted); }
+.row .date { color:var(--muted); }
