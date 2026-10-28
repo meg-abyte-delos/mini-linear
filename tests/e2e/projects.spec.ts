@@ -29,3 +29,17 @@ test('palette: Go to project, Assign to me, Copy issue id', async ({ page, conte
   await page.getByRole('option', { name: /^Mini Linear/ }).click();
   await expect(page).toHaveURL(/project=p1/);
 });
+
+test('projects list shows status, lead, target date; roadmap toggle draws bars', async ({ page }) => {
+  await page.goto('/?view=projects');
+  await page.waitForSelector('html[data-ready]');
+  const row = page.locator('.pj-row[data-project="p1"]');
+  await expect(row).toContainText('In progress');
+  await expect(row).toContainText('Meg Abyte');
+  await expect(page.getByTestId('target-p1')).toContainText('Target Nov 20');
+  await page.getByRole('group', { name: 'Projects display' }).getByRole('button', { name: 'Roadmap' }).click();
+  await expect(page.locator('.rm-bar')).toHaveCount(2);
+  await expect(page.getByRole('img', { name: /^Mini Linear: Sep 14 to Nov 20/ })).toBeVisible();
+  await page.getByRole('group', { name: 'Projects display' }).getByRole('button', { name: 'List' }).click();
+  await expect(page.locator('.pj-row')).toHaveCount(2);
+});

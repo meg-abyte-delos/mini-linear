@@ -22,8 +22,8 @@ export const LABELS = [
 
 // M2 API shapes (PR #10): project {id,name,description,team_ids}, cycle {id,team_id,name,start_date,end_date (YYYY-MM-DD)}.
 export const PROJECTS = [
-  { id: 'p1', name: 'Mini Linear', description: '', team_ids: ['t1'] },
-  { id: 'p2', name: 'Cronkit', description: '', team_ids: ['t1'] },
+  { id: 'p1', name: 'Mini Linear', description: '', team_ids: ['t1'], status: 'in_progress', lead_id: 'u1', start_date: '2026-09-14', target_date: '2026-11-20' },
+  { id: 'p2', name: 'Cronkit', description: '', team_ids: ['t1'], status: 'planned', lead_id: 'u3', start_date: '2026-10-19', target_date: '2026-12-18' },
 ] as const;
 export const CYCLES = [
   { id: 'c1', team_id: 't1', name: 'Cycle 1', start_date: '2026-10-05', end_date: '2026-10-18' },
@@ -75,7 +75,7 @@ export function seedIssues(n: number): Issue[] {
 
 // Lookup data for filters, pickers and the cycles view. Mocks by default; API mode fills it from /labels, /cycles, /projects.
 export interface LabelMeta { id: string; name: string; hue: string; scope?: 'team' | 'workspace' }
-export interface ProjectMeta { id: string; name: string; description: string; team_ids: readonly string[] }
+export interface ProjectMeta { id: string; name: string; description: string; team_ids: readonly string[]; status?: string; lead_id?: string | null; start_date?: string | null; target_date?: string | null }
 export interface CycleMeta { id: string; team_id: string; name: string; start_date: string; end_date: string }
 export const scopeBadge = (s?: 'team' | 'workspace'): string | undefined => (s === 'team' ? 'Team' : s === 'workspace' ? 'Workspace' : undefined);
 export interface Meta { labels: readonly LabelMeta[]; projects: readonly ProjectMeta[]; cycles: readonly CycleMeta[] }

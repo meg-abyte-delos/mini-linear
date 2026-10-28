@@ -199,3 +199,19 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .inbox-detail h2 { font-size:15px; margin:0 0 12px; }
 .inbox-detail dt { color:var(--muted); font-size:12px; margin-top:8px; }
 .inbox-detail dd { margin:0; }
+
+/* Projects list + roadmap */
+.pj-toggle { display:flex; gap:4px; padding:8px 16px; }
+.pj-toggle button { height:24px; padding:0 10px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--fg); cursor:pointer; font:inherit; font-size:var(--fs-sm); }
+.pj-toggle button[aria-pressed=true] { background:var(--raised); border-color:var(--accent); }
+.pj-row { grid-template-columns:140px 100px 120px 150px 1fr 48px auto; }
+.pj-status { color:var(--muted-strong); font-size:var(--fs-sm); }
+.pj-late { color:var(--fg); font-weight:600; }
+.rm { padding:8px 16px; }
+.rm-axis { display:flex; justify-content:space-between; color:var(--muted-strong); font-size:var(--fs-sm); padding-left:140px; }
+.rm-row { display:grid; grid-template-columns:140px 1fr; align-items:center; min-height:var(--row-h); border-bottom:1px solid var(--line-soft); }
+.rm-track { position:relative; height:16px; }
+.rm-bar { position:absolute; top:2px; height:12px; border-radius:6px; background:var(--raised); border:1px solid var(--line); overflow:hidden; }
+.rm-bar > span { display:block; height:100%; background:var(--accent); }
+.rm-today { position:absolute; top:-4px; bottom:-4px; width:1px; background:var(--muted-strong); }
+.rm-none { color:var(--muted-strong); font-size:var(--fs-sm); }
