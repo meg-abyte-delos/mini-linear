@@ -34,7 +34,7 @@ describe.runIf(runIntegration)('T5 invalid invites are indistinguishable', () =>
     const snaps = [];
     for (const t of tokens) snaps.push(await snap(await accept(W.N, t)));
     for (const s of snaps) { expect([404, 422]).toContain(s.s); expect(JSON.parse(s.b).error.code).toBe('INVITE_INVALID'); }
-    for (const s of snaps.slice(1)) expect({ s: s.s, b: s.b, h: s.h }).toEqual({ s: snaps[0].s, b: snaps[0].b, h: snaps[0].h });
+    const [first] = snaps; for (const s of snaps.slice(1)) expect({ s: s.s, b: s.b, h: s.h }).toEqual({ s: first!.s, b: first!.b, h: first!.h });
   });
 });
 
