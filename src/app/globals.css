@@ -176,3 +176,12 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .selbar button:hover{background:var(--hover)}
 .selbar-count{font-weight:600;margin-right:4px}
 .row .rowsel{margin-right:6px}
+.sv-row { display:flex; align-items:center; }
+.sv-row .side-link { flex:1; min-width:0; }
+.sv-tag { margin-left:auto; font-size:var(--fs-sm); color:var(--muted-strong); }
+.sv-act { border:0; background:none; color:var(--muted-strong); cursor:pointer; font:inherit; font-size:var(--fs-sm); padding:0 4px; height:24px; border-radius:4px; }
+.sv-act:hover, .sv-act:focus-visible { color:var(--fg); background:var(--hover); }
+.save-form { display:inline-flex; align-items:center; gap:6px; }
+.save-form input[type=text], .save-form input:not([type]) { height:24px; border-radius:6px; border:1px solid var(--line); background:none; color:var(--fg); font:inherit; font-size:var(--fs-sm); padding:0 8px; }
+.save-form label { color:var(--muted-strong); font-size:var(--fs-sm); display:inline-flex; align-items:center; gap:4px; }
+.save-err { color:var(--fg); font-size:var(--fs-sm); }
