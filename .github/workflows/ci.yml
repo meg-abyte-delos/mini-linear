@@ -55,8 +55,8 @@ jobs:
       - run: pnpm build
       - name: Start app (2 instances, for T6 cross-instance rate limit)
         run: |
-          PORT=3000 TRUSTED_PROXIES=127.0.0.1 nohup pnpm start > app1.log 2>&1 &
-          PORT=3001 TRUSTED_PROXIES=127.0.0.1 nohup pnpm start > app2.log 2>&1 &
+          PORT=3000 TRUSTED_PROXIES=127.0.0.1 ML_ALLOW_SHARED_RATELIMIT_BUCKET=1 nohup pnpm start > app1.log 2>&1 &
+          PORT=3001 TRUSTED_PROXIES=127.0.0.1 ML_ALLOW_SHARED_RATELIMIT_BUCKET=1 nohup pnpm start > app2.log 2>&1 &
           for i in $(seq 1 60); do
             curl -s -o /dev/null http://localhost:3000 && curl -s -o /dev/null http://localhost:3001 && exit 0
             sleep 1
