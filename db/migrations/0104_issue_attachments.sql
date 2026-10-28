@@ -11,7 +11,7 @@ CREATE TABLE issue_attachments (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (id, workspace_id),
   FOREIGN KEY (issue_id, workspace_id) REFERENCES issues(id, workspace_id) ON DELETE CASCADE);
-CREATE INDEX issue_attachments_issue_idx ON issue_attachments (issue_id, created_at, id);
+CREATE INDEX issue_attachments_issue_idx ON issue_attachments (workspace_id, issue_id, created_at, id);
 
 -- Activity feed: audit rows of one entity, newest first.
 CREATE INDEX audit_events_entity_idx ON audit_events (workspace_id, entity_id, created_at DESC, id DESC);
