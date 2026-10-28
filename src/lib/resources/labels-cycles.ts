@@ -4,7 +4,7 @@ import { ApiError } from "../http/errors";
 import { ifMatchVersion, listQuery, parseId, parseJson, parseQuery, uuidSchema } from "../http/validate";
 import { diffOf } from "../audit";
 import { uuidv7 } from "../uuid7";
-import { type Row, stale, out, audit, listPage, afterId } from "./common";
+import { type Row, stale, out, audit, listPage, afterId, teamVisible } from "./common";
 
 // ------------------------------------------------ labels (workspace-wide)
 const LABEL_F = ["name", "color"];
@@ -57,7 +57,7 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => !Number.isNaN
 const cycleBody = z.object({ team_id: uuidSchema, name: z.string().trim().min(1).max(255), start_date: date, end_date: date }).strict();
 const CSEL = (ctx: Ctx) => ctx.tx`select id, team_id, name, start_date::text as start_date, end_date::text as end_date, version, created_at, updated_at from cycles`;
 const getCycle = async (ctx: Ctx, id: string) => {
-  const r = await ctx.tx<Row[]>`${CSEL(ctx)} where id = ${id}`;
+  const r = await ctx.tx<Row[]>`${CSEL(ctx)} where id = ${id} and ${teamVisible(ctx, "team_id")}`;
   if (!r[0]) throw new ApiError("not_found");
   return r[0];
 };
@@ -65,7 +65,7 @@ const ordered = (s: string, e: string) => { if (e < s) throw new ApiError("valid
 export const listCycles = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member"); // guests: no cycles (same as projects)
   const q = parseQuery(req, listQuery.extend({ team_id: uuidSchema.optional() })), c = afterId(ctx, "cycles", q);
-  const rows = await ctx.tx<Row[]>`${CSEL(ctx)} where ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} ${q.team_id ? ctx.tx`and team_id = ${q.team_id}` : ctx.tx``} order by id limit ${q.limit + 1}`;
+  const rows = await ctx.tx<Row[]>`${CSEL(ctx)} where ${teamVisible(ctx, "team_id")} and ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} ${q.team_id ? ctx.tx`and team_id = ${q.team_id}` : ctx.tx``} order by id limit ${q.limit + 1}`;
   return listPage(ctx, "cycles", q, rows);
 });
 export const createCycle = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {

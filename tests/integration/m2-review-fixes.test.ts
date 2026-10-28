@@ -22,7 +22,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     setSessionResolver(async (r) => r.headers.get("x-u"));
     teamA = randomUUID(); teamA2 = randomUUID(); cycA = randomUUID(); cycA2 = randomUUID();
     await asOwner(seed.a.id, async (tx) => {
-      await tx`insert into teams (id, workspace_id, name, key) values (${teamA}, ${seed.a.id}, 'Eng', 'ENG'), (${teamA2}, ${seed.a.id}, 'Ops', 'OPS')`;
+      await tx`insert into teams (id, workspace_id, name, key) values (${teamA}, ${seed.a.id}, 'Eng', 'ENG'), (${teamA2}, ${seed.a.id}, 'Ops', 'OPS')`; await tx`insert into team_memberships (workspace_id, team_id, user_id) values (${seed.a.id}, ${teamA}, ${seed.a.member}), (${seed.a.id}, ${teamA2}, ${seed.a.member})`;
       await tx`insert into cycles (id, workspace_id, team_id, name, start_date, end_date) values (${cycA}, ${seed.a.id}, ${teamA}, 'c1', '2026-01-01', '2026-01-14'), (${cycA2}, ${seed.a.id}, ${teamA2}, 'c2', '2026-01-01', '2026-01-14')`;
     });
   });
