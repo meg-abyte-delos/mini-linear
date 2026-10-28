@@ -65,8 +65,7 @@ test('golden: palette search finds an issue by title', async ({ page }) => {
   await expect(page.getByRole('listbox', { name: 'Commands' }).getByRole('option').first()).toBeVisible();
 });
 
-// Full-text search (area 8) is built in parallel: no dedicated search page on main yet.
-test.fixme('golden: full-text search page returns ranked issues', async ({ page }) => {
+test('golden: full-text search page returns ranked issues', async ({ page }) => {
   await page.goto('/search?q=cron');
   await expect(page.getByRole('list', { name: /results/i }).getByRole('listitem').first()).toBeVisible();
 });

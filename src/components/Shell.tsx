@@ -6,6 +6,7 @@ import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/mock-api';
+import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
@@ -15,7 +16,7 @@ type View = 'list' | 'board' | 'cycles' | 'projects';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
 const BUCKETS: { id: CycleBucket; title: string }[] = [{ id: 'active', title: 'Active' }, { id: 'upcoming', title: 'Upcoming' }, { id: 'past', title: 'Past' }];
 type PickKind = 'priority' | 'assignee' | 'label';
-interface Cmd { id: string; label: string; hint?: string; run: () => void }
+interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit }
 
 function Column({ status, items, renderCard, selectedId, overZone, zone }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
-export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean }) {
+export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
   const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
@@ -117,8 +118,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const qs = sp.toString().replace(/%2C/gi, ',');
     window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
   }
-  const [selId, setSelId] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const [selId, setSelId] = useState<string | null>(initialIssueId ?? null);
+  const [open, setOpen] = useState(!!initialIssueId);
   const [palette, setPalette] = useState(false);
   const [q, setQ] = useState('');
   const [pi, setPi] = useState(0);
@@ -300,7 +301,29 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
   if (!readOnly) commands.splice(3, 0, { id: 'create', label: 'Create issue', hint: hint('create'), run: create });
-  const results = fuzzyFilter(commands, q, (c) => c.label);
+  // Cmd+K search: top 8 hits from GET /search (API mode) or a local match (mock mode), debounced, stale responses dropped.
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const issuesRef = useRef<Issue[]>([]);
+  issuesRef.current = allIssues;
+  useEffect(() => {
+    const term = q.trim();
+    if (!palette || term.length < MIN_QUERY) { setHits([]); return; }
+    const ctl = new AbortController();
+    const t = setTimeout(async () => {
+      if (api) { const r = await searchApi(api.slug, term, { limit: 8, signal: ctl.signal }); if (!ctl.signal.aborted) setHits(r?.items ?? []); }
+      else setHits(searchLocal(issuesRef.current, term, undefined, 8).items);
+    }, api ? 150 : 0);
+    return () => { clearTimeout(t); ctl.abort(); };
+  }, [q, palette, api]);
+  function openHit(h: SearchHit) {
+    if (h.kind === 'project') { goToProject(h.id); return; }
+    setFilters(emptyFilters()); setView('list'); setSelId(h.issue_id ?? h.id); setOpen(true);
+  }
+  const matched = fuzzyFilter(commands, q, (c) => c.label);
+  const hitCmds: Cmd[] = hits.map((h) => ({ id: `hit-${h.kind}-${h.id}`, label: `${h.identifier ? `${h.identifier} ` : ''}${h.title}`, hint: h.kind === 'issue' ? undefined : h.kind, run: () => openHit(h), hit: h }));
+  const allCmd: Cmd[] = q.trim().length >= MIN_QUERY ? [{ id: 'search-all', label: `Search all for “${q.trim()}”`, run: () => router.push(`/search?q=${encodeURIComponent(q.trim())}`) }] : [];
+  // An identifier-looking query (DEL-12) puts the hits first; otherwise commands keep priority.
+  const results: Cmd[] = looksLikeIdentifier(q) ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...hitCmds, ...allCmd];
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
@@ -549,7 +572,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               else if (f.length === 1) e.preventDefault();
             }}>
             <input
-              autoFocus role='combobox' aria-expanded='true' aria-controls='palette-list' aria-activedescendant={results[pi] ? `pc-${results[pi].id}` : undefined} aria-autocomplete='list' aria-label='Search commands' placeholder='Type a command or search…' value={q}
+              autoFocus role='combobox' aria-expanded='true' aria-controls='palette-list' aria-activedescendant={results[pi] ? `pc-${results[pi].id}` : undefined} aria-autocomplete='list' aria-label='Search commands' placeholder='Type a command or search issues…' value={q}
               onChange={(e) => { setQ(e.target.value); setPi(0); }}
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') { e.preventDefault(); setPi((p) => Math.min(p + 1, results.length - 1)); }
@@ -559,7 +582,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             />
             <ul id='palette-list' role='listbox' aria-label='Commands'>
               {results.map((c, idx) => (
-                <li key={c.id} id={`pc-${c.id}`} role='option' aria-selected={idx === pi} onClick={() => { closePalette(); c.run(); }}><span>{c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
+                <li key={c.id} id={`pc-${c.id}`} role='option' aria-selected={idx === pi} onClick={() => { closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
               ))}
               {results.length === 0 && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
             </ul>

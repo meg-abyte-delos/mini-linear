@@ -16,8 +16,8 @@ run("A8 search_workspace RPC", () => {
   let seed: Seed; let teamA: string; let teamB: string; let teamOther: string;
   let issueShared: string, issueTeam: string, issueOther: string, issueDeleted: string, projectA: string, projectOther: string, commentTeam: string;
   const search = (ws: string, role: string, user: string, q: string, o: { kinds?: string[]; limit?: number; team?: string; afterRank?: number | null; afterId?: string | null } = {}) =>
-    withWorkspace(app, ws, (tx) => tx<Hit[]>`select * from search_workspace(${role}, ${user}::uuid, ${q}, ${o.kinds ?? ["issue", "comment", "project"]}::text[], ${o.limit ?? 20},
-      null, ${o.team ?? null}::uuid, null, null, null, ${o.afterRank ?? null}::float8, ${o.afterId ?? null}::uuid)`);
+    withWorkspace(app, ws, async (tx) => { await tx`select set_config('app.user_id', ${user}, true)`; return tx<Hit[]>`select * from search_workspace(${q}, ${o.kinds ?? ["issue", "comment", "project"]}::text[], ${o.limit ?? 20},
+      null, ${o.team ?? null}::uuid, null, null, null, ${o.afterRank ?? null}::float8, ${o.afterId ?? null}::uuid)`; });
   const mkTeam = (tx: Tx, ws: string, key: string) => tx`insert into teams (id, workspace_id, name, key) values (${uuidv7()}, ${ws}, ${key}, ${key}) returning id`.then((r) => r[0]!.id as string);
   const mkIssue = async (tx: Tx, ws: string, team: string, n: number, by: string, title: string, desc = "", deleted = false) => {
     const id = uuidv7();
@@ -115,8 +115,26 @@ run("A8 search_workspace RPC", () => {
     expect(new Set(r.map((h) => h.id))).toEqual(new Set([issueOther, projectOther]).add(r.find((h) => h.kind === "comment")!.id));
   });
 
+  it("identity comes from the session: old (role, user) signature is gone, no user setting means no rows", async () => {
+    await expect(withWorkspace(app, seed.a.id, (tx) => tx`select * from search_workspace('owner', ${seed.a.admin}::uuid, 'quokka')`)).rejects.toThrow();
+    expect(await withWorkspace(app, seed.a.id, (tx) => tx<Hit[]>`select * from search_workspace('quokka')`)).toHaveLength(0);
+    // a member of workspace A acting inside workspace B sees nothing (role is looked up in the current workspace)
+    expect(await search(seed.b.id, "admin", seed.a.member, "quokka")).toHaveLength(0);
+  });
+
+  it("punctuation-only tails produce no NOTICE and no error", async () => {
+    const notices: string[] = [];
+    const sql = postgres(process.env.DATABASE_URL as string, { max: 1, onnotice: (n) => notices.push(String(n.message)) });
+    await sql.begin(async (tx) => {
+      await tx`select set_config('app.workspace_id', ${seed.a.id}, true)`; await tx`select set_config('app.user_id', ${seed.a.admin}, true)`;
+      for (const q of ["quokka ---", "foo ---", "---", "!!! &&"]) await tx`select * from search_workspace(${q})`;
+    });
+    await sql.end();
+    expect(notices).toEqual([]);
+  });
+
   it("anonymous (no tenant set) sees nothing", async () => {
-    const r = await withWorkspace(app, null, (tx) => tx<Hit[]>`select * from search_workspace('admin', ${seed.a.admin}::uuid, 'quokka')`);
+    const r = await withWorkspace(app, null, async (tx) => { await tx`select set_config('app.user_id', ${seed.a.admin}, true)`; return tx<Hit[]>`select * from search_workspace('quokka')`; });
     expect(r).toHaveLength(0);
   });
 

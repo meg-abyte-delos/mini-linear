@@ -24,7 +24,7 @@ export const searchWorkspace = (req: Request, slug: string) => withWorkspaceCtx(
   const after = cur ? Number(cur.k) : null;
   if (cur && !Number.isFinite(after)) throw new ApiError("bad_request", "invalid cursor");
   const kinds = q.kind ? [q.kind] : [...KINDS];
-  const rows = await ctx.tx<Row[]>`select * from search_workspace(${ctx.role}, ${ctx.userId}::uuid, ${q.q}, ${kinds}::text[], ${q.limit + 1},
+  const rows = await ctx.tx<Row[]>`select * from search_workspace(${q.q}, ${kinds}::text[], ${q.limit + 1},
     ${q.status ?? null}::issue_status, ${q.team_id ?? null}::uuid, ${q.assignee_id ?? null}::uuid, ${q.project_id ?? null}::uuid, ${q.label_id ?? null}::uuid,
     ${after}::float8, ${cur?.id ?? null}::uuid)`;
   const p = page(rows, q.limit, ctx.workspaceId, SCOPE, (r) => ({ k: String(r.rank), id: r.id }));

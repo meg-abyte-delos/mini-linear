@@ -43,6 +43,7 @@ export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx
       if (rows.length === 0) throw new ApiError("not_found");
       const { workspace_id, role } = rows[0]!;
       await tx`select set_config('app.workspace_id', ${workspace_id}, true)`;
+      await tx`select set_config('app.user_id', ${userId}, true)`; // per-user RLS (inbox tables)
       return fn({ tx, userId, workspaceId: workspace_id, role, req: r });
     });
     try {

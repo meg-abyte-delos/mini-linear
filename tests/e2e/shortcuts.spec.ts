@@ -81,7 +81,8 @@ test('guests are read-only: no Create issue, c does nothing', async ({ page }) =
   await expect(page.locator('[role=option]')).toHaveCount(n);
   await page.keyboard.press('Control+k');
   await page.getByRole('combobox', { name: 'Search commands' }).fill('create issue');
-  await expect(page.getByText('No matching command')).toBeVisible();
+  // Since Cmd+K search, a query always offers 'Search all for …', so assert the command itself is absent.
+  await expect(page.getByRole('option', { name: /^Create issue/ })).toHaveCount(0);
 });
 
 test('? overlay screenshot', async ({ page }) => {
