@@ -73,6 +73,7 @@ export const patchProject = (req: Request, slug: string, rawId: string) => withW
   const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, projectBody.partial());
   if (b.team_ids) requireRole(ctx, "admin"); // changing team scope is admin-only
   const before = await getProject(ctx, id);
+  if (b.member_ids && !atLeast(ctx.role, "admin") && before.lead_id !== ctx.userId) throw new ApiError("forbidden"); // P-5: membership is managed by the lead or an admin
   if (Number(before.version) !== want) throw stale(before);
   const pick = <K extends keyof typeof b>(k: K, cur: unknown) => (k in b ? (b[k] ?? null) : cur);
   const lead = pick("lead_id", before.lead_id) as string | null, sd = pick("start_date", before.start_date) as string | null, td = pick("target_date", before.target_date) as string | null;
