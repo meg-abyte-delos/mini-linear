@@ -30,5 +30,5 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     console.error('listIssues failed:', e instanceof Error ? e.message : e);
     error = 'Could not load issues';
   }
-  return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} truncated={truncated} initialFilters={parseFilters(sp, meta, !!api)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} readOnly={readOnly} />;
+  return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} truncated={truncated} initialFilters={parseFilters(sp, meta, !!api)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} readOnly={readOnly} initialIssueId={Array.isArray(sp.issue) ? sp.issue[0] : sp.issue} />;
 }
