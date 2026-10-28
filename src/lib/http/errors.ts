@@ -22,6 +22,7 @@ export function errorResponse(e: unknown): Response {
   else if (pgCode(e) === "23P01") err = new ApiError("conflict", "overlaps an existing entry");
   else if (pgCode(e) === "23505") err = new ApiError("conflict", "already exists");
   else if (pgCode(e) === "40P01") err = new ApiError("conflict", "concurrent update, retry");
+  else if (pgCode(e) === "42501") err = new ApiError("forbidden"); // RLS / role guard refused the write
   else if (pgCode(e) === "23503") err = new ApiError("validation_failed", "referenced entity not found");
   else err = new ApiError("internal", "internal error");
   const request_id = randomUUID();

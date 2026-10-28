@@ -45,6 +45,7 @@ export const workspaces = pgTable("workspaces", {
   id: uuid("id").primaryKey(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
+  logoUrl: text("logo_url"), // https only, <= 2048 chars (0006)
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -70,6 +71,7 @@ export const teamMemberships = pgTable("team_memberships", {
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   teamId: uuid("team_id").notNull(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("member"), // admin | member | guest (0006)
 }, (t) => [
   primaryKey({ columns: [t.teamId, t.userId] }),
   // composite FK: a membership cannot point at a team of another workspace (FK checks bypass RLS)

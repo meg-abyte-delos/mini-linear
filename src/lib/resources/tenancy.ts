@@ -7,7 +7,7 @@ import { uuidv7 } from "../uuid7";
 import { recordAudit } from "../audit";
 import { hashToken, newToken } from "../auth/tokens";
 import { sendMail } from "../auth/mail";
-import { type Row, audit, listPage, afterId } from "./common";
+import { type Row, audit, listPage, afterId, assertTeamAdmin } from "./common";
 
 const emailS = z.string().trim().toLowerCase().email().max(254);
 const slugS = z.string().regex(/^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/);
@@ -35,6 +35,26 @@ export const getWorkspace = (req: Request, slug: string) => withUser(req, async 
   const r = await tx<Row[]>`select id, slug, name, role from list_my_workspaces(${userId}) where slug = ${slug}`;
   if (!r[0]) throw new ApiError("not_found"); // non-member -> 404
   return Response.json(r[0]);
+});
+
+/** Workspace settings (Area 9): any member reads; admins/owners update name, slug, logo_url ("" clears the logo). */
+export const getWorkspaceSettings = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  const r = await ctx.tx<Row[]>`select id, slug, name, logo_url from get_workspace_settings()`;
+  if (!r[0]) throw new ApiError("not_found");
+  return Response.json({ ...r[0], role: ctx.role });
+});
+const logoS = z.union([z.literal(""), z.string().trim().max(2048).url().refine((u) => u.startsWith("https://"), "logo_url must be https")]);
+export const patchWorkspaceSettings = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "admin");
+  const b = await parseJson(req, z.object({ name: nameS.optional(), slug: slugS.optional(), logo_url: logoS.optional() }).strict());
+  const before = (await ctx.tx<Row[]>`select id, slug, name, logo_url from get_workspace_settings()`)[0];
+  if (!before) throw new ApiError("not_found");
+  const r = await ctx.tx<Row[]>`select * from update_workspace_settings(${b.name ?? null}, ${b.slug ?? null}, ${b.logo_url ?? null})`;
+  const after = r[0]!;
+  const diff: Record<string, { before: unknown; after: unknown }> = {};
+  for (const k of ["name", "slug", "logo_url"] as const) if (before[k] !== after[k]) diff[k] = { before: before[k], after: after[k] };
+  if (Object.keys(diff).length) await audit(ctx, "workspace", ctx.workspaceId, "update", diff);
+  return Response.json({ ...after, role: ctx.role });
 });
 
 // ---------------------------------------------------------------- members
@@ -153,8 +173,8 @@ export const createTeam = (req: Request, slug: string) => withWorkspaceCtx(req, 
   return Response.json(await getTeam(ctx, id), { status: 201 });
 });
 export const patchTeam = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  requireRole(ctx, "admin");
   const id = parseId(rawId), b = await parseJson(req, z.object({ name: nameS }).strict()), before = await getTeam(ctx, id);
+  await assertTeamAdmin(ctx, id);
   await ctx.tx`update teams set name = ${b.name} where id = ${id}`; // key is immutable: it is baked into issue identifiers
   await audit(ctx, "team", id, "update", { name: { before: before.name, after: b.name } });
   return Response.json(await getTeam(ctx, id));
@@ -168,19 +188,49 @@ export const deleteTeam = (req: Request, slug: string, rawId: string) => withWor
 });
 export const listTeamMembers = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const id = parseId(rawId); await getTeam(ctx, id);
-  const items = await ctx.tx<Row[]>`select t.user_id, u.email from team_memberships t join users u on u.id = t.user_id where t.team_id = ${id} order by t.user_id`;
+  const items = await ctx.tx<Row[]>`select t.user_id, u.email, t.role from team_memberships t join users u on u.id = t.user_id where t.team_id = ${id} order by t.user_id`;
   return Response.json({ items, next_cursor: null });
 });
+const TEAM_ROLES = ["admin", "member", "guest"] as const;
+type TeamRole = (typeof TEAM_ROLES)[number];
+/** A workspace guest can only hold the team role 'guest' (the DB caps it anyway; refuse loudly instead). */
+const assertTeamRoleFor = (wsRole: Role, teamRole: TeamRole) => {
+  if (wsRole === "guest" && teamRole !== "guest") throw new ApiError("validation_failed", "workspace guests can only be team guests");
+};
+const optionalBody = async <T,>(req: Request, s: z.ZodType<T>): Promise<T> => {
+  const txt = await req.text();
+  return s.parse(txt.trim() ? JSON.parse(txt) : {});
+};
 export const addTeamMember = (req: Request, slug: string, rawId: string, rawUid: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  requireRole(ctx, "admin");
-  const id = parseId(rawId), uid = parseId(rawUid); await getTeam(ctx, id); await roleOf(ctx.tx, uid); // target must be a workspace member
-  const r = await ctx.tx`insert into team_memberships (workspace_id, team_id, user_id) values (${ctx.workspaceId}, ${id}, ${uid}) on conflict do nothing returning user_id`;
-  if (r.length) await audit(ctx, "team_member", id, "create", { user_id: { before: null, after: uid } });
-  return Response.json({ team_id: id, user_id: uid }, { status: r.length ? 201 : 200 });
+  const id = parseId(rawId), uid = parseId(rawUid); await getTeam(ctx, id);
+  await assertTeamAdmin(ctx, id);
+  const wsRole = await roleOf(ctx.tx, uid); // target must be a workspace member
+  const b = await optionalBody(req, z.object({ role: z.enum(TEAM_ROLES).optional() }).strict()).catch(() => { throw new ApiError("validation_failed", "invalid request"); });
+  const role: TeamRole = b.role ?? (wsRole === "guest" ? "guest" : "member");
+  assertTeamRoleFor(wsRole, role);
+  const r = await ctx.tx`insert into team_memberships (workspace_id, team_id, user_id, role) values (${ctx.workspaceId}, ${id}, ${uid}, ${role}) on conflict do nothing returning user_id`;
+  if (r.length) await audit(ctx, "team_member", id, "create", { user_id: { before: null, after: uid }, role: { before: null, after: role } });
+  return Response.json({ team_id: id, user_id: uid, role }, { status: r.length ? 201 : 200 });
+});
+/** Change a team role. Refuses to demote the team's last admin (workspace admins can still manage it). */
+export const patchTeamMember = (req: Request, slug: string, rawId: string, rawUid: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  const id = parseId(rawId), uid = parseId(rawUid); await getTeam(ctx, id);
+  await assertTeamAdmin(ctx, id);
+  const b = await parseJson(req, z.object({ role: z.enum(TEAM_ROLES) }).strict());
+  const cur = (await ctx.tx<{ role: TeamRole }[]>`select role from team_memberships where team_id = ${id} and user_id = ${uid} for update`)[0];
+  if (!cur) throw new ApiError("not_found");
+  assertTeamRoleFor(await roleOf(ctx.tx, uid), b.role);
+  if (cur.role === "admin" && b.role !== "admin" && ctx.role !== "owner" && ctx.role !== "admin") {
+    const admins = await ctx.tx`select 1 from team_memberships where team_id = ${id} and role = 'admin' for update`;
+    if (admins.length < 2) throw new ApiError("conflict", "cannot demote the last team admin");
+  }
+  await ctx.tx`update team_memberships set role = ${b.role} where team_id = ${id} and user_id = ${uid}`;
+  if (cur.role !== b.role) await audit(ctx, "team_member", id, "update", { role: { before: cur.role, after: b.role } });
+  return Response.json({ team_id: id, user_id: uid, role: b.role });
 });
 export const removeTeamMember = (req: Request, slug: string, rawId: string, rawUid: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  requireRole(ctx, "admin");
   const id = parseId(rawId), uid = parseId(rawUid); await getTeam(ctx, id);
+  if (uid !== ctx.userId) await assertTeamAdmin(ctx, id); // anyone may leave a team
   const r = await ctx.tx`delete from team_memberships where team_id = ${id} and user_id = ${uid} returning user_id`;
   if (r.length) await audit(ctx, "team_member", id, "delete", { user_id: { before: uid, after: null } });
   return new Response(null, { status: 204 });
