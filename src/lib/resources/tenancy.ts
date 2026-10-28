@@ -34,7 +34,7 @@ export const createWorkspace = (req: Request) => withUser(req, async (tx, userId
 export const getWorkspace = (req: Request, slug: string) => withUser(req, async (tx, userId) => {
   const r = await tx<Row[]>`select id, slug, name, role from list_my_workspaces(${userId}) where slug = ${slug}`;
   if (!r[0]) throw new ApiError("not_found"); // non-member -> 404
-  return Response.json(r[0]);
+  return Response.json({ ...r[0], user_id: userId }); // user_id lets the UI show author-only actions
 });
 
 /** Workspace settings (Area 9): any member reads; admins/owners update name, slug, logo_url ("" clears the logo). */

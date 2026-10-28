@@ -29,6 +29,8 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     const list = await (await go(T.listWorkspaces, seed.a.member, "GET")).json();
     expect(list.items.map((w: { slug: string }) => w.slug).sort()).toEqual([seed.a.slug, slug].sort());
     expect((await go(T.getWorkspace, seed.a.member, "GET", undefined, slug)).status).toBe(200);
+    const me = await (await go(T.getWorkspace, seed.a.member, "GET", undefined, slug)).json(); // session user id for author-only UI actions
+    expect(me.user_id).toBe(seed.a.member);
     expect((await go(T.getWorkspace, seed.b.member, "GET", undefined, slug)).status).toBe(404);
   });
 
