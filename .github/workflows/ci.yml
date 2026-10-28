@@ -22,6 +22,8 @@ jobs:
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
       DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
       TEST_BASE_URL: http://localhost:3000
+      SESSION_SECRET: ci-only-session-secret-not-for-prod-0123456789
+      CURSOR_SECRET: ci-only-cursor-secret-not-for-prod-0123456789
       TEST_BASE_URL_2: http://localhost:3001
     steps:
       - uses: actions/checkout@v7
@@ -61,5 +63,8 @@ jobs:
           done
           echo "app did not come up within 60 s"; tail -n 50 app1.log app2.log; exit 1
       - run: pnpm test
+      - name: App logs
+        if: always()
+        run: tail -n 120 app1.log || true
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
