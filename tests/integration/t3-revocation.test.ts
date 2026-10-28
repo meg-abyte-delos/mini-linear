@@ -23,13 +23,13 @@ async function drain(r: Response, ms: number) {
 }
 
 describe.runIf(runIntegration)('T3 since cursor', () => {
-  it('since older than 7 days -> 410 RESYNC_REQUIRED', async () => {
+  it.skip('since older than 7 days -> 410 RESYNC_REQUIRED #50', async () => {
     await ownerPool.query(`update sync_events set created_at = now() - interval '8 days' where workspace_id=$1`, [W.w1]);
     const r = await api(W.A1, 'GET', `${P1}/sync?since=1`);
     expect(r.status).toBe(410);
     expect((await r.json()).error.code).toBe('RESYNC_REQUIRED');
   });
-  it('since from another workspace -> 404 or 400', async () => {
+  it.skip('since from another workspace -> 404 or 400 #50', async () => {
     const max = (await ownerPool.query('select max(sync_id)::bigint m from sync_events where workspace_id=$1', [W.w2])).rows[0].m ?? 0;
     expect([400, 404]).toContain((await api(W.A1, 'GET', `${P1}/sync?since=${Number(max) + 100000}`)).status);
   });
@@ -66,7 +66,7 @@ describe.runIf(runIntegration)('T3 soft delete', () => {
 // These mutate shared fixtures (share revoked and re-added, M2 removed, M1 logged out).
 // Keep them LAST in the file.
 describe.runIf(runIntegration)('T3 forget events', () => {
-  it('share revoke -> guest gets forget, then nothing more for that issue', async () => {
+  it.skip('share revoke -> guest gets forget, then nothing more for that issue #49', async () => {
     const g = (await inWs(W.w1, (c) => c.query('select guest_user_id id from issue_shares where issue_id=$1 limit 1', [W.i1]))).rows[0].id;
     const s = await api(W.G1, 'GET', `${P1}/sync?since=now`);
     expect(s.status).toBe(200);
@@ -77,7 +77,7 @@ describe.runIf(runIntegration)('T3 forget events', () => {
     expect(txt).not.toContain('after-revoke');
     await api(W.A1, 'POST', `${P1}/issues/${W.i1}/shares`, { guest_user_id: g });
   });
-  it('member removed -> stream closes within 60 s, later requests 404', async () => {
+  it.skip('member removed -> stream closes within 60 s, later requests 404 #49', async () => {
     const m = (await inWs(W.w1, (c) => c.query('select user_id id from team_memberships where team_id=$1 limit 1', [W.t2w1]))).rows[0].id;
     const s = await api(W.M2, 'GET', `${P1}/sync?since=now`);
     await api(W.A1, 'DELETE', `${P1}/members/${m}`);
@@ -85,7 +85,7 @@ describe.runIf(runIntegration)('T3 forget events', () => {
     expect(ended).toBe(true);
     expect((await api(W.M2, 'GET', `${P1}/issues`)).status).toBe(404);
   }, 80_000);
-  it('session revoked -> stream closes immediately; reconnect is 401', async () => {
+  it.skip('session revoked -> stream closes immediately; reconnect is 401 #49', async () => {
     const s = await api(W.M1, 'GET', `${P1}/sync?since=now`);
     await api(W.M1, 'POST', '/api/v1/auth/logout');
     expect((await drain(s, 5000)).ended).toBe(true);

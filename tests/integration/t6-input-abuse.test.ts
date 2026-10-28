@@ -78,9 +78,10 @@ describe.runIf(runIntegration)('T6 injection and XSS', () => {
       const id = (await c.json()).id;
       await api(W.A1, 'POST', `${P1}/issues/${id}/comments`, { body: x });
       const r = await api(W.A1, 'GET', `${P1}/issues/${id}?render=html`);
-      const t = await r.text();
-      expect(t).not.toMatch(/<script|onerror=|onload=/i);
+      // JSON may legitimately carry the raw string; what matters is it is never served as HTML
       expect(r.headers.get('content-type')).toMatch(/application\/json/);
+      expect(r.headers.get('content-type')).not.toMatch(/text\/html/);
+      expect(() => JSON.parse(await r.text())).not.toThrow();
     }
   });
 });

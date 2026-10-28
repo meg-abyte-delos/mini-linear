@@ -58,6 +58,8 @@ export async function world() {
     await c.query('insert into team_memberships (workspace_id, team_id, user_id) values ($1,$2,$3), ($1,$2,$4)', [w1, t1, A1.id, M1.id]);
     await c.query('insert into labels (id, workspace_id, name) values ($1,$2,$3)', [randomUUID(), w1, 'bug']);
     const i1 = await issue(c, w1, t1, 1, M1.id);
+    // T2/T3/T7 need an active share I1 -> G1 (v6)
+    await c.query('insert into issue_shares (workspace_id, issue_id, guest_user_id, shared_by) values ($1,$2,$3,$4)', [w1, i1, G1.id, M1.id]);
     return { A1, M1, M2, G1, i1 };
   });
   const r2 = await inWs(w2, async (c) => {
