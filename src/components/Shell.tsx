@@ -462,7 +462,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
 
   const row = (i: Issue) => (
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
-      {!readOnly && <input type='checkbox' className='rowsel' tabIndex={-1} aria-label={`Select ${i.identifier ?? i.id}`} checked={multi.includes(i.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggleSelect(i.id)} />}
+      {!readOnly && <span className={`rowsel${multi.includes(i.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${i.identifier ?? i.id}`} onClick={(e) => { e.stopPropagation(); toggleSelect(i.id); }}>{multi.includes(i.id) ? '☑' : '☐'}</span>}
       <PriorityIcon priority={i.priority} />
       <span className='id'>{i.identifier ?? i.id}</span>
       <StatusIcon status={i.status} />
