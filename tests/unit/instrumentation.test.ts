@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const installDevAuth = vi.fn();
 const warnIfNoSocketResolver = vi.fn();
 const startPurgeScheduler = vi.fn();
+const startWebhookDispatcher = vi.fn();
 const fakeDb = {};
 
 vi.mock('@/lib/dev-auth', () => ({ installDevAuth }));
 vi.mock('../../src/lib/auth/ratelimit', () => ({ warnIfNoSocketResolver, startPurgeScheduler }));
+vi.mock('../../src/lib/integrations/webhooks', () => ({ startWebhookDispatcher }));
 vi.mock('../../src/lib/http/ctx', () => ({ db: () => fakeDb }));
 
 const env = { ...process.env };
@@ -22,6 +24,7 @@ describe('instrumentation register()', () => {
     expect(installDevAuth).toHaveBeenCalledOnce();
     expect(warnIfNoSocketResolver).toHaveBeenCalledOnce();
     expect(startPurgeScheduler).toHaveBeenCalledWith(fakeDb);
+    expect(startWebhookDispatcher).toHaveBeenCalledWith(fakeDb, { asRole: true });
   });
 
   it('does not start the scheduler without DATABASE_URL', async () => {

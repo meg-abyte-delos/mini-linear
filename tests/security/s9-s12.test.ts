@@ -127,7 +127,9 @@ describe.runIf(runIntegration)('S12 migrations', () => {
     for (const f of fns) {
       expect((f.proconfig ?? []).join(), f.proname).toMatch(/search_path=pg_catalog, public/);
       expect((await p.query(`select has_function_privilege('public', $1::oid, 'EXECUTE') x`, [f.oid])).rows[0].x, f.proname + ' public EXECUTE').toBe(false);
-      expect((await p.query(`select has_function_privilege('app_user', $1::oid, 'EXECUTE') x`, [f.oid])).rows[0].x, f.proname + ' app_user').toBe(true);
+      // Dispatcher-only functions expose cross-tenant data (url+secret): app_user must NOT execute them.
+      const dispatcherOnly = ['claim_webhook_deliveries', 'complete_webhook_delivery', 'purge_webhook_deliveries'].includes(f.proname);
+      expect((await p.query(`select has_function_privilege('app_user', $1::oid, 'EXECUTE') x`, [f.oid])).rows[0].x, f.proname + ' app_user').toBe(!dispatcherOnly);
     }
     await p.end();
   });
