@@ -3,6 +3,7 @@ import './theme.css';
 import './globals.css';
 import './ui-progress.css';
 import './ui-search.css';
+import './ui-board.css';
 import { cookies } from 'next/headers';
 
 export const metadata = { title: 'Mini-Linear' };
