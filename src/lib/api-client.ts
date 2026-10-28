@@ -32,9 +32,9 @@ export async function patchIssue(slug: string, prev: Issue, version: number, pat
   } catch { return { kind: 'error', issue: null }; }
 }
 
-export async function createIssue(slug: string, teamId: string, title: string, f: Fetch = fetch): Promise<Issue | null> {
+export async function createIssue(slug: string, teamId: string, title: string, f: Fetch = fetch, parentId?: string): Promise<Issue | null> {
   try {
-    const res = await f(`${base(slug)}/issues`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ team_id: teamId, title }) });
+    const res = await f(`${base(slug)}/issues`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(parentId ? { team_id: teamId, title, parent_id: parentId } : { team_id: teamId, title }) });
     return res.ok ? fromApi((await res.json()) as Record<string, unknown>) : null;
   } catch { return null; }
 }

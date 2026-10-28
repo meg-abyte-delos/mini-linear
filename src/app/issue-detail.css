@@ -56,3 +56,27 @@
 .feed .ev{position:relative;padding-left:16px}.feed .ev .dot{position:absolute;left:3px;top:11px;width:6px;height:6px;border-radius:50%;background:var(--line)}
 .feed .tl-cmt{margin:var(--sp-2) 0;color:var(--fg)}
 .cmt-actions{float:right;display:inline-flex;gap:4px;opacity:0}.cmt:hover .cmt-actions,.cmt:focus-within .cmt-actions{opacity:1}.cmt-actions button{border:0;background:none;color:var(--muted);padding:0 6px;font-size:12px}.cmt-actions button:hover{color:var(--fg)}
+
+/* Relations and sub-issues (Iris spec) */
+.idp-sec h2 .sec-add{margin-left:auto;width:24px;height:24px;padding:0;border:0;border-radius:var(--r-sm);color:var(--muted);font-size:16px;line-height:1}
+.idp-sec h2 .sec-add:hover,.idp-sec h2 .sec-add:focus-visible{background:color-mix(in srgb,var(--fg) 6%,transparent);color:var(--fg)}
+.rel-add{margin-left:auto;position:relative;display:inline-flex}.rel-add .sec-add{margin-left:0}
+.sub-bar{display:inline-block;width:64px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--fg) 14%,transparent);overflow:hidden}
+.sub-bar span{display:block;height:100%;background:var(--accent)}
+.rel-group{margin-bottom:var(--sp-2)}.rel-type{font-size:var(--fs-sm);color:var(--muted);min-width:0;padding:0 8px}
+.idp-rows li{position:relative;height:32px;padding:0;gap:0}
+.idp-rows li:hover{background:color-mix(in srgb,var(--fg) 4%,transparent)}
+.idp-rows .row-link{display:flex;align-items:center;gap:8px;padding:0 8px;height:32px;border-radius:6px;font-size:13px;color:var(--fg)}
+.idp-rows .row-link:focus-visible{outline:1px solid var(--accent);outline-offset:-1px}
+.idp-rows .row-link .id{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.idp-rows .row-link .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.idp-rows .row-link .av{width:16px;height:16px;font-size:9px}
+.idp-rows li.is-done .t{color:var(--muted)}
+.idp-rows li .x{position:absolute;right:4px;top:4px;opacity:0;height:24px;background:transparent}
+.idp-rows li:hover .x,.idp-rows li:focus-within .x{opacity:1}
+.idp-rows li:hover .row-link .av,.idp-rows li:focus-within .row-link .av{margin-right:24px}
+.blocked-flag{color:#e0a43a;font-size:var(--fs-sm)}
+.add-row{display:block;width:100%;text-align:left;border:0;color:var(--muted);height:32px;padding:0 8px;border-radius:6px}
+.add-row:hover,.add-row:focus-visible{background:color-mix(in srgb,var(--fg) 4%,transparent);color:var(--fg)}
+.parent-crumb{display:block;font-size:var(--fs-sm);color:var(--muted);text-decoration:none;margin-bottom:2px}
+.parent-crumb:hover{color:var(--fg)}

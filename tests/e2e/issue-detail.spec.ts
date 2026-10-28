@@ -70,14 +70,19 @@ test('comments: mention autocomplete, reply thread, reactions', async ({ page })
 
 test('sub-issues, relations, attachments', async ({ page }) => {
   await ready(page);
+  await page.getByRole('button', { name: 'Add sub-issue' }).first().click();
   await page.getByLabel('New sub-issue title').fill('Write e2e');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('heading', { name: /Sub-issues/ })).toContainText('0/1');
-  await page.getByRole('button', { name: 'Add relation' }).click();
+  await page.getByRole('button', { name: 'Add relation', exact: true }).click();
   await page.getByRole('menuitem', { name: /Blocks/ }).click();
   await page.getByRole('combobox', { name: /Add relation/ }).fill('Set up CI');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Relations' }).locator('..')).toContainText('Set up CI');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: 'test-results/relations-after.png' });
+  const ax = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(ax.violations.map((v) => `${v.id} x${v.nodes.length}`)).toEqual([]);
   await page.getByRole('button', { name: 'Add link' }).click();
   await page.getByLabel('Link URL').fill('javascript:alert(1)');
   await page.getByRole('button', { name: 'Attach' }).click();
