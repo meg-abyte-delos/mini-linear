@@ -3,7 +3,8 @@ export default defineConfig({
   testDir: 'tests/e2e',
   use: { baseURL: 'http://localhost:3000' },
   webServer: {
-    command: 'pnpm build && pnpm start',
+    // CI already ran `pnpm build` in the same job: reuse that artifact instead of rebuilding.
+    command: process.env.CI ? 'pnpm start' : 'pnpm build && pnpm start',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
