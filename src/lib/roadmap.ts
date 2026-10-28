@@ -2,7 +2,7 @@
 export const PROJECT_STATUS_LABEL: Record<string, string> = { backlog: 'Backlog', planned: 'Planned', in_progress: 'In progress', paused: 'Paused', completed: 'Completed', canceled: 'Canceled' };
 export const statusLabel = (s?: string): string => (s ? (PROJECT_STATUS_LABEL[s] ?? s) : 'Backlog');
 
-export interface Bar { leftPct: number; widthPct: number }
+export interface Bar { leftPct: number; widthPct: number; clipStart: boolean; clipEnd: boolean }
 export interface Span { start: string | null | undefined; end: string | null | undefined }
 const day = (iso: string): number => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 86400000;
 
@@ -20,7 +20,7 @@ export function barFor(span: Span, range: { from: string; to: string }): Bar | n
   if (!a || !b) return null;
   const total = Math.max(1, day(range.to) - day(range.from));
   const s = Math.max(day(range.from), Math.min(day(a), day(b))), e = Math.min(day(range.to), Math.max(day(a), day(b)) + 1);
-  return { leftPct: ((s - day(range.from)) / total) * 100, widthPct: Math.max(1, ((e - s) / total) * 100) };
+  return { leftPct: ((s - day(range.from)) / total) * 100, widthPct: Math.max(1, ((e - s) / total) * 100), clipStart: Math.min(day(a), day(b)) < day(range.from), clipEnd: Math.max(day(a), day(b)) + 1 > day(range.to) };
 }
 
 /** Where today falls in the window, as a percentage; null when outside. */
@@ -40,3 +40,26 @@ export function progress(issues: { status: string }[]): { done: number; total: n
 
 export const sortProjects = <T extends { name: string; target_date?: string | null }>(p: readonly T[]): T[] =>
   [...p].sort((a, b) => (a.target_date ?? '9999') < (b.target_date ?? '9999') ? -1 : (a.target_date ?? '9999') > (b.target_date ?? '9999') ? 1 : a.name.localeCompare(b.name));
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** One tick per month start inside the window (label "Oct 2026"), positioned as a percentage of it. */
+export function monthTicks(range: { from: string; to: string }): { label: string; leftPct: number }[] {
+  const total = Math.max(1, day(range.to) - day(range.from)), out: { label: string; leftPct: number }[] = [];
+  let y = Number(range.from.slice(0, 4)), m = Number(range.from.slice(5, 7)) - 1;
+  for (let guard = 0; guard < 240; guard++) {
+    const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    if (first > range.to) break;
+    if (first >= range.from) out.push({ label: `${MONTHS[m]} ${y}`, leftPct: ((day(first) - day(range.from)) / total) * 100 });
+    if (++m > 11) { m = 0; y++; }
+  }
+  return out;
+}
+
+/** Progress for a project: the API's progress_pct when present (computed server side over all issues), else from the loaded issues. */
+export function projectProgress(p: { progress_pct?: number; issue_count?: number; done_count?: number }, issues: { status: string }[]): { done: number; total: number; pct: number } {
+  if (typeof p.progress_pct === 'number') return { done: p.done_count ?? 0, total: p.issue_count ?? 0, pct: p.progress_pct };
+  return progress(issues);
+}
+
+/** Pixel width of the scrollable timeline: 5px per day, at least 900. */
+export const timelineWidth = (range: { from: string; to: string }): number => Math.max(900, Math.round((day(range.to) - day(range.from)) * 5));
