@@ -1,4 +1,6 @@
 'use client';
+import { Inbox } from '@/components/Inbox';
+import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
@@ -12,7 +14,7 @@ import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
 
-type View = 'list' | 'board' | 'cycles' | 'projects';
+type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
 const BUCKETS: { id: CycleBucket; title: string }[] = [{ id: 'active', title: 'Active' }, { id: 'upcoming', title: 'Upcoming' }, { id: 'past', title: 'Past' }];
 type PickKind = 'priority' | 'assignee' | 'label';
@@ -119,6 +121,17 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
   }
   const [selId, setSelId] = useState<string | null>(initialIssueId ?? null);
+  // Inbox: HTTP in API mode, in-memory seed otherwise. The unread badge polls every 30s (API mode only).
+  const inboxClient = useMemo(() => (api ? httpInboxClient(api.slug) : mockInboxClient()), [api]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  useEffect(() => {
+    let live = true;
+    const tick = () => { void inboxClient.unreadCount().then((n) => { if (live) setUnreadCount(n); }); };
+    tick();
+    if (!api) return () => { live = false; };
+    const t = setInterval(tick, 30000);
+    return () => { live = false; clearInterval(t); };
+  }, [inboxClient, api]);
   const [open, setOpen] = useState(!!initialIssueId);
   const [palette, setPalette] = useState(false);
   const [q, setQ] = useState('');
@@ -354,6 +367,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       if (helpOpen.current && e.key !== 'Escape') return;
       // Bare modifier / navigation keydowns (Shift, Control, Tab...) must not reset a pending g sequence.
       if (e.key.length > 1 && e.key !== 'Enter' && e.key !== 'Escape') return;
+      // The inbox owns its list keys while it is the current view.
+      if (document.querySelector('main[data-view=inbox]') && ['j', 'k', 'u', 'e', 'h', 'Enter'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) return;
       const key = keyOf(e); if (!key) return;
       if (key === 'Enter' && t.closest('button, a, [role="button"], select')) { matcher.reset(); return; }
       const id = matcher.feed(key);
@@ -421,27 +436,27 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         {!readOnly && <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
         <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
         <nav aria-label='Primary'>
-          <a className='side-link' href='#inbox' onClick={(e) => e.preventDefault()}><Icon name='inbox' /><span>Inbox</span></a>
+          <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><Icon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
           <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><Icon name='issues' /><span>My issues</span></a>
           <a className='side-link' href='#views' onClick={(e) => e.preventDefault()}><Icon name='views' /><span>Views</span></a>
         </nav>
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
           <a className='side-link' href='#team' onClick={(e) => e.preventDefault()}><Icon name='team' /><span>Delos</span></a>
-          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects') setView('list'); }}><span>Issues</span></a>
+          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><span>Issues</span></a>
           <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><span>Cycles</span></a>
           <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><span>Projects</span></a>
         </nav>
       </aside>
-      <main className='main' ref={mainRef}>
+      <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
-          <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
+          <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
           <div className='switch' role='group' aria-label='View'>
             <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
             <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>
           </div>
         </header>
-        {view !== 'cycles' && view !== 'projects' && !loadError && allIssues.length > 0 && (
+        {view !== 'cycles' && view !== 'projects' && view !== 'inbox' && !loadError && allIssues.length > 0 && (
           <div className='filterbar' role='toolbar' aria-label='Filters'>
             {FILTER_KEYS.map((k) => (
               <button key={k} id={`fb-${k}`} className={`fchip${filters[k].length ? ' on' : ''}`} aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed={filters[k].length > 0} onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
@@ -461,6 +476,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             <p>No issues yet.</p>
             {!readOnly && <button onClick={create}>Create issue <kbd>C</kbd></button>}
           </div>
+        ) : view === 'inbox' ? (
+          <Inbox client={inboxClient} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' ? (
           <div className='scroll cycles'>
             <section className='group' aria-labelledby='pj-all'>

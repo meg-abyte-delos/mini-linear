@@ -4,7 +4,7 @@ import { parseFilters, TODAY_RE } from '@/lib/filters';
 import { seedIssues, MOCK_META, type Issue, type Meta } from '@/lib/issues';
 import { apiConfig, loadRemote, loadRole } from '@/lib/remote';
 
-const parseView = (v: string | string[] | undefined) => { const x = Array.isArray(v) ? v[0] : v; return x === 'board' || x === 'cycles' || x === 'projects' ? x : 'list'; };
+const parseView = (v: string | string[] | undefined) => { const x = Array.isArray(v) ? v[0] : v; return x === 'board' || x === 'cycles' || x === 'projects' || x === 'inbox' ? x : 'list'; };
 
 export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;

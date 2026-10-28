@@ -37,9 +37,10 @@ export async function seedTwoWorkspaces(sql: postgres.Sql = ownerSql()): Promise
 }
 
 /** Run fn in one tx with app.workspace_id set (null = left unset). Use with the app_user connection. */
-export async function withWorkspace<T>(sql: postgres.Sql, workspaceId: string | null, fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
+export async function withWorkspace<T>(sql: postgres.Sql, workspaceId: string | null, fn: (tx: postgres.TransactionSql) => Promise<T>, userId: string | null = null): Promise<T> {
   return sql.begin(async (tx) => {
     if (workspaceId) await tx`select set_config('app.workspace_id', ${workspaceId}, true)`;
+    if (userId) await tx`select set_config('app.user_id', ${userId}, true)`;
     return fn(tx);
   }) as Promise<T>;
 }

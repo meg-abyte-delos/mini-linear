@@ -109,7 +109,7 @@ describe("ctx: roles, auth and workspace scoping", () => {
     expect(r.status).toBe(404); expect(fn).not.toHaveBeenCalled();
   });
   it("member: sets app.workspace_id from the server-resolved id and passes role", async () => {
-    const { sql, calls } = fakeSql([[{ workspace_id: "ws-9", role: "member" }], []]);
+    const { sql, calls } = fakeSql([[{ workspace_id: "ws-9", role: "member" }], [], []]);
     let seen: Ctx | undefined;
     const r = await withWorkspaceCtx(req("GET"), "w1", async (c) => { seen = c; return new Response("ok"); }, sql);
     expect(r.status).toBe(200);
@@ -119,7 +119,7 @@ describe("ctx: roles, auth and workspace scoping", () => {
     expect(seen).toMatchObject({ userId: "user-1", workspaceId: "ws-9", role: "member" });
   });
   it("handler ApiError maps to its status; deadlock retried once", async () => {
-    const r = await withWorkspaceCtx(req("GET"), "w1", async (c) => { requireRole(c, "admin"); return new Response("ok"); }, fakeSql([[{ workspace_id: "w", role: "guest" }], []]).sql);
+    const r = await withWorkspaceCtx(req("GET"), "w1", async (c) => { requireRole(c, "admin"); return new Response("ok"); }, fakeSql([[{ workspace_id: "w", role: "guest" }], [], []]).sql);
     expect(r.status).toBe(403);
     let n = 0;
     const r2 = await withWorkspaceCtx(req("GET"), "w1", async () => { if (n++ === 0) throw Object.assign(new Error("dl"), { code: "40P01" }); return new Response("ok"); },
