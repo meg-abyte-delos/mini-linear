@@ -5,3 +5,7 @@
 .cy-prog-fill { fill:var(--accent); transition:width .2s ease-out; }
 .cycle[data-bucket='past'] .cy-prog-fill { fill:var(--muted); }
 @media (prefers-reduced-motion: reduce) { .cy-prog-fill { transition:none; } }
+
+/* Roadmap: the 1px accent edge of the fill ran through the label text. Drop the edge (the 55% fill already separates from the 25% track) and keep the label above the fill. */
+.rm-bar .rm-fill { border-right:0; }
+.rm-bar .rm-label { z-index:1; }
