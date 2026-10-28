@@ -6,7 +6,7 @@ const ready = async (page: import('@playwright/test').Page) => { await page.goto
 
 test('detail page renders and passes axe (wcag2a/aa)', async ({ page }) => {
   await ready(page);
-  await expect(page.getByLabel('Title')).toHaveValue('Board drag and drop');
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Board drag and drop');
   await expect(page.getByRole('complementary', { name: 'Properties' })).toBeVisible();
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(r.violations.map((v) => `${v.id} x${v.nodes.length}`)).toEqual([]);
@@ -14,13 +14,17 @@ test('detail page renders and passes axe (wcag2a/aa)', async ({ page }) => {
 });
 
 test('unknown or malformed identifier is a 404', async ({ page }) => {
-  expect((await page.goto('/w/delos/issue/DEL-9999'))?.status()).toBe(404);
-  expect((await page.goto('/w/delos/issue/not_an_id'))?.status()).toBe(404);
+  // Dynamic routes stream, so the HTTP status can be 200: assert the not-found UI instead (and no issue page).
+  for (const u of ['/w/delos/issue/DEL-9999', '/w/delos/issue/not_an_id']) {
+    await page.goto(u);
+    await expect(page.getByText(/could not be found|404/i).first()).toBeVisible();
+    await expect(page.locator('.idp')).toHaveCount(0);
+  }
 });
 
 test('inline title, properties and activity', async ({ page }) => {
   await ready(page);
-  const t = page.getByLabel('Title');
+  const t = page.getByLabel('Title', { exact: true });
   await t.fill('Board DnD v2'); await t.press('Enter');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('changed the title');
   await page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: /in progress|todo|backlog|done|review/i }).first().click();
@@ -71,7 +75,7 @@ test('sub-issues, relations, attachments', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /Sub-issues/ })).toContainText('0/1');
   await page.getByRole('button', { name: 'Add relation' }).click();
   await page.getByRole('menuitem', { name: /Blocks/ }).click();
-  await page.getByRole('combobox', { name: /Add relation/ }).fill('CI');
+  await page.getByRole('combobox', { name: /Add relation/ }).fill('Set up CI');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Relations' }).locator('..')).toContainText('Set up CI');
   await page.getByRole('button', { name: 'Add link' }).click();
@@ -97,7 +101,7 @@ test('copy branch shortcut, archive, delete and restore', async ({ page, context
   page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'Delete' }).click();
   await expect(page.locator('.idp-banner')).toContainText('trash');
-  await expect(page.getByLabel('Title')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('Title', { exact: true })).toHaveAttribute('readonly', '');
   await page.getByRole('button', { name: 'Restore' }).click();
   await expect(page.locator('.idp-banner')).toHaveCount(0);
 });
