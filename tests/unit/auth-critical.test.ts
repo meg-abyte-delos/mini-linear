@@ -123,7 +123,7 @@ describe("ctx: roles, auth and workspace scoping", () => {
     expect(r.status).toBe(403);
     let n = 0;
     const r2 = await withWorkspaceCtx(req("GET"), "w1", async () => { if (n++ === 0) throw Object.assign(new Error("dl"), { code: "40P01" }); return new Response("ok"); },
-      fakeSql([[{ workspace_id: "w", role: "owner" }], [], [{ workspace_id: "w", role: "owner" }], []]).sql);
+      fakeSql([[{ workspace_id: "w", role: "owner" }], [], [], [{ workspace_id: "w", role: "owner" }], [], []]).sql);
     expect(r2.status).toBe(200); expect(n).toBe(2);
   });
 });
