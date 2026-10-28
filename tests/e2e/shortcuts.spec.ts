@@ -87,7 +87,7 @@ test('guests are read-only: no Create issue, c does nothing', async ({ page }) =
 test('? overlay screenshot', async ({ page }) => {
   await page.keyboard.press('?');
   await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
-  await page.screenshot({ path: '/workspace/a5-help-overlay.png' });
+  await page.screenshot({ path: 'test-results/a5-help-overlay.png' });
 });
 
 test('bulk: palette moves every selected issue, one toast', async ({ page }) => {
