@@ -6,7 +6,8 @@ const iss = (id: string, title: string, description = ''): Issue => ({ id, title
 
 describe('search client', () => {
   it('builds the request and parses the page', async () => {
-    const f = vi.fn(async () => new Response(JSON.stringify({ items: [{ kind: 'issue', id: 'a' }], next_cursor: 'c' })));
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const f = vi.fn(async (_u: string) => new Response(JSON.stringify({ items: [{ kind: 'issue', id: 'a' }], next_cursor: 'c' })));
     const r = await searchApi('acme', ' foo bar ', { kind: 'issue', limit: 8, cursor: 'x' }, f as unknown as typeof fetch);
     expect(f.mock.calls[0]![0]).toBe('/api/v1/w/acme/search?q=foo+bar&kind=issue&limit=8&cursor=x');
     expect(r).toEqual({ items: [{ kind: 'issue', id: 'a' }], next_cursor: 'c' });
