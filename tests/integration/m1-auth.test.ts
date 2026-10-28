@@ -58,11 +58,12 @@ const cookieOf = (r: Response) => /ml_session=([^;]+)/.exec(r.headers.get("set-c
   it("same 401 body for unknown, wrong password and locked; locks after 5 failures", async () => {
     const email = await register();
     const bodies = new Set<string>();
-    for (const e of [em(), email]) bodies.add(await (await login(post({ email: e, password: "wrong-password-1" }), app)).text());
+    const norm = (t: string) => { try { const j = JSON.parse(t); delete j.request_id; if (j.error) delete j.error.request_id; return JSON.stringify(j); } catch { return t; } };
+    for (const e of [em(), email]) bodies.add(norm(await (await login(post({ email: e, password: "wrong-password-1" }), app)).text()));
     for (let i = 0; i < 5; i++) expect((await login(post({ email, password: "wrong-password-1" }), app)).status).toBe(401);
     const locked = await login(post({ email, password: PW }), app);
     expect(locked.status).toBe(401);
-    bodies.add(await locked.text());
+    bodies.add(norm(await locked.text()));
     expect(bodies.size).toBe(1);
   });
 

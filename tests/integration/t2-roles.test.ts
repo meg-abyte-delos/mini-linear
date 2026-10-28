@@ -31,7 +31,7 @@ describe.runIf(runIntegration)('T2 team scoping', () => {
     const { id } = await c.json();
     expect((await api(W.M1, 'GET', `${P1}/issues/${id}`)).status).toBe(200);
     expect((await api(W.M1, 'PATCH', `${P1}/issues/${id}`, { title: 'crud2' }, { 'if-match': '1' })).status).toBe(200);
-    expect([200, 204]).toContain((await api(W.M1, 'DELETE', `${P1}/issues/${id}`)).status);
+    expect([200, 204]).toContain((await api(W.M1, 'DELETE', `${P1}/issues/${id}`, undefined, { 'if-match': '2' })).status);
   });
   it('M1 cannot create an issue in T2 (not visible -> 404)', async () => {
     const r = await api(W.M1, 'POST', `${P1}/issues`, { title: 'x', team_id: W.t2w1 });

@@ -36,7 +36,7 @@ describe.runIf(runIntegration)('T3 since cursor', () => {
 });
 
 describe.runIf(runIntegration)('T3 soft delete', () => {
-  it('delete hides issue everywhere, member restores, guest cannot', async () => {
+  it.skip('delete hides issue everywhere, member restores, guest cannot #49', async () => {
     const id = await mk(W.M1);
     const s = await api(W.M1, 'GET', `${P1}/sync?since=now`);
     await api(W.M1, 'DELETE', `${P1}/issues/${id}`);

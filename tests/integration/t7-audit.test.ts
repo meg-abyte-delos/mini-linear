@@ -7,7 +7,7 @@ let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { if (runIntegration) W = await world(); });
 const P1 = '/api/v1/w/w1';
 const events = async (since: Date) =>
-  (await ownerPool.query(`select * from audit_events where workspace_id=$1 and created_at >= $2 order by created_at`, [W.w1, since])).rows;
+  (await inWs(W.w1, (c) => c.query(`select * from audit_events where workspace_id=$1 and created_at >= $2 order by created_at`, [W.w1, since]))).rows;
 
 describe.runIf(runIntegration)('T7 one request = one transaction = one audit event', () => {
   it('PATCH lists every changed field in a single event', async () => {
@@ -44,25 +44,25 @@ describe.runIf(runIntegration)('T7 audited actions', () => {
   it('role change is audited', async () => {
     const t0 = new Date();
     const m = (await inWs(W.w1, (c) => c.query("select tm.user_id id from team_memberships tm join memberships m on m.user_id=tm.user_id and m.workspace_id=tm.workspace_id where tm.team_id=$1 and m.role<>'admin' limit 1", [W.t1]))).rows[0].id;
-    await api(W.A1, 'PATCH', `${P1}/members/${m}`, { role: 'member' });
+    expect([200, 204]).toContain((await api(W.A1, 'PATCH', `${P1}/members/${m}`, { role: 'member' })).status);
     expect(await has(t0, /role/i)).toBe(true);
   });
   it('invite create is audited', async () => {
     const t0 = new Date();
-    await api(W.A1, 'POST', `${P1}/invites`, { email: `aud${Date.now()}@example.test`, role: 'member' });
+    expect((await api(W.A1, 'POST', `${P1}/invites`, { email: `aud${Date.now()}@example.test`, role: 'member' })).status).toBe(201);
     expect(await has(t0, /invite/i)).toBe(true);
   });
   it('share and revoke are audited', async () => {
     const t0 = new Date();
     const g = (await inWs(W.w1, (c) => c.query('select guest_user_id id from issue_shares where issue_id=$1 limit 1', [W.i1]))).rows[0].id;
-    await api(W.A1, 'DELETE', `${P1}/issues/${W.i1}/shares/${g}`);
-    await api(W.A1, 'POST', `${P1}/issues/${W.i1}/shares`, { guest_user_id: g });
+    expect([200, 204]).toContain((await api(W.A1, 'DELETE', `${P1}/issues/${W.i1}/shares/${g}`)).status);
+    expect([200, 201]).toContain((await api(W.A1, 'POST', `${P1}/issues/${W.i1}/shares`, { guest_user_id: g })).status);
     const ev = await events(t0);
     expect(ev.filter((e) => /share/i.test(e.action)).length).toBeGreaterThanOrEqual(2);
   });
   it('login and logout are audited', async () => {
     const t0 = new Date();
-    await api(W.M1, 'POST', '/api/v1/auth/logout');
+    expect([200, 204]).toContain((await api(W.M1, 'POST', '/api/v1/auth/logout')).status);
     const r = await ownerPool.query(`select action from audit_events where created_at >= $1 and action ~* 'logout|login'`, [t0]);
     expect(r.rows.length).toBeGreaterThanOrEqual(1);
   });

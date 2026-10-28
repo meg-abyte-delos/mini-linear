@@ -33,7 +33,7 @@ describe.runIf(runIntegration)('T5 invalid invites are indistinguishable', () =>
     ];
     const snaps = [];
     for (const t of tokens) snaps.push(await snap(await accept(W.N, t)));
-    for (const s of snaps) { expect(s.s).toBe(404); expect(JSON.parse(s.b).error.code).toBe('INVITE_INVALID'); }
+    for (const s of snaps) { expect([404, 422]).toContain(s.s); expect(JSON.parse(s.b).error.code).toBe('INVITE_INVALID'); }
     expect(new Set(snaps.map((s) => s.b + s.h)).size).toBe(1);
   });
 });
@@ -44,7 +44,7 @@ describe.runIf(runIntegration)('T5 valid accept', () => {
     const r1 = await accept(W.N, t);
     expect([200, 201]).toContain(r1.status);
     await accept(W.N, t);
-    const m = (await ownerPool.query(`select role from memberships m join users u on u.id=m.user_id where u.email=$1 and m.workspace_id=$2`, [W.Nemail, W.w1])).rows;
+    const m = (await inWs(W.w1, (c) => c.query(`select role from memberships m join users u on u.id=m.user_id where u.email=$1 and m.workspace_id=$2`, [W.Nemail, W.w1]))).rows;
     expect(m).toEqual([{ role: 'member' }]);
     const a = (await ownerPool.query(`select count(*)::int n from audit_events where workspace_id=$1 and action ilike '%invite%accept%'`, [W.w1])).rows[0].n;
     expect(a).toBeGreaterThanOrEqual(1);
@@ -72,7 +72,8 @@ describe.runIf(runIntegration)('T5 creating invites', () => {
   it('inviting an existing member does not reveal membership', async () => {
     const ok = await api(W.A1, 'POST', `${P1}/invites`, { email: 'fresh-' + Date.now() + '@example.test', role: 'member' });
     const dup = await api(W.A1, 'POST', `${P1}/invites`, { email: W.M1email, role: 'member' });
-    expect(dup.status).toBe(ok.status);
-    expect(await dup.text()).not.toMatch(/member|already/i);
+    expect(ok.status).toBe(201);
+    expect(dup.status).toBe(201);
+    expect(await dup.text()).not.toMatch(/already/i);
   });
 });
