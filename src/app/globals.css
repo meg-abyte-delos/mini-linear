@@ -226,7 +226,7 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .rm-bar { position:absolute; top:8px; height:24px; border-radius:6px; background:color-mix(in srgb, var(--accent) 25%, transparent); overflow:clip; display:flex; align-items:center; }
 .rm-bar[data-clip-start=true] { border-top-left-radius:0; border-bottom-left-radius:0; }
 .rm-bar[data-clip-end=true] { border-top-right-radius:0; border-bottom-right-radius:0; }
-.rm-fill { position:absolute; left:0; top:0; bottom:0; background:color-mix(in srgb, var(--accent) 70%, transparent); }
+.rm-fill { position:absolute; left:0; top:0; bottom:0; border-right:1px solid var(--accent); box-sizing:border-box; background:color-mix(in srgb, var(--accent) 70%, transparent); }
 /* Dark: 70% teal over the 25% track is too light for var(--fg) labels (3.4:1), so the fill is darkened to keep AA. */
 html:not([data-theme]) .rm-fill, html[data-theme='dark'] .rm-fill { background:color-mix(in srgb, var(--accent) 55%, var(--bg)); }
 @media (prefers-color-scheme: light) { html:not([data-theme]) .rm-fill { background:color-mix(in srgb, var(--accent) 70%, transparent); } }

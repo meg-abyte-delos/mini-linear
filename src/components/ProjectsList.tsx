@@ -13,7 +13,15 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
   const dated = sorted.some((p) => p.start_date || p.target_date);
   const range = dated ? roadmapRange([...sorted.map((p) => ({ start: p.start_date, end: p.target_date })), { start: today, end: today }]) : null;
   const tp = range ? todayPct(today, range) : null;
-  const ticks = range ? monthTicks(range) : [];
+  const W = range ? timelineWidth(range) : 0;
+  const todayPx = tp === null ? null : (tp / 100) * W;
+  // Hide a month label whose text (about 72px from tick+6) would sit within 12px of the Today pill (about 48px wide).
+  const ticks = (range ? monthTicks(range) : []).filter((t) => {
+    if (todayPx === null) return true;
+    const x = (t.leftPct / 100) * W + 6;
+    return !(x < todayPx + 24 + 12 && x + 72 > todayPx - 24 - 12);
+  });
+  const gridTicks = range ? monthTicks(range) : [];
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = scrollRef.current;
@@ -68,7 +76,7 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
                       <div key={p.id} className='rm-row' data-project={p.id}>
                         <span className='rm-name'>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />}<span className='rm-name-t'>{p.name}</span></span>
                         <div className='rm-track'>
-                          {ticks.map((t) => <span key={t.label} className='rm-grid' style={{ left: `${t.leftPct}%` }} aria-hidden='true' />)}
+                          {gridTicks.map((t) => <span key={t.label} className='rm-grid' style={{ left: `${t.leftPct}%` }} aria-hidden='true' />)}
                           {tp !== null && <span className='rm-today' data-testid='rm-today' style={{ left: `${tp}%` }} aria-hidden='true' />}
                           {bar ? (
                             <span className='rm-bar' data-status={p.status ?? 'backlog'} data-clip-start={bar.clipStart} data-clip-end={bar.clipEnd} role='img' style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%` }}

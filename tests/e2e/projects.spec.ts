@@ -51,6 +51,8 @@ test('roadmap shows a month axis and a today marker', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Months' }).getByRole('listitem').first()).toContainText(/\w{3} 20\d\d/);
   await expect(page.getByTestId('rm-today').first()).toBeAttached();
   await expect(page.getByTestId('rm-pill')).toHaveText('Today');
+  const pill = await page.getByTestId('rm-pill').boundingBox();
+  for (const t of await page.getByRole('list', { name: 'Months' }).getByRole('listitem').all()) { const b = (await t.boundingBox())!; expect(b.x + b.width <= pill!.x - 8 || b.x >= pill!.x + pill!.width + 8).toBe(true); }
 });
 
 test('roadmap axis: sticky header, pill and month labels pass axe contrast in dark and light', async ({ page }) => {
