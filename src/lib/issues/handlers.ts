@@ -81,7 +81,7 @@ function visible(ctx: Ctx) {
 const SEL = (ctx: Ctx) => ctx.tx`select i.*, t.key as team_key, coalesce((select array_agg(label_id order by label_id) from issue_labels where issue_id = i.id), '{}') as label_ids,
     i.due_date::text as due_date_text
     from issues i join teams t on t.id = i.team_id and t.workspace_id = i.workspace_id`;
-async function load(ctx: Ctx, id: string, deleted = false) {
+export async function load(ctx: Ctx, id: string, deleted = false) {
   const rows = await ctx.tx<Row[]>`${SEL(ctx)} where i.id = ${id} and ${visible(ctx)} and ${deleted ? ctx.tx`i.deleted_at is not null` : ctx.tx`i.deleted_at is null`}`;
   if (rows.length === 0) throw new ApiError("not_found");
   return norm(rows[0]!);
