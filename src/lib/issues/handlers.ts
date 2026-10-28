@@ -6,7 +6,7 @@ import { ifMatchVersion, listQuery, parseId, parseJson, parseQuery, uuidSchema }
 import { recordAudit, diffOf } from "../audit";
 import { allocateIssueNumber } from "../../db/issues";
 import { uuidv7 } from "../uuid7";
-import { assertAssignee, assertTeamVisible, teamVisible } from "../resources/common";
+import { assertAssignee, assertTeamVisible, assertTeamWrite, teamVisible } from "../resources/common";
 import { subscribe } from "../resources/subscriptions";
 
 const STATUS = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
@@ -127,6 +127,7 @@ export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req,
   requireRole(ctx, "member");
   const b = await parseJson(req, createBody);
   await assertTeamVisible(ctx, b.team_id); // same 422 for a team the member is not in as for an unknown one
+  await assertTeamWrite(ctx, b.team_id); // team guests are read-only
   const n = await allocateIssueNumber(ctx.tx, b.team_id).catch(() => { throw new ApiError("validation_failed", "unknown team"); });
   const id = uuidv7();
   if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
@@ -153,6 +154,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
   requireRole(ctx, "member");
   const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, patchBody);
   const before = await load(ctx, id);
+  await assertTeamWrite(ctx, before.team_id as string);
   if (Number(before.version) !== want) throw stale(before);
   if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
   if (b.cycle_id) await assertCycleTeam(ctx, b.cycle_id, before.team_id as string);
@@ -179,6 +181,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
 export const deleteIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const id = parseId(rawId), row = await load(ctx, id), want = ifMatchVersion(req); // 404 (visibility) before 428
+  await assertTeamWrite(ctx, row.team_id as string);
   if (Number(row.version) !== want) throw stale(row);
   const upd = await ctx.tx`update issues set deleted_at = now(), version = version + 1, updated_at = now() where id = ${id} and version = ${want} returning id`;
   if (upd.length === 0) throw stale(row);
@@ -189,6 +192,7 @@ export const deleteIssue = (req: Request, slug: string, rawId: string) => withWo
 export const restoreIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const id = parseId(rawId), row = await load(ctx, id, true);
+  await assertTeamWrite(ctx, row.team_id as string);
   if (Date.now() - new Date(row.deleted_at as string).getTime() > PURGE_MS) throw new ApiError("not_found"); // purge window: 30 days
   // deleted_at predicate: a concurrent restore (or the purge job) must not be double-applied / resurrect a purged row.
   const upd = await ctx.tx`update issues set deleted_at = null, version = version + 1, updated_at = now() where id = ${id} and deleted_at is not null returning id`;

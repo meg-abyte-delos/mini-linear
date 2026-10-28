@@ -44,3 +44,19 @@ export async function assertTeamVisible(ctx: Ctx, teamId: string) {
   const r = await ctx.tx`select 1 from team_memberships where team_id = ${teamId} and user_id = ${ctx.userId}`;
   if (r.length === 0) throw new ApiError("validation_failed", "unknown team");
 }
+
+/**
+ * Team write guard (Area 9): guests are read-only on their teams. Workspace admins/owners always pass. Mirrors the
+ * RESTRICTIVE RLS policies of migration 0006 so callers get a clean 403 instead of a 0-row update.
+ */
+export async function assertTeamWrite(ctx: Ctx, teamId: string) {
+  if (ctx.role === "owner" || ctx.role === "admin") return;
+  const r = await ctx.tx<{ ok: boolean }[]>`select has_team_role(${teamId}::uuid, 'member') as ok`;
+  if (!r[0]?.ok) throw new ApiError("forbidden", "read-only on this team");
+}
+/** Team admin guard: workspace admins/owners, or an admin of this team. */
+export async function assertTeamAdmin(ctx: Ctx, teamId: string) {
+  if (ctx.role === "owner" || ctx.role === "admin") return;
+  const r = await ctx.tx<{ ok: boolean }[]>`select has_team_role(${teamId}::uuid, 'admin') as ok`;
+  if (!r[0]?.ok) throw new ApiError("forbidden");
+}
