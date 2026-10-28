@@ -23,6 +23,7 @@ CREATE TABLE cycle_snapshots (
   day date NOT NULL, scope integer NOT NULL CHECK (scope >= 0), started integer NOT NULL CHECK (started >= 0), completed integer NOT NULL CHECK (completed >= 0),
   PRIMARY KEY (cycle_id, day),
   FOREIGN KEY (cycle_id, workspace_id) REFERENCES cycles(id, workspace_id) ON DELETE CASCADE);
+CREATE INDEX cycle_snapshots_cycle_idx ON cycle_snapshots (workspace_id, cycle_id, day); -- S12
 
 DO $$ DECLARE t text; BEGIN
   FOREACH t IN ARRAY ARRAY['team_cycle_settings','cycle_snapshots'] LOOP
