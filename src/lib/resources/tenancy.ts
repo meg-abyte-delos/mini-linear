@@ -114,17 +114,19 @@ export const deleteInvite = (req: Request, slug: string, rawId: string) => withW
 /** Accept: signed-in user whose (lowercased) email equals the invite's. Same 404 for unknown/expired/used/mismatched, so tokens leak nothing. */
 export const acceptInvite = (req: Request) => withUser(req, async (tx, userId) => {
   const { token } = await parseJson(req, z.object({ token: z.string().min(20).max(200) }).strict());
-  const inv = (await tx<{ invite_id: string; workspace_id: string; email: string; role: Role }[]>`select * from lookup_invite(${hashToken(token)})`)[0];
+  const inv = (await tx<{ workspace_id: string; email: string }[]>`select * from lookup_invite(${hashToken(token)})`)[0];
   const u = (await tx<{ email: string; email_verified_at: Date | null }[]>`select email, email_verified_at from users where id = ${userId}`)[0];
   if (!inv || !u || !u.email_verified_at || u.email.toLowerCase() !== inv.email.toLowerCase()) throw new ApiError("not_found");
   await tx`select set_config('app.workspace_id', ${inv.workspace_id}, true)`;
-  const used = await tx`update invites set used_at = now() where id = ${inv.invite_id} and used_at is null returning id`;
+  // id and role are read under RLS, not via the definer function (#56)
+  const used = await tx<{ id: string; role: Role }[]>`update invites set used_at = now() where token_hash = ${hashToken(token)} and used_at is null and expires_at > now() returning id, role`;
   if (!used.length) throw new ApiError("not_found");
-  const ins = await tx`insert into memberships (id, workspace_id, user_id, role) values (${randomUUID()}, ${inv.workspace_id}, ${userId}, ${inv.role}) on conflict (workspace_id, user_id) do nothing returning id`;
+  const role = used[0]!.role;
+  const ins = await tx`insert into memberships (id, workspace_id, user_id, role) values (${randomUUID()}, ${inv.workspace_id}, ${userId}, ${role}) on conflict (workspace_id, user_id) do nothing returning id`;
   if (!ins.length) throw new ApiError("conflict", "already a member");
-  await recordAudit(tx, { workspaceId: inv.workspace_id, actorId: userId, entity: "member", entityId: userId, action: "create", diff: { role: { before: null, after: inv.role } } });
+  await recordAudit(tx, { workspaceId: inv.workspace_id, actorId: userId, entity: "member", entityId: userId, action: "create", diff: { role: { before: null, after: role } } });
   const ws = (await tx<Row[]>`select id, slug, name, role from list_my_workspaces(${userId}) where id = ${inv.workspace_id}`)[0];
-  return Response.json(ws ?? { id: inv.workspace_id, role: inv.role });
+  return Response.json(ws ?? { id: inv.workspace_id, role });
 });
 
 // ---------------------------------------------------------------- teams

@@ -32,7 +32,7 @@ run("M1 RLS", () => {
     expect(ok.length).toBe(1);
     expect(no.length).toBe(0);
   });
-  it("lookup_invite works under FORCE RLS (definer bypass) and returns only the 4 agreed columns", async () => {
+  it("lookup_invite works under FORCE RLS (definer bypass) and returns only workspace_id and email (#56)", async () => {
     const hash = "h-" + seed.a.id;
     await owner.begin(async (tx) => {
       await tx`select set_config('app.workspace_id', ${seed.a.id}, true)`;
@@ -40,7 +40,7 @@ run("M1 RLS", () => {
     });
     const r = await app`select * from lookup_invite(${hash})`;
     expect(r.length).toBe(1);
-    expect(Object.keys(r[0]!).sort()).toEqual(["email", "invite_id", "role", "workspace_id"]);
+    expect(Object.keys(r[0]!).sort()).toEqual(["email", "workspace_id"]);
   });
   it("workspaces: app_user cannot read it directly, and INSERT is tenant-checked", async () => {
     await expect(withWorkspace(app, seed.a.id, (tx) => tx`select 1 from workspaces`)).rejects.toThrow(/permission denied/i);
