@@ -32,6 +32,8 @@ CREATE TABLE comment_reactions (
   UNIQUE (comment_id, user_id, emoji),
   FOREIGN KEY (comment_id, workspace_id) REFERENCES comments(id, workspace_id) ON DELETE CASCADE);
 
+CREATE INDEX comment_reactions_ws_comment_idx ON comment_reactions (workspace_id, comment_id);
+
 CREATE TABLE comment_mentions (
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   comment_id uuid NOT NULL, user_id uuid NOT NULL REFERENCES users(id),
