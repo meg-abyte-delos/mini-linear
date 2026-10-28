@@ -33,7 +33,7 @@ CREATE TABLE project_updates (
   version integer NOT NULL DEFAULT 1, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (id, workspace_id),
   FOREIGN KEY (project_id, workspace_id) REFERENCES projects(id, workspace_id) ON DELETE CASCADE);
-CREATE INDEX project_updates_project_idx ON project_updates (project_id, created_at DESC);
+CREATE INDEX project_updates_project_idx ON project_updates (workspace_id, project_id, created_at DESC);
 
 DO $$ DECLARE t text; BEGIN
   FOREACH t IN ARRAY ARRAY['project_members','project_milestones','project_updates'] LOOP
