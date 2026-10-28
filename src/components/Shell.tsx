@@ -469,7 +469,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       // Bare modifier / navigation keydowns (Shift, Control, Tab...) must not reset a pending g sequence.
       if (e.key.length > 1 && e.key !== 'Enter' && e.key !== 'Escape') return;
       // The inbox owns its list keys while it is the current view.
-      if (document.querySelector('main[data-view=inbox]') && ['j', 'k', 'u', 'e', 'h', 'Enter'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) return;
+      if (document.querySelector('main[data-view=inbox]') && ['j', 'k', 'u', 'e', 'h', 's', 'x', '1', '2', '3', 'Enter'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) return;
       const key = keyOf(e); if (!key) return;
       if (key === 'Enter' && t.closest('button, a, [role="button"], select')) { matcher.reset(); return; }
       const id = matcher.feed(key);
