@@ -4,7 +4,7 @@ import { buildCsp, SECURITY_HEADERS } from '@/lib/csp';
 
 export function proxy(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith('/api/') && !originAllowed(req)) {
-    return NextResponse.json({ error: { code: 'forbidden', message: 'cross-origin request refused' } }, { status: 403 });
+    return NextResponse.json({ error: { code: 'forbidden', message: 'cross-origin request refused', request_id: crypto.randomUUID() } }, { status: 403 });
   }
   const nonce = btoa(crypto.randomUUID());
   const csp = buildCsp(nonce);

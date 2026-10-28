@@ -82,7 +82,7 @@ describe('S11 logs and errors', () => {
 });
 
 describe.runIf(runIntegration)('S12 migrations', () => {
-  const owner = () => new Pool({ connectionString: process.env.OWNER_DATABASE_URL });
+  const owner = () => new Pool({ connectionString: process.env.DATABASE_OWNER_URL });
   it('exempt allowlist is exactly users, sessions, email_verifications, password_resets', () => {
     const f = ['db/rls-exempt.json', 'db/rls-exempt.txt'].find(existsSync);
     expect(f).toBeTruthy();

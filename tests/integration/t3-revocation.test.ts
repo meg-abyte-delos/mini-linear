@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { ownerPool, api, world, type U } from './helpers/world';
+import { ownerPool, inWs, api, world, type U } from './helpers/world';
 import { runIntegration } from './helpers/gate';
 let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { if (runIntegration) W = await world(); });
@@ -67,7 +67,7 @@ describe.runIf(runIntegration)('T3 soft delete', () => {
 // Keep them LAST in the file.
 describe.runIf(runIntegration)('T3 forget events', () => {
   it('share revoke -> guest gets forget, then nothing more for that issue', async () => {
-    const g = (await ownerPool.query('select guest_user_id id from issue_shares where issue_id=$1 limit 1', [W.i1])).rows[0].id;
+    const g = (await inWs(W.w1, (c) => c.query('select guest_user_id id from issue_shares where issue_id=$1 limit 1', [W.i1]))).rows[0].id;
     const s = await api(W.G1, 'GET', `${P1}/sync?since=now`);
     expect(s.status).toBe(200);
     await api(W.A1, 'DELETE', `${P1}/issues/${W.i1}/shares/${g}`);
@@ -78,7 +78,7 @@ describe.runIf(runIntegration)('T3 forget events', () => {
     await api(W.A1, 'POST', `${P1}/issues/${W.i1}/shares`, { guest_user_id: g });
   });
   it('member removed -> stream closes within 60 s, later requests 404', async () => {
-    const m = (await ownerPool.query('select user_id id from team_memberships where team_id=$1 limit 1', [W.t2w1])).rows[0].id;
+    const m = (await inWs(W.w1, (c) => c.query('select user_id id from team_memberships where team_id=$1 limit 1', [W.t2w1]))).rows[0].id;
     const s = await api(W.M2, 'GET', `${P1}/sync?since=now`);
     await api(W.A1, 'DELETE', `${P1}/members/${m}`);
     const { ended } = await drain(s, 65_000);

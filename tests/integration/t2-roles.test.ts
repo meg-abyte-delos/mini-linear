@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { ownerPool, api, world, type U } from './helpers/world';
+import { ownerPool, inWs, api, world, type U } from './helpers/world';
 import { runIntegration } from './helpers/gate';
 let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { if (runIntegration) W = await world(); });
@@ -37,7 +37,7 @@ describe.runIf(runIntegration)('T2 team scoping', () => {
 
 describe.runIf(runIntegration)('T2 labels', () => {
   it('members apply labels, cannot create or edit (403)', async () => {
-    const lid = (await ownerPool.query('select id from labels where workspace_id=$1 limit 1', [W.w1])).rows[0].id;
+    const lid = (await inWs(W.w1, (c) => c.query('select id from labels where workspace_id=$1 limit 1', [W.w1]))).rows[0].id;
     const id = await mk(W.M1);
     expect((await api(W.M1, 'PATCH', `${P1}/issues/${id}`, { label_ids: [lid] }, { 'if-match': '1' })).status).toBe(200);
     expect((await api(W.M1, 'POST', `${P1}/labels`, { name: 'new' })).status).toBe(403);
@@ -71,7 +71,7 @@ describe.runIf(runIntegration)('T2 guest G1', () => {
 });
 
 describe.runIf(runIntegration)('T2 share / revoke', () => {
-  const guestId = async () => (await ownerPool.query('select guest_user_id id from issue_shares where issue_id=$1 limit 1', [W.i1])).rows[0].id;
+  const guestId = async () => (await inWs(W.w1, (c) => c.query('select guest_user_id id from issue_shares where issue_id=$1 limit 1', [W.i1]))).rows[0].id;
   it('A1 and T1 member can share and revoke', async () => {
     const g = await guestId();
     for (const u of [W.A1, W.M1]) {
@@ -99,7 +99,7 @@ describe.runIf(runIntegration)('T2 admin-only actions', () => {
     expect([200, 204]).toContain((await api(W.A1, 'PATCH', `${P1}/members/${m2}`, { role: 'member' })).status);
   });
   it('removing or demoting the last admin is blocked', async () => {
-    const a = (await ownerPool.query(`select user_id id from memberships where workspace_id=$1 and role='admin'`, [W.w1])).rows;
+    const a = (await inWs(W.w1, (c) => c.query(`select user_id id from memberships where workspace_id=$1 and role='admin'`, [W.w1]))).rows;
     expect(a.length).toBe(1);
     expect([409, 422]).toContain((await api(W.A1, 'DELETE', `${P1}/members/${a[0].id}`)).status);
     expect([409, 422]).toContain((await api(W.A1, 'PATCH', `${P1}/members/${a[0].id}`, { role: 'member' })).status);
