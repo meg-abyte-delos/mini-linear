@@ -81,7 +81,8 @@ describe.runIf(runIntegration)('T6 injection and XSS', () => {
       // JSON may legitimately carry the raw string; what matters is it is never served as HTML
       expect(r.headers.get('content-type')).toMatch(/application\/json/);
       expect(r.headers.get('content-type')).not.toMatch(/text\/html/);
-      expect(() => JSON.parse(await r.text())).not.toThrow();
+      const body = await r.text();
+      expect(() => JSON.parse(body)).not.toThrow();
     }
   });
 });
