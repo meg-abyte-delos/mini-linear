@@ -5,6 +5,7 @@ import { MOCK_META, type Meta } from '@/lib/issues';
 import { apiConfig, loadRemote, loadViewer, type Viewer } from '@/lib/remote';
 import { findByIdentifier } from '@/lib/detail/issue-meta';
 import '../../../../issue-detail.css';
+import '../../../../ui-issue-detail.css';
 
 const IDENT_RE = /^[A-Za-z][A-Za-z0-9]{0,9}-\d{1,9}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;

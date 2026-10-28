@@ -1,0 +1,28 @@
+/* Issue detail polish to match Linear (Iris). Loaded after issue-detail.css. Tokens only. */
+
+/* Header actions: borderless icon-style buttons, tint on hover */
+.idp-actions button{border-color:transparent;height:28px;padding:0 8px;color:var(--muted-strong)}
+.idp-actions button:hover:not(:disabled){background:color-mix(in srgb,var(--fg) 6%,transparent);color:var(--fg)}
+.idp-actions .danger{color:var(--danger)}
+
+/* Title: Linear scale */
+.idp-title{font-size:24px;font-weight:600;line-height:1.3;letter-spacing:-0.01em;padding:var(--sp-1) 0}
+.idp-title::placeholder{color:var(--muted)}
+
+/* Editor tabs: tint, no accent outline */
+.md-tabs button,.md-tools button{border-color:transparent;height:24px;padding:0 8px;font-size:var(--fs-sm);color:var(--muted)}
+.md-tabs [aria-selected=true]{background:color-mix(in srgb,var(--fg) 8%,transparent);border-color:transparent;color:var(--fg)}
+.md-input:focus,.composer textarea:focus{border-color:color-mix(in srgb,var(--fg) 24%,transparent)}
+
+/* Properties sidebar: 32px rows, borderless pickers */
+.idp-side{padding:var(--sp-4) var(--sp-3)}
+.idp-side dl{grid-template-columns:88px minmax(0,1fr);gap:2px var(--sp-2)}
+.idp-side dt{font-size:var(--fs-sm);color:var(--muted);padding-left:var(--sp-1)}
+.idp-side dd button,.idp-side select,.idp-side input[type=date]{min-height:32px;padding:0 8px;border-color:transparent;border-radius:6px}
+.idp-side dd button:hover:not(:disabled),.idp-side select:hover,.idp-side input[type=date]:hover{background:color-mix(in srgb,var(--fg) 5%,transparent)}
+
+/* Comments and composer */
+.cmt{background:color-mix(in srgb,var(--fg) 2%,transparent);border-color:var(--line-soft);padding:var(--sp-3)}
+.composer textarea{min-height:72px;line-height:1.5}
+.composer-actions button{height:28px;padding:0 12px}
+.feed .ev{font-size:var(--fs-sm);line-height:1.5}
