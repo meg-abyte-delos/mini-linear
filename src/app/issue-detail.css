@@ -74,9 +74,13 @@
 .idp-rows li.is-done .t{color:var(--muted)}
 .idp-rows li .x{position:absolute;right:4px;top:4px;opacity:0;height:24px;background:transparent}
 .idp-rows li:hover .x,.idp-rows li:focus-within .x{opacity:1}
-.idp-rows li:hover .row-link .av,.idp-rows li:focus-within .row-link .av{margin-right:24px}
-.blocked-flag{color:#e0a43a;font-size:var(--fs-sm)}
+.idp-rows li:hover .row-link,.idp-rows li:focus-within .row-link{padding-right:32px}
+.idp-rows .row-link,.idp-rows .row-link:hover{text-decoration:none}.idp-rows li .x{z-index:1;color:var(--fg)}
+.blocked-flag{color:var(--warn);font-size:var(--fs-sm)}
 .add-row{display:block;width:100%;text-align:left;border:0;color:var(--muted);height:32px;padding:0 8px;border-radius:6px}
 .add-row:hover,.add-row:focus-visible{background:color-mix(in srgb,var(--fg) 4%,transparent);color:var(--fg)}
 .parent-crumb{display:block;font-size:var(--fs-sm);color:var(--muted);text-decoration:none;margin-bottom:2px}
 .parent-crumb:hover{color:var(--fg)}
+
+.idp-rows li:has(.row-link){margin:0 -8px}.rel-type{padding:0}
+.add-row{width:calc(100% + 16px);margin:0 -8px}.inline-add{min-height:32px;align-items:center}.inline-add input{height:32px;box-sizing:border-box}

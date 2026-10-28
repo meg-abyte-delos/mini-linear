@@ -13,9 +13,8 @@ import { safeHref } from '@/lib/detail/markdown';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
 type PickKind = 'status' | 'priority' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent' | 'relation';
-const REL_GROUP: Record<Relation['type'], string> = { blocks: 'Blocks', blocked_by: 'Blocked by', related: 'Related', duplicate: 'Duplicate of' };
 const REL_ORDER: Relation['type'][] = ['blocks', 'blocked_by', 'related', 'duplicate'];
-const REL_LABEL: Record<Relation['type'], string> = { blocks: 'Blocks', blocked_by: 'Blocked by', related: 'Related to', duplicate: 'Duplicate of' };
+const REL_LABEL: Record<Relation['type'], string> = { blocks: 'Blocks', blocked_by: 'Blocked by', related: 'Related', duplicate: 'Duplicate of' };
 const ESTIMATES = [0, 1, 2, 3, 5, 8, 13];
 const EMOJIS = ['👍', '🎉', '❤️', '👀'];
 const MENTION_USERS: MentionUser[] = USERS.map((u) => ({ id: u.id, name: u.name, handle: u.name.split(' ')[0]?.toLowerCase() ?? u.id }));
@@ -44,6 +43,8 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
   const [comments, setComments] = useState<Comment[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([{ id: 'a0', actor_id: initial.assignee_id as string | null, action: 'created the issue', created_at: initial.created_at }]);
   const [toast, setToast] = useState<string | null>(null);
+  const [subBusy, setSubBusy] = useState(false);
+  const relBtn = useRef<HTMLButtonElement>(null);
   const [linkForm, setLinkForm] = useState<{ url: string; title: string } | null>(null);
   const [relMenu, setRelMenu] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -149,18 +150,24 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
     log('removed a relation');
   }
 
-  async function addSubIssue(t: string) {
+  async function addSubIssue(t: string): Promise<boolean> {
+    if (api && !teamId) { setToast('Cannot create a sub-issue: no team selected'); return false; }
     if (api && teamId) {
-      const row = await createIssue(slug, teamId, t, undefined, issue.id);
-      if (!row) { setToast('Could not create the sub-issue'); return; }
-      setOthers((o) => [...o, { ...row, parent_id: issue.id } as DetailIssue]);
-      log(`added sub-issue ${identifierOf(row)}`);
-      return;
+      if (subBusy) return false;
+      setSubBusy(true);
+      try {
+        const row = await createIssue(slug, teamId, t, undefined, issue.id);
+        if (!row) { setToast('Could not create the sub-issue'); return false; }
+        setOthers((o) => [...o, { ...row, parent_id: issue.id } as DetailIssue]);
+        log(`added sub-issue ${identifierOf(row)}`);
+        return true;
+      } finally { setSubBusy(false); }
     }
     const n = others.length + 2000;
     const child: DetailIssue = { ...issue, id: `${ident.split('-')[0] ?? 'DEL'}-${n}`, identifier: undefined, title: t, description: '', status: 'todo', parent_id: issue.id, label_ids: [], version: 1, created_at: now(), deleted_at: null, archived_at: null };
     setOthers((o) => [...o, child]);
     log(`added sub-issue ${child.id}`);
+    return true;
   }
 
   async function lifecycle(action: 'archive' | 'unarchive' | 'delete' | 'restore') {
@@ -282,16 +289,16 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
           <h2 id='h-sub'>Sub-issues {pr.total > 0 && <><span className='count'>{pr.done}/{pr.total}</span><span className='sub-bar' role='img' aria-label={`${pr.done} of ${pr.total} sub-issues done`}><span style={{ width: `${Math.round((pr.done / pr.total) * 100)}%` }} /></span></>}
             {!readOnly && <button className='sec-add' aria-label='Add sub-issue' onClick={() => setAdding(true)}>+</button>}</h2>
           {children.length > 0 && <ul className='idp-rows'>{children.map((c) => <li key={c.id} className={c.status === 'done' ? 'is-done' : undefined}><Link className='row-link' href={`/w/${slug}/issue/${identifierOf(c)}`}><StatusIcon status={c.status} /><span className='id'>{identifierOf(c)}</span><span className='t'>{c.title}</span>{(() => { const u = who(c.assignee_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}</Link></li>)}</ul>}
-          {!readOnly && adding && <form className='inline-add' onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (new FormData(f).get('t') as string ?? '').trim(); if (t) { void addSubIssue(t); f.reset(); } }}><label className='sr-only' htmlFor='sub-t'>New sub-issue title</label><input id='sub-t' name='t' autoFocus placeholder='Sub-issue title, Enter to create' maxLength={255} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAdding(false); } }} /><button type='submit'>Add</button></form>}
+          {!readOnly && adding && <form className='inline-add' onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (new FormData(f).get('t') as string ?? '').trim(); if (t && !subBusy) { void addSubIssue(t).then((ok) => { if (ok) f.reset(); }); } }}><label className='sr-only' htmlFor='sub-t'>New sub-issue title</label><input id='sub-t' name='t' autoFocus readOnly={subBusy} aria-busy={subBusy} placeholder='Sub-issue title, Enter to create' maxLength={255} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAdding(false); } }} /><button type='submit' disabled={subBusy}>Add</button></form>}
           {!readOnly && !adding && children.length > 0 && <button className='add-row' onClick={() => setAdding(true)}>+ Add sub-issue</button>}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-rel'>
           <h2 id='h-rel'>Relations
-            {!readOnly && <span className='rel-add'><button className='sec-add' aria-label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}>+</button>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') setRelMenu(false); }}>{REL_ORDER.map((t) => <button role='menuitem' key={t} onClick={(e) => { setRelMenu(false); setPick({ kind: 'relation', relType: t, rect: e.currentTarget.getBoundingClientRect() }); }}>{REL_LABEL[t]}…</button>)}</div>}</span>}
+            {!readOnly && <span className='rel-add'><button ref={relBtn} className='sec-add' aria-label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}>+</button>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button role='menuitem' key={t} onClick={(e) => { setRelMenu(false); setPick({ kind: 'relation', relType: t, rect: e.currentTarget.getBoundingClientRect() }); }}>{REL_LABEL[t]}…</button>)}</div>}</span>}
           </h2>
           {REL_ORDER.map((t) => { const rs = relations.filter((r) => r.type === t); if (!rs.length) return null; return (
-            <div key={t} className='rel-group'><div className='rel-type' id={`rg-${t}`}>{REL_GROUP[t]}</div>
+            <div key={t} className='rel-group'><div className='rel-type' id={`rg-${t}`}>{REL_LABEL[t]}</div>
               <ul className='idp-rows' aria-labelledby={`rg-${t}`}>{rs.map((r) => { const o = byId(r.related_issue_id); const open = t === 'blocked_by' && !!o && o.status !== 'done'; const u = who(o?.assignee_id); return (
                 <li key={r.id} className={o?.status === 'done' ? 'is-done' : undefined}>
                   {o ? <Link className='row-link' href={`/w/${slug}/issue/${identifierOf(o)}`}><StatusIcon status={o.status} /><span className='id'>{identifierOf(o)}</span><span className='t'>{o.title}</span>{open && <span className='blocked-flag' title='Still blocking'>Blocked</span>}{u && <Avatar initials={u.initials} hue={u.hue} />}</Link> : <span className='row-link'>{r.related_issue_id}</span>}
