@@ -63,6 +63,12 @@ jobs:
           done
           echo "app did not come up within 60 s"; tail -n 50 app1.log app2.log; exit 1
       - run: pnpm test
+      - name: Coverage report (non-blocking)
+        if: always()
+        run: node scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: coverage, path: coverage/, if-no-files-found: ignore }
       - name: App logs
         if: always()
         run: tail -n 120 app1.log || true
