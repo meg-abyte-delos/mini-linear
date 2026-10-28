@@ -17,6 +17,7 @@ CREATE TABLE github_team_settings (
   on_pr_merge issue_status DEFAULT 'done',
   updated_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (team_id, workspace_id) REFERENCES teams(id, workspace_id) ON DELETE CASCADE);
+CREATE INDEX github_team_settings_ws_idx ON github_team_settings (workspace_id, team_id);
 
 CREATE TABLE issue_pr_links (
   id uuid PRIMARY KEY, workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
