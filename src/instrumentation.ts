@@ -9,5 +9,9 @@ export async function register() {
     const { startPurgeScheduler } = await import('./lib/auth/ratelimit');
     const { db } = await import('./lib/http/ctx');
     startPurgeScheduler(db());
+    if (process.env.WEBHOOKS_DISABLED !== '1') {
+      const { startWebhookDispatcher } = await import('./lib/integrations/webhooks');
+      startWebhookDispatcher(db());
+    }
   }
 }
