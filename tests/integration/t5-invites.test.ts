@@ -1,17 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment -- TODO(M1) draft suite */
-// @ts-nocheck TODO(M1): black-box suite drafted before the M1 routes exist; remove once typed against the real API.
 import { describe, it, expect, beforeAll } from 'vitest';
 import { createHash, randomBytes } from 'node:crypto';
-import { ownerPool, appPool, api, world } from './helpers/world';
+import { ownerPool, appPool, api, world, type U } from './helpers/world';
 import { runIntegration } from './helpers/gate';
 let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { if (runIntegration) W = await world(); });
 const P1 = '/api/v1/w/w1';
-const accept = (u: any, token: string) => api(u, 'POST', '/api/v1/invites/accept', { token });
+const accept = (u: U | null, token: string) => api(u, 'POST', '/api/v1/invites/accept', { token });
 const snap = async (r: Response) => ({
   s: r.status,
   b: (await r.text()).replace(/"request_?id":"[^"]*"/i, ''),
-  h: [...r.headers.entries()].filter(([k]) => !['date', 'x-request-id', 'content-length', 'set-cookie'].includes(k)).sort().join('|'),
+  h: [...(r.headers as unknown as Iterable<[string, string]>)].filter(([k]) => !['date', 'x-request-id', 'content-length', 'set-cookie'].includes(k)).sort().join('|'),
 });
 // Seeds an invite directly as owner; returns the raw token.
 const seed = async (o: { email: string; role?: string; expired?: boolean; revoked?: boolean; used?: boolean }) => {
@@ -24,8 +22,7 @@ const seed = async (o: { email: string; role?: string; expired?: boolean; revoke
   return token;
 };
 
-// TODO(M1)
-describe.skip('T5 invalid invites are indistinguishable', () => {
+describe.runIf(runIntegration)('T5 invalid invites are indistinguishable', () => {
   it('invalid, expired, reused, wrong-email, revoked: same 404 INVITE_INVALID, body and headers', async () => {
     const me = W.Nemail;
     const tokens = [
@@ -39,11 +36,11 @@ describe.skip('T5 invalid invites are indistinguishable', () => {
   });
 });
 
-// TODO(M1)
-describe.skip('T5 valid accept', () => {
+describe.runIf(runIntegration)('T5 valid accept', () => {
   it('adds membership once, idempotent, invited role, audit event', async () => {
     const t = await seed({ email: W.Nemail, role: 'member' });
-    const r1 = await accept(W.N, t); expect([200, 201]).toContain(r1.status);
+    const r1 = await accept(W.N, t);
+    expect([200, 201]).toContain(r1.status);
     await accept(W.N, t);
     const m = (await ownerPool.query(`select role from memberships m join users u on u.id=m.user_id where u.email=$1 and m.workspace_id=$2`, [W.Nemail, W.w1])).rows;
     expect(m).toEqual([{ role: 'member' }]);
@@ -66,8 +63,7 @@ describe.skip('T5 valid accept', () => {
   });
 });
 
-// TODO(M1)
-describe.skip('T5 creating invites', () => {
+describe.runIf(runIntegration)('T5 creating invites', () => {
   it('non-admins cannot create invites', async () => {
     for (const u of [W.M1, W.G1]) expect([403, 404]).toContain((await api(u, 'POST', `${P1}/invites`, { email: 'x@example.test', role: 'member' })).status);
   });

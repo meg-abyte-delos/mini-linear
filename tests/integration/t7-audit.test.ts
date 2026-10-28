@@ -39,19 +39,18 @@ describe.runIf(runIntegration)('T7 one request = one transaction = one audit eve
 
 describe.runIf(runIntegration)('T7 audited actions', () => {
   const has = async (t0: Date, re: RegExp) => (await events(t0)).some((e) => re.test(e.action));
-  // TODO(M1): members, invites, shares and auth routes are not merged yet.
-  it.skip('role change is audited', async () => {
+  it('role change is audited', async () => {
     const t0 = new Date();
     const m = (await ownerPool.query('select user_id id from team_memberships where team_id=$1 limit 1', [W.t1])).rows[0].id;
     await api(W.A1, 'PATCH', `${P1}/members/${m}`, { role: 'member' });
     expect(await has(t0, /role/i)).toBe(true);
   });
-  it.skip('invite create is audited', async () => {
+  it('invite create is audited', async () => {
     const t0 = new Date();
     await api(W.A1, 'POST', `${P1}/invites`, { email: `aud${Date.now()}@example.test`, role: 'member' });
     expect(await has(t0, /invite/i)).toBe(true);
   });
-  it.skip('share and revoke are audited', async () => {
+  it('share and revoke are audited', async () => {
     const t0 = new Date();
     const g = (await ownerPool.query('select guest_user_id id from issue_shares where issue_id=$1 limit 1', [W.i1])).rows[0].id;
     await api(W.A1, 'DELETE', `${P1}/issues/${W.i1}/shares/${g}`);
@@ -59,7 +58,7 @@ describe.runIf(runIntegration)('T7 audited actions', () => {
     const ev = await events(t0);
     expect(ev.filter((e) => /share/i.test(e.action)).length).toBeGreaterThanOrEqual(2);
   });
-  it.skip('login and logout are audited', async () => {
+  it('login and logout are audited', async () => {
     const t0 = new Date();
     await api(W.M1, 'POST', '/api/v1/auth/logout');
     const r = await ownerPool.query(`select action from audit_events where created_at >= $1 and action ~* 'logout|login'`, [t0]);
@@ -74,8 +73,7 @@ describe.runIf(runIntegration)('T7 no secrets in diffs (canary, S11)', () => {
     const all = JSON.stringify((await ownerPool.query('select diff from audit_events')).rows);
     expect(all).not.toMatch(/\$argon2|password_hash|token_hash|"token"|"secret"/i);
   });
-  // TODO(M1): GET /audit not merged.
-  it.skip('GET /audit contains no hashes or tokens', async () => {
+  it('GET /audit contains no hashes or tokens', async () => {
     const r = await (await api(W.A1, 'GET', `${P1}/audit?limit=100`)).text();
     expect(r).not.toMatch(/\$argon2|password_hash|token_hash|"token"|"secret"/i);
   });

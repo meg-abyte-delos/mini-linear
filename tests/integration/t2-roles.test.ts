@@ -1,13 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment -- TODO(M1) draft suite */
-// @ts-nocheck TODO(M1): black-box suite drafted before the M1 routes exist; remove once typed against the real API.
 import { describe, it, expect, beforeAll } from 'vitest';
-import { ownerPool, api, world } from './helpers/world';
+import { ownerPool, api, world, type U } from './helpers/world';
 import { runIntegration } from './helpers/gate';
 let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { if (runIntegration) W = await world(); });
 const P1 = '/api/v1/w/w1';
-const mk = async (u: any, title = 't2') =>
-  (await (await api(u, 'POST', `${P1}/issues`, { title, team_id: W.t1 })).json()).id as string;
+const mk = async (u: U | null, title = 't2') => (await (await api(u, 'POST', `${P1}/issues`, { title, team_id: W.t1 })).json()).id as string;
 
 describe.runIf(runIntegration)('T2 team scoping', () => {
   it('M2 on a T1 issue: 404 on read, no write', async () => {
@@ -16,7 +13,8 @@ describe.runIf(runIntegration)('T2 team scoping', () => {
     expect((await api(W.M2, 'PATCH', `${P1}/issues/${id}`, { title: 'hax' }, { 'if-match': '1' })).status).toBe(404);
     expect((await api(W.M2, 'DELETE', `${P1}/issues/${id}`)).status).toBe(404);
     const t = (await ownerPool.query('select title, deleted_at from issues where id=$1', [id])).rows[0];
-    expect(t.title).toBe('orig'); expect(t.deleted_at).toBeNull();
+    expect(t.title).toBe('orig');
+    expect(t.deleted_at).toBeNull();
   });
   it.each(['issues', 'projects', 'cycles'])('M2 list %s?team_id=T1 shows nothing from T1', async (kind) => {
     const r = await api(W.M2, 'GET', `${P1}/${kind}?team_id=${W.t1}`);
@@ -25,7 +23,8 @@ describe.runIf(runIntegration)('T2 team scoping', () => {
   });
   it('M1 has full CRUD in own team', async () => {
     const c = await api(W.M1, 'POST', `${P1}/issues`, { title: 'crud', team_id: W.t1 });
-    expect(c.status).toBe(201); const { id } = await c.json();
+    expect(c.status).toBe(201);
+    const { id } = await c.json();
     expect((await api(W.M1, 'GET', `${P1}/issues/${id}`)).status).toBe(200);
     expect((await api(W.M1, 'PATCH', `${P1}/issues/${id}`, { title: 'crud2' }, { 'if-match': '1' })).status).toBe(200);
     expect([200, 204]).toContain((await api(W.M1, 'DELETE', `${P1}/issues/${id}`)).status);
@@ -71,8 +70,7 @@ describe.runIf(runIntegration)('T2 guest G1', () => {
   });
 });
 
-// TODO(M1): shares and members routes are not merged yet.
-describe.skip('T2 share / revoke', () => {
+describe.runIf(runIntegration)('T2 share / revoke', () => {
   const guestId = async () => (await ownerPool.query('select guest_user_id id from issue_shares where issue_id=$1 limit 1', [W.i1])).rows[0].id;
   it('A1 and T1 member can share and revoke', async () => {
     const g = await guestId();
@@ -92,8 +90,7 @@ describe.skip('T2 share / revoke', () => {
   });
 });
 
-// TODO(M1): members/audit routes are not merged yet.
-describe.skip('T2 admin-only actions', () => {
+describe.runIf(runIntegration)('T2 admin-only actions', () => {
   const uid = async (team: string) => (await ownerPool.query('select user_id id from team_memberships where team_id=$1 limit 1', [team])).rows[0].id;
   it('role change and removal: member 403, admin ok', async () => {
     const m2 = await uid(W.t2w1);
