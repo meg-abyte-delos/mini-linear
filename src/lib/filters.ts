@@ -4,6 +4,7 @@ import { MOCK_META, STATUSES, USERS, type Issue, type Meta } from '@/lib/issues'
 export const FILTER_KEYS = ['status', 'assignee', 'label', 'project', 'cycle'] as const;
 export type FilterKey = (typeof FILTER_KEYS)[number];
 export type Filters = Record<FilterKey, string[]>;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const NONE = 'none'; // Unassigned / No project / No cycle
 
 const known = (m: Meta): Record<FilterKey, string[]> => ({
@@ -17,7 +18,7 @@ const known = (m: Meta): Record<FilterKey, string[]> => ({
 export const emptyFilters = (): Filters => ({ status: [], assignee: [], label: [], project: [], cycle: [] });
 
 /** Unknown values are dropped, duplicates removed; order follows the known lists. */
-export function parseFilters(sp: URLSearchParams | Record<string, string | string[] | undefined>, meta: Meta = MOCK_META): Filters {
+export function parseFilters(sp: URLSearchParams | Record<string, string | string[] | undefined>, meta: Meta = MOCK_META, apiMode = false): Filters {
   const KNOWN = known(meta);
   const get = (k: string): string => {
     if (sp instanceof URLSearchParams) return sp.get(k) ?? '';
@@ -27,7 +28,9 @@ export function parseFilters(sp: URLSearchParams | Record<string, string | strin
   const f = emptyFilters();
   for (const k of FILTER_KEYS) {
     const want = new Set(get(k).split(',').filter(Boolean));
-    f[k] = KNOWN[k].filter((v) => want.has(v));
+    // API mode: assignees are real member UUIDs that the mocked USERS list does not know.
+    if (k === 'assignee' && apiMode) f[k] = [...want].filter((v) => v === NONE || UUID_RE.test(v));
+    else f[k] = KNOWN[k].filter((v) => want.has(v));
   }
   return f;
 }

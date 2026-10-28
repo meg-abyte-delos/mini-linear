@@ -18,13 +18,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   let issues: Issue[] = [];
   let error: string | null = null;
   let meta: Meta = MOCK_META;
+  let truncated = false;
   const api = apiConfig();
   try {
-    if (api && !sim) ({ issues, meta } = await loadRemote(api)); else issues = await listIssues(sim);
+    if (api && !sim) ({ issues, meta, truncated } = await loadRemote(api)); else issues = await listIssues(sim);
     if (seed > 0 && !sim) issues = [...issues, ...seedIssues(seed)]; } catch (e) {
     // Log the real cause server-side only; the UI gets a fixed, user-safe message.
     console.error('listIssues failed:', e instanceof Error ? e.message : e);
     error = 'Could not load issues';
   }
-  return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} initialFilters={parseFilters(sp, meta)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} />;
+  return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} truncated={truncated} initialFilters={parseFilters(sp, meta, !!api)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} />;
 }

@@ -49,10 +49,10 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
-export function Shell({ initialIssues, loadError = null, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list' }: { initialIssues: Issue[]; loadError?: string | null; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View }) {
+export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list' }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
   // API mode: server versions by issue id, and one write chain per issue so If-Match never races our own PATCHes.
   const versions = useRef(new Map<string, number>(initialIssues.map((i) => [i.id, i.version])));
   const chains = useRef(new Map<string, Promise<unknown>>());
@@ -69,7 +69,13 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
     if (!prev) return;
     const run = async () => {
       const r = await apiPatch(api.slug, prev, versions.current.get(id) ?? prev.version, patch);
-      if (r.issue) { versions.current.set(id, r.issue.version); store.current.upsert({ ...r.issue, sort_key: prev.sort_key }); sync(); }
+      if (r.issue) {
+        versions.current.set(id, r.issue.version);
+        // Success: keep the optimistic local row (no flicker), adopt only the server version/identifier. Conflict/error: the server copy wins.
+        const local = store.current.list().find((x) => x.id === id);
+        store.current.upsert(r.kind === 'ok' && local ? { ...local, version: r.issue.version, identifier: r.issue.identifier } : { ...r.issue, sort_key: prev.sort_key });
+        sync();
+      }
       if (r.kind === 'conflict') setToast('Issue modified elsewhere. Reloaded the latest version.');
       else if (r.kind === 'error') setToast('Could not save the change. Reloaded the latest version.');
     };
@@ -175,6 +181,8 @@ export function Shell({ initialIssues, loadError = null, initialFilters = emptyF
   });
   function openPick(kind: PickKind) {
     const id = currentIdRef.current; if (!id) return;
+    // Mock USERS ids are not UUIDs, so an assignment would be local-only: disabled in API mode until GET members exists.
+    if (kind === 'assignee' && api) { setToast('Assignee picker needs the members API (not available yet).'); return; }
     const rect = document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.getBoundingClientRect() ?? null;
     setPick({ kind, id, rect });
   }

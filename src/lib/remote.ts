@@ -16,37 +16,42 @@ export function apiConfig(): ApiConfig | null {
 }
 
 type Page<T> = { items: T[]; next_cursor: string | null };
-async function all<T>(h: (req: Request, slug: string) => Promise<Response>, slug: string, path: string): Promise<T[]> {
+export class HttpError extends Error { constructor(msg: string, readonly status: number) { super(msg); } }
+export const PAGE_CAP = 100; // pages of 100 rows -> 10k rows
+type All<T> = { items: T[]; truncated: boolean };
+async function all<T>(h: (req: Request, slug: string) => Promise<Response>, slug: string, path: string): Promise<All<T>> {
   installDevAuth();
   const out: T[] = [];
   let cursor: string | null = null;
-  for (let n = 0; n < 100; n++) { // hard cap: 10k rows
+  for (let n = 0; n < PAGE_CAP; n++) { // hard cap: 10k rows
     const url = `http://localhost/api/v1/w/${slug}/${path}?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
     const res = await h(new Request(url), slug);
-    if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+    if (!res.ok) throw new HttpError(`${path} -> ${res.status}`, res.status);
     const body = (await res.json()) as Page<T>;
     out.push(...body.items);
-    if (!body.next_cursor) return out;
+    if (!body.next_cursor) return { items: out, truncated: false };
     cursor = body.next_cursor;
   }
-  return out;
+  return { items: out, truncated: true };
 }
 
 type ApiIssue = Omit<Issue, 'sort_key'> & { identifier: string };
 export function toIssue(r: ApiIssue, i = 0): Issue {
   return { ...r, sort_key: String(i).padStart(8, '0'), created_at: r.created_at };
 }
-// Guests get 403 on labels/cycles/projects: treat as empty lookups instead of failing the page.
-const soft = async <T,>(p: Promise<T[]>): Promise<T[]> => p.catch(() => []);
+// Guests get 403 on labels/cycles/projects: only that is an empty lookup. Anything else (500, network) fails the page.
+const soft = async <T,>(p: Promise<All<T>>): Promise<All<T>> => p.catch((e) => { if (e instanceof HttpError && e.status === 403) return { items: [], truncated: false }; throw e; });
 
-export async function loadRemote(cfg: ApiConfig): Promise<{ issues: Issue[]; meta: Meta }> {
-  const [issues, labels, cycles, projects] = await Promise.all([
+export async function loadRemote(cfg: ApiConfig): Promise<{ issues: Issue[]; meta: Meta; truncated: boolean }> {
+  const [iss, lab, cyc, prj] = await Promise.all([
     all<ApiIssue>(listIssues, cfg.slug, 'issues'),
     soft(all<{ id: string; name: string }>(listLabels, cfg.slug, 'labels')),
     soft(all<Meta['cycles'][number]>(listCycles, cfg.slug, 'cycles')),
     soft(all<Meta['projects'][number]>(listProjects, cfg.slug, 'projects')),
   ]);
+  const issues = iss.items, labels = lab.items, cycles = cyc.items, projects = prj.items;
   return {
+    truncated: iss.truncated,
     issues: issues.map(toIssue),
     meta: {
       // The API label has a hex color; chips use 3 theme hues for now (TODO: render the hex once the theme allows inline colors).
