@@ -556,7 +556,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       </main>
       {open && current && (
         <aside className='panel' aria-label='Issue detail'>
-          <div className='panel-head'><span className='id'>{current.identifier ?? current.id}</span><button onClick={() => setOpen(false)} aria-label='Close detail panel'>Esc</button></div>
+          <div className='panel-head'><span className='id'>{current.identifier ?? current.id}</span><a href={`/w/${api?.slug ?? 'delos'}/issue/${current.identifier ?? current.id}`}>Open</a><button onClick={() => setOpen(false)} aria-label='Close detail panel'>Esc</button></div>
           <h2>{current.title}</h2>
           <dl>
             <dt>Status</dt><dd><StatusIcon status={current.status} />{STATUS_LABEL[current.status]}</dd>
