@@ -46,7 +46,8 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
               <span className='pj-status' data-status={p.status ?? 'backlog'}>{statusLabel(p.status)}</span>
               <span className='cy-dates'>{lead(p.lead_id)}</span>
               <span className={`cy-dates${late ? ' pj-late' : ''}`} data-testid={`target-${p.id}`}>{p.target_date ? `Target ${fmtDate(p.target_date)}${late ? ' (overdue)' : ''}` : 'No target date'}</span>
-              <span className='cy-prog' role='img' aria-label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`}><span style={{ width: `${pr.pct}%` }} /></span>
+              {/* SVG rect width is an attribute, not an inline style: it survives the strict CSP (style-src 'self'). */}
+              <svg className='cy-prog' role='img' aria-label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`}><rect className='cy-prog-fill' x='0' y='0' height='100%' width={`${pr.pct}%`} /></svg>
               <span className='cy-count'>{pr.pct}%</span>
               {canOpen && <button onClick={() => onOpen(p.id)}>Open</button>}<button onClick={() => onViewIssues(p.id)}>View issues</button>
             </div>
