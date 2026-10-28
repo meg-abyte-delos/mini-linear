@@ -9,7 +9,9 @@ import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/mock-api';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
-import { createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
+import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
+import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
+import { SelectionBar, type BulkKind } from './SelectionBar';
 import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
 import { ProjectDetail } from '@/components/ProjectDetail';
@@ -18,7 +20,7 @@ import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
 const BUCKETS: { id: CycleBucket; title: string }[] = [{ id: 'active', title: 'Active' }, { id: 'upcoming', title: 'Upcoming' }, { id: 'past', title: 'Past' }];
-type PickKind = 'priority' | 'assignee' | 'label';
+type PickKind = 'priority' | 'assignee' | 'label' | BulkKind;
 interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit }
 
 function Column({ status, items, renderCard, selectedId, overZone, zone }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object }) {
@@ -176,7 +178,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   function setStatusBulk(st: Status) {
     if (readOnly) { setToast('Guests have read-only access.'); return; }
     const ids = targetIds();
-    if (ids.length > 1) { for (const id of ids) { const was = store.current.list().find((x) => x.id === id)?.status; store.current.move(id, st, null); if (was && was !== st) push(id, { status: st }); } sync(); setToast(`Moved ${ids.length} issues to ${STATUS_LABEL[st]}`); }
+    if (ids.length > 1) void applyBulk(ids, { status: st }, 'Status');
     else if (ids[0]) moveTo(ids[0], st, null);
   }
   // Drag and drop: drop on a section sets its status (appended); drop on a row/card inserts before it.
@@ -208,12 +210,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); setOverKey(`z-${s}`); } },
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveTo(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
-  function openPick(kind: PickKind) {
+  function openPick(kind: PickKind, at?: DOMRect) {
     if (readOnly) { setToast('Guests have read-only access.'); return; }
     const ids = targetIds(); const id = ids[0]; if (!id) return;
     // Mock USERS ids are not UUIDs, so an assignment would be local-only: disabled in API mode until GET members exists.
     if (kind === 'assignee' && api) { setToast('Assignee picker needs the members API (not available yet).'); return; }
-    const rect = document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.getBoundingClientRect() ?? null;
+    const rect = at ?? document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.getBoundingClientRect() ?? null;
     setPick({ kind, id, ids, rect });
   }
   function closePick() {
@@ -223,6 +225,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   function applyPick(optId: string) {
     if (!pick) return;
     const items = pick.ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x); if (!items.length) return;
+    const NO = 'none';
+    if (items.length > 1) {
+      const k = pick.kind, ids = items.map((x) => x.id);
+      if (k === 'label') { void applyBulk(ids, labelTogglePatch(items, optId), 'Labels'); return; }
+      const m: Record<string, [string, BulkPatch]> = { priority: ['Priority', { priority: Number(optId) }], assignee: ['Assignee', { assignee_id: optId === NO ? null : optId }], status: ['Status', { status: optId as Status }], project: ['Project', { project_id: optId === NO ? null : optId }], cycle: ['Cycle', { cycle_id: optId === NO ? null : optId }] };
+      const e = m[k]; if (e) void applyBulk(ids, e[1], e[0]);
+      closePick(); return;
+    }
     if (pick.kind === 'priority') { for (const cur of items) { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); push(cur.id, { priority: Number(optId) }); } sync(); closePick(); }
     else if (pick.kind === 'assignee') { for (const cur of items) { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); if (isUuid(optId)) push(cur.id, { assignee_id: optId }); else if (optId === 'none') push(cur.id, { assignee_id: null }); /* mock USERS ids are not UUIDs: local only until GET members exists */ } sync(); closePick(); }
     else {
@@ -232,12 +242,50 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       sync();
     }
   }
+
+  // Bulk edit: one optimistic local update, then POST /issues/bulk (API mode, chunks of 250). Failed ids are rolled back to their
+  // previous row and reported; the successful part is undoable (Undo in the bar / toast) through the inverse patches.
+  const [undo, setUndo] = useState<{ label: string; groups: BulkGroup[] } | null>(null);
+  async function applyBulk(ids: string[], patch: BulkPatch, label: string, recordUndo = true) {
+    const items = ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x);
+    if (!items.length) return;
+    const groups = inverseGroups(items, patch);
+    if (!groups.length) { setToast('Nothing to change.'); return; }
+    for (const it of items) { const nx = applyBulkLocal(it, patch); if (patch.status !== undefined && nx.status !== it.status) store.current.move(it.id, nx.status, null); store.current.update(it.id, { priority: nx.priority, assignee_id: nx.assignee_id, project_id: nx.project_id, cycle_id: nx.cycle_id, label_ids: nx.label_ids }); }
+    sync();
+    let failed: { id: string; message: string }[] = [];
+    if (api) {
+      // Let our own queued PATCHes land first so the bulk does not race them (versions stay exact: +1 per updated issue).
+      await Promise.all(ids.map((id) => chains.current.get(id)).filter(Boolean));
+      const okIds: string[] = [];
+      for (const part of chunk(ids, BULK_MAX)) {
+        const r = await apiBulk(api.slug, part, patch as Record<string, unknown>);
+        for (const id of r.succeeded) { versions.current.set(id, (versions.current.get(id) ?? items.find((x) => x.id === id)?.version ?? 0) + 1); okIds.push(id); }
+        failed = failed.concat(r.failed);
+      }
+      for (const f of failed) { const orig = items.find((x) => x.id === f.id); if (orig) store.current.upsert(orig); }
+      sync();
+      if (recordUndo) groups.forEach((g) => { g.ids = g.ids.filter((id) => okIds.includes(id)); });
+    }
+    const done = ids.length - failed.length;
+    setToast(failed.length ? `${label}: ${done} of ${ids.length} updated, ${failed.length} failed (${failed[0]!.message})` : `${label}: ${done} issue${done === 1 ? '' : 's'} updated`);
+    if (recordUndo) setUndo(done > 0 ? { label, groups: groups.filter((g) => g.ids.length) } : null);
+  }
+  async function undoBulk() {
+    const u = undo; if (!u) return;
+    setUndo(null);
+    for (const g of u.groups) await applyBulk(g.ids, g.patch, `Undo ${u.label.toLowerCase()}`, false);
+  }
+
   function pickOptions(): PickOption[] {
     const sel = pick ? allIssues.filter((x) => pick.ids.includes(x.id)) : [];
     const cur = sel[0];
     if (!pick || !cur) return [];
     if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: sel.every((x) => x.priority === n), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
     if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (pick.kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: sel.every((x) => x.status === st), lead: <StatusIcon status={st} /> }));
+    if (pick.kind === 'project') return [{ id: 'none', label: 'No project', checked: sel.every((x) => x.project_id === null) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: sel.every((x) => x.project_id === p.id) }))];
+    if (pick.kind === 'cycle') return [{ id: 'none', label: 'No cycle', checked: sel.every((x) => x.cycle_id === null) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: sel.every((x) => x.cycle_id === c.id) }))];
     return LABELS.map((l) => ({ id: l.id, label: l.name, badge: scopeBadge(l.scope), checked: sel.every((x) => x.label_ids.includes(l.id)), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
   // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
@@ -414,6 +462,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
 
   const row = (i: Issue) => (
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
+      {!readOnly && <input type='checkbox' className='rowsel' aria-label={`Select ${i.identifier ?? i.id}`} checked={multi.includes(i.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggleSelect(i.id)} />}
       <PriorityIcon priority={i.priority} />
       <span className='id'>{i.identifier ?? i.id}</span>
       <StatusIcon status={i.status} />
@@ -566,6 +615,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </dl>
         </aside>
       )}
+      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} />}
       {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
       {help && (
         <div className='overlay' onClick={() => setHelp(false)}>
@@ -577,7 +627,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </div>
       )}
       {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}</div>}
-      {pick && <Picker title={pick.kind === 'priority' ? 'Set priority' : pick.kind === 'assignee' ? 'Set assignee' : 'Set labels'} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
+      {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}
       {filterPick && <Picker title={`Filter by ${FILTER_LABEL[filterPick.kind].toLowerCase()}`} multi anchor={filterPick.rect} options={filterOptions(filterPick.kind)} onPick={(id) => toggleFilter(filterPick.kind, id)} onClose={() => { const k = filterPick.kind; setFilterPick(null); setTimeout(() => document.getElementById(`fb-${k}`)?.focus(), 0); }} />}
       {palette && (
