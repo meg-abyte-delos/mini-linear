@@ -119,6 +119,7 @@ export const cycles = pgTable("cycles", {
 });
 export const labels = pgTable("labels", {
   id: uuid("id").primaryKey(), workspaceId: wsId(), name: text("name").notNull(), color: text("color").notNull().default("#888888"),
+  teamId: uuid("team_id"), groupId: uuid("group_id"), description: text("description").notNull().default(""), // 0106
   version: integer("version").notNull().default(1), createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 export const issues = pgTable("issues", {
@@ -185,3 +186,13 @@ export const notificationPreferences = pgTable("notification_preferences", {
   workspaceId: wsId(), userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: notificationTypeEnum("type").notNull(), inApp: boolean("in_app").notNull().default(true), email: boolean("email").notNull().default(false),
 }, (t) => [primaryKey({ columns: [t.workspaceId, t.userId, t.type] })]);
+// --- Area 9 Part 2 (db/migrations/0106_team_settings_labels.sql): team configuration + label groups.
+export const teamSettings = pgTable("team_settings", {
+  teamId: uuid("team_id").primaryKey(), workspaceId: wsId(), estimateScale: text("estimate_scale").notNull().default("none"),
+  estimateAllowZero: boolean("estimate_allow_zero").notNull().default(false),
+  version: integer("version").notNull().default(1), createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+export const labelGroups = pgTable("label_groups", {
+  id: uuid("id").primaryKey(), workspaceId: wsId(), teamId: uuid("team_id"), name: text("name").notNull(), color: text("color").notNull().default("#888888"),
+  version: integer("version").notNull().default(1), createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
+});
