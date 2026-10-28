@@ -25,3 +25,13 @@ describe('project client', () => {
     expect(byTarget(m).map((x) => x.id)).toEqual(['3', '2', '1']);
   });
 });
+describe('project patch', () => {
+  it('sends PATCH with If-Match version', async () => {
+    let seen: RequestInit | undefined;
+    const f = (async (_u: string, init?: RequestInit) => { seen = init; return res({ id: 'p1' }); }) as unknown as typeof fetch;
+    await projectClient('w', 'p1', f).patch(3, { status: 'paused' });
+    expect(seen?.method).toBe('PATCH');
+    expect((seen?.headers as Record<string, string>)['if-match']).toBe('"3"');
+    expect(JSON.parse(seen?.body as string)).toEqual({ status: 'paused' });
+  });
+});
