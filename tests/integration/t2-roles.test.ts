@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { ownerPool, inWs, api, world, type U } from './helpers/world';
+import { inWs, api, world, type U } from './helpers/world';
 import { runIntegration } from './helpers/gate';
 let W: Awaited<ReturnType<typeof world>>;
 beforeAll(async () => { if (runIntegration) W = await world(); });
@@ -16,7 +16,7 @@ describe.runIf(runIntegration)('T2 team scoping', () => {
     expect((await api(W.M2, 'GET', `${P1}/issues/${id}`)).status).toBe(404);
     expect((await api(W.M2, 'PATCH', `${P1}/issues/${id}`, { title: 'hax' }, { 'if-match': '1' })).status).toBe(404);
     expect((await api(W.M2, 'DELETE', `${P1}/issues/${id}`)).status).toBe(404);
-    const t = (await ownerPool.query('select title, deleted_at from issues where id=$1', [id])).rows[0];
+    const t = (await inWs(W.w1, (c) => c.query('select title, deleted_at from issues where id=$1', [id]))).rows[0];
     expect(t.title).toBe('orig');
     expect(t.deleted_at).toBeNull();
   });
@@ -95,9 +95,8 @@ describe.runIf(runIntegration)('T2 share / revoke', () => {
 });
 
 describe.runIf(runIntegration)('T2 admin-only actions', () => {
-  const uid = async (team: string) => (await inWs(W.w1, (c) => c.query('select user_id id from team_memberships where team_id=$1 limit 1', [team]))).rows[0].id;
   it('role change and removal: member 403, admin ok', async () => {
-    const m2 = await uid(W.t2w1);
+    const m2 = W.M2.id; // M2 is a workspace member in no team
     expect((await api(W.M1, 'PATCH', `${P1}/members/${m2}`, { role: 'admin' })).status).toBe(403);
     expect((await api(W.M1, 'DELETE', `${P1}/members/${m2}`)).status).toBe(403);
     expect([200, 204]).toContain((await api(W.A1, 'PATCH', `${P1}/members/${m2}`, { role: 'member' })).status);
