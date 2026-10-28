@@ -12,10 +12,14 @@ export async function call<T>(f: Fetch, url: string, init?: RequestInit): Promis
   } catch { return { ok: false, unsupported: false, status: 0 }; }
 }
 
-export interface Relation { id: string; type: 'blocks' | 'blocked_by' | 'related' | 'duplicate'; issue_id: string; related_issue_id: string }
+export interface Relation { id: string; type: 'blocks' | 'blocked_by' | 'related' | 'duplicate'; issue_id: string; related_issue_id: string; direction?: 'outgoing' | 'incoming' }
 export interface Attachment { id: string; kind: 'link' | 'file'; url: string; title: string; created_by: string | null }
-export interface Comment { id: string; body: string; author_id: string | null; parent_comment_id: string | null; created_at: string; reactions?: { emoji: string; count: number; mine: boolean }[] }
-export interface ActivityItem { id: string; actor: string | null; action: string; diff?: Record<string, { from: unknown; to: unknown }>; created_at: string }
+export interface Comment { id: string; body: string; author_id: string | null; parent_comment_id: string | null; created_at: string; reactions?: Reaction[] }
+/** Server shape (#75): user_ids of reactors; `mine` is derived client-side from the viewer id. */
+export interface Reaction { emoji: string; count: number; user_ids?: string[] }
+export const reactedBy = (r: Reaction | undefined, me: string) => !!r?.user_ids?.includes(me);
+/** Server shape (#68): actor_id + human summary + per-field changes (description/body values are redacted to null). */
+export interface ActivityItem { id: string; actor_id: string | null; action: string; summary?: string; changes?: { field: string; label: string; before: unknown; after: unknown; text: string }[]; created_at: string }
 type Page<T> = { items: T[]; next_cursor: string | null };
 
 export function detailApi(slug: string, f: Fetch = (...a) => fetch(...a)) {

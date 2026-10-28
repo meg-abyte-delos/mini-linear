@@ -6,7 +6,7 @@ import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
 import { Picker, type PickOption } from '@/components/Picker';
 import { Markdown } from '@/components/Markdown';
 import { patchIssue } from '@/lib/api-client';
-import { detailApi, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
+import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
 import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
 import { activeMention, insertMention, suggest, type MentionUser } from '@/lib/detail/mentions';
 import { safeHref } from '@/lib/detail/markdown';
@@ -40,7 +40,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
   const [relations, setRelations] = useState<Relation[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
-  const [activity, setActivity] = useState<ActivityItem[]>([{ id: 'a0', actor: initial.assignee_id, action: 'created the issue', created_at: initial.created_at }]);
+  const [activity, setActivity] = useState<ActivityItem[]>([{ id: 'a0', actor_id: initial.assignee_id as string | null, action: 'created the issue', created_at: initial.created_at }]);
   const [toast, setToast] = useState<string | null>(null);
   const [linkForm, setLinkForm] = useState<{ url: string; title: string } | null>(null);
   const [relMenu, setRelMenu] = useState(false);
@@ -65,13 +65,13 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
   useEffect(() => { document.documentElement.dataset.ready = '1'; }, []);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); }, [toast]);
 
-  const log = (action: string, diff?: ActivityItem['diff']) => setActivity((a) => [...a, { id: lid('a'), actor: ME, action, diff, created_at: now() }]);
+  const log = (action: string) => setActivity((a) => [...a, { id: lid('a'), actor_id: ME, action, summary: action, created_at: now() }]);
 
   async function update(patch: Partial<DetailIssue>, label: string) {
     const prev = issue;
     const next = { ...issue, ...patch, version: issue.version + 1 };
     setIssue(next);
-    log(label, Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, { from: (prev as unknown as Record<string, unknown>)[k], to: v }])));
+    log(label);
     if (!api) return;
     const r = await patchIssue(slug, prev, version.current, patch as Record<string, unknown>);
     if (r.issue) { version.current = r.issue.version; if (r.kind !== 'ok') setIssue(r.issue); }
@@ -186,14 +186,15 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
   }
   async function toggleReaction(c: Comment, emoji: string) {
     const cur = c.reactions?.find((x) => x.emoji === emoji);
-    const on = !cur?.mine;
+    const on = !reactedBy(cur, ME);
     const r = client ? await client.react(c.id, emoji, on) : null;
     if (r && !r.ok && !r.unsupported) { setToast('Could not react'); return; }
     setComments((cs) => cs.map((x) => {
       if (x.id !== c.id) return x;
       const list = (x.reactions ?? []).filter((y) => y.emoji !== emoji);
       const count = (cur?.count ?? 0) + (on ? 1 : -1);
-      return { ...x, reactions: count > 0 ? [...list, { emoji, count, mine: on }] : list };
+      const ids = on ? [...(cur?.user_ids ?? []), ME] : (cur?.user_ids ?? []).filter((u) => u !== ME);
+      return { ...x, reactions: count > 0 ? [...list, { emoji, count, user_ids: ids }] : list };
     }));
   }
 
@@ -267,7 +268,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
         <section className='idp-sec' aria-labelledby='h-act'>
           <h2 id='h-act'>Activity</h2>
           <ol className='feed' aria-label='Activity'>
-            {activity.map((a) => <li key={a.id} className='ev'><span className='who'>{who(a.actor)?.name ?? 'Someone'}</span> {a.action} <time dateTime={a.created_at}>{fmtTime(a.created_at)}</time></li>)}
+            {activity.map((a) => <li key={a.id} className='ev'><span className='who'>{who(a.actor_id)?.name ?? 'Someone'}</span> {a.summary ?? a.action} <time dateTime={a.created_at}>{fmtTime(a.created_at)}</time></li>)}
           </ol>
           <ul className='threads' aria-label='Comments'>
             {roots.map((c) => <CommentItem key={c.id} c={c} replies={replies(c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, c.id)} readOnly={readOnly} />)}
@@ -303,7 +304,7 @@ function CommentItem({ c, replies, onReact, onReply, readOnly }: { c: Comment; r
       <header><span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time></header>
       <Markdown source={x.body} empty='' />
       <div className='reacts' role='group' aria-label='Reactions'>
-        {EMOJIS.map((e) => { const r = x.reactions?.find((y) => y.emoji === e); return (r || !readOnly) && <button key={e} className={r?.mine ? 'on' : ''} aria-pressed={!!r?.mine} aria-label={`React ${e}${r ? `, ${r.count}` : ''}`} disabled={readOnly} onClick={() => onReact(x, e)}>{e}{r && <span>{r.count}</span>}</button>; })}
+        {EMOJIS.map((e) => { const r = x.reactions?.find((y) => y.emoji === e); return (r || !readOnly) && <button key={e} className={reactedBy(r, ME) ? 'on' : ''} aria-pressed={reactedBy(r, ME)} aria-label={`React ${e}${r ? `, ${r.count}` : ''}`} disabled={readOnly} onClick={() => onReact(x, e)}>{e}{r && <span>{r.count}</span>}</button>; })}
       </div>
     </article>
   );
