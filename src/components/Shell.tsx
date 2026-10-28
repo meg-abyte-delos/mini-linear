@@ -15,10 +15,11 @@ import { SelectionBar, type BulkKind } from './SelectionBar';
 import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
 import { ProjectDetail } from '@/components/ProjectDetail';
+import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
-const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
+const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'Priority', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
 const BUCKETS: { id: CycleBucket; title: string }[] = [{ id: 'active', title: 'Active' }, { id: 'upcoming', title: 'Upcoming' }, { id: 'past', title: 'Past' }];
 type PickKind = 'priority' | 'assignee' | 'label' | BulkKind;
 interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit }
@@ -95,8 +96,57 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // Filters live in the URL: replaceState keeps other params (seed, state) and does not refetch.
   function setFilters(f: Filters) {
     setFiltersState(f);
-    const qs = writeFilters(window.location.search, f);
+    setActiveViewId(null); // an edited filter set is no longer the saved view
+    const sp = new URLSearchParams(window.location.search); sp.delete('v');
+    const qs = writeFilters(sp.toString(), f);
     window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+  }
+  // Saved views (custom views): HTTP in API mode, in-memory otherwise. ?v=<id> opens one (shareable URL).
+  const viewsClient = useMemo(() => (api ? httpViewsClient(api.slug) : mockViewsClient()), [api]);
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [saving, setSaving] = useState<{ name: string; shared: boolean; err: boolean } | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  function applyView(v: SavedView) {
+    const f = groupToFilters(v.filters);
+    setFiltersState(f); setViewState(v.layout);
+    setActiveViewId(v.id);
+    const sp = new URLSearchParams(); sp.set('v', v.id);
+    if (v.layout === 'board') sp.set('view', 'board');
+    const qs = writeFilters(sp.toString(), f);
+    window.history.replaceState(null, '', `${window.location.pathname}?${qs}${window.location.hash}`);
+  }
+  useEffect(() => {
+    if (readOnly && api) return;
+    let live = true;
+    void viewsClient.list().then((list) => {
+      if (!live) return;
+      setViews(list);
+      const want = new URLSearchParams(window.location.search).get('v');
+      const hit = want ? list.find((x) => x.id === want) : undefined;
+      if (hit) applyView(hit);
+    });
+    return () => { live = false; };
+  }, [viewsClient]);
+  async function saveView() {
+    if (!saving) return;
+    const name = saving.name.trim();
+    if (!name) { setSaving({ ...saving, err: true }); return; }
+    const row = await viewsClient.create({ name, shared: saving.shared, layout: view === 'board' ? 'board' : 'list', filters });
+    if (!row) { setSaving({ ...saving, err: true }); return; }
+    setViews((l) => [...l, row]); setSaving(null); setActiveViewId(row.id);
+    const sp = new URLSearchParams(window.location.search); sp.set('v', row.id);
+    window.history.replaceState(null, '', `${window.location.pathname}?${sp.toString().replace(/%2C/gi, ',')}${window.location.hash}`);
+  }
+  async function deleteView(v: SavedView) {
+    if (!(await viewsClient.remove(v))) return;
+    setViews((l) => l.filter((x) => x.id !== v.id));
+    if (activeViewId === v.id) setFilters(emptyFilters());
+  }
+  function copyViewLink(v: SavedView) {
+    const url = viewUrl(window.location.origin, window.location.pathname, v.id);
+    void navigator.clipboard?.writeText(url).catch(() => undefined);
+    setCopied(v.id); setTimeout(() => setCopied((c) => (c === v.id ? null : c)), 1500);
   }
   function toggleFilter(kind: FilterKey, id: string) {
     const cur = filters[kind];
@@ -105,6 +155,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   function filterOptions(kind: FilterKey): PickOption[] {
     const on = (id: string) => filters[kind].includes(id);
     if (kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: on(st), lead: <StatusIcon status={st} /> }));
+    if (kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: on(String(n)), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
     if (kind === 'assignee') return [{ id: NONE, label: 'Unassigned', checked: on(NONE), lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: on(u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     if (kind === 'label') return LABELS.map((l) => ({ id: l.id, label: l.name, badge: scopeBadge(l.scope), checked: on(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
     if (kind === 'project') return [{ id: NONE, label: 'No project', checked: on(NONE) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: on(p.id) }))];
@@ -490,6 +541,15 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><Icon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
           <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><Icon name='issues' /><span>My issues</span></a>
           <a className='side-link' href='#views' onClick={(e) => e.preventDefault()}><Icon name='views' /><span>Views</span></a>
+          <div role='group' aria-label='Saved views' data-testid='saved-views'>
+            {views.map((v) => (
+              <div key={v.id} className='sv-row'>
+                <a className={`side-link sub${activeViewId === v.id ? ' active' : ''}`} aria-current={activeViewId === v.id ? 'page' : undefined} href={`?v=${v.id}`} onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setViewState('list'); applyView(v); }}><span>{v.name}</span>{v.shared && <span className='sv-tag'>Shared</span>}</a>
+                <button className='sv-act' aria-label={`Copy link to ${v.name}`} onClick={() => copyViewLink(v)}>{copied === v.id ? 'Copied' : 'Link'}</button>
+                {!readOnly && <button className='sv-act' aria-label={`Delete view ${v.name}`} onClick={() => void deleteView(v)}>×</button>}
+              </div>
+            ))}
+          </div>
         </nav>
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
@@ -515,6 +575,16 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               </button>
             ))}
             {activeCount(filters) > 0 && <button className='fclear' onClick={() => setFilters(emptyFilters())}>Clear filters</button>}
+            {activeCount(filters) > 0 && !readOnly && !activeViewId && !saving && <button className='fchip save-view' onClick={() => setSaving({ name: '', shared: false, err: false })}>Save view</button>}
+            {saving && (
+              <form className='save-form' onSubmit={(e) => { e.preventDefault(); void saveView(); }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setSaving(null); } }}>
+                <input autoFocus aria-label='View name' aria-invalid={saving.err} placeholder='View name' maxLength={80} value={saving.name} onChange={(e) => setSaving({ ...saving, name: e.target.value, err: false })} />
+                <label><input type='checkbox' checked={saving.shared} onChange={(e) => setSaving({ ...saving, shared: e.target.checked })} /> Shared</label>
+                <button type='submit' className='fchip on'>Save</button>
+                <button type='button' className='fclear' onClick={() => setSaving(null)}>Cancel</button>
+                {saving.err && <span role='alert' className='save-err'>Enter a name (could not save).</span>}
+              </form>
+            )}
           </div>
         )}
         {loadError ? (

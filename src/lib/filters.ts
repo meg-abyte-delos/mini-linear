@@ -1,7 +1,7 @@
-// Pure filter + cycle helpers. Filter state lives in the URL (?status=todo,done&assignee=u1&label=l1&project=p1&cycle=c2).
+// Pure filter + cycle helpers. Filter state lives in the URL (?status=todo,done&priority=1,2&assignee=u1&label=l1&project=p1&cycle=c2).
 import { MOCK_META, STATUSES, USERS, type Issue, type Meta } from '@/lib/issues';
 
-export const FILTER_KEYS = ['status', 'assignee', 'label', 'project', 'cycle'] as const;
+export const FILTER_KEYS = ['status', 'priority', 'assignee', 'label', 'project', 'cycle'] as const;
 export type FilterKey = (typeof FILTER_KEYS)[number];
 export type Filters = Record<FilterKey, string[]>;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -9,13 +9,14 @@ export const NONE = 'none'; // Unassigned / No project / No cycle
 
 const known = (m: Meta): Record<FilterKey, string[]> => ({
   status: [...STATUSES],
+  priority: ['0', '1', '2', '3', '4'],
   assignee: [NONE, ...USERS.map((u) => u.id)],
   label: m.labels.map((l) => l.id),
   project: [NONE, ...m.projects.map((p) => p.id)],
   cycle: [NONE, ...m.cycles.map((c) => c.id)],
 });
 
-export const emptyFilters = (): Filters => ({ status: [], assignee: [], label: [], project: [], cycle: [] });
+export const emptyFilters = (): Filters => ({ status: [], priority: [], assignee: [], label: [], project: [], cycle: [] });
 
 /** Unknown values are dropped, duplicates removed; order follows the known lists. */
 export function parseFilters(sp: URLSearchParams | Record<string, string | string[] | undefined>, meta: Meta = MOCK_META, apiMode = false): Filters {
@@ -49,6 +50,7 @@ export function applyFilters(issues: Issue[], f: Filters): Issue[] {
   const has = (k: FilterKey) => f[k].length > 0;
   return issues.filter((i) =>
     (!has('status') || f.status.includes(i.status)) &&
+    (!has('priority') || f.priority.includes(String(i.priority))) &&
     (!has('assignee') || f.assignee.includes(i.assignee_id ?? NONE)) &&
     (!has('project') || f.project.includes(i.project_id ?? NONE)) &&
     (!has('cycle') || f.cycle.includes(i.cycle_id ?? NONE)) &&
