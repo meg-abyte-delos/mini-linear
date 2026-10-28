@@ -15,22 +15,21 @@ const snap = async (r: Response) => ({
 // Seeds an invite directly as owner; returns the raw token.
 const seed = async (o: { email: string; role?: string; expired?: boolean; revoked?: boolean; used?: boolean }) => {
   const token = randomBytes(32).toString('base64url');
-  // schema has used_at, no revoked_at (#51); RLS is FORCEd so seed through inWs
-  if (o.revoked) throw new Error('revoked invites need invites.revoked_at (#51)');
+  // RLS is FORCEd so seed through inWs
   await inWs(W.w1, (c) => c.query(
-    `insert into invites (id, workspace_id, email, role, token_hash, invited_by, expires_at, used_at)
-     values ($1,$2,$3,$4,$5,$6, now() + ($7)::interval, $8)`,
+    `insert into invites (id, workspace_id, email, role, token_hash, invited_by, expires_at, used_at, revoked_at)
+     values ($1,$2,$3,$4,$5,$6, now() + ($7)::interval, $8, $9)`,
     [randomUUID(), W.w1, o.email, o.role ?? 'member', createHash('sha256').update(token).digest('hex'), W.A1id,
-     o.expired ? '-1 day' : '7 days', o.used ? new Date() : null]));
+     o.expired ? '-1 day' : '7 days', o.used ? new Date() : null, o.revoked ? new Date() : null]));
   return token;
 };
 
 describe.runIf(runIntegration)('T5 invalid invites are indistinguishable', () => {
-  it('invalid, expired, reused, wrong-email (revoked: #51): same 404 INVITE_INVALID, body and headers', async () => {
+  it('invalid, expired, reused, revoked, wrong-email: same 404 INVITE_INVALID, body and headers', async () => {
     const me = W.Nemail;
     const tokens = [
       'nope', await seed({ email: me, expired: true }), await seed({ email: me, used: true }),
-      await seed({ email: 'someone-else@example.test' }), // revoked case skipped until #51
+      await seed({ email: me, revoked: true }), await seed({ email: 'someone-else@example.test' }),
     ];
     const snaps = [];
     for (const t of tokens) snaps.push(await snap(await accept(W.N, t)));
@@ -40,7 +39,7 @@ describe.runIf(runIntegration)('T5 invalid invites are indistinguishable', () =>
 });
 
 describe.runIf(runIntegration)('T5 valid accept', () => {
-  it.skip('(#55) adds membership once, idempotent, invited role, audit event', async () => {
+  it('(#55) adds membership once, idempotent, invited role, audit event', async () => {
     const t = await seed({ email: W.Nemail, role: 'member' });
     const r1 = await accept(W.N, t);
     expect([200, 201]).toContain(r1.status);
@@ -76,5 +75,52 @@ describe.runIf(runIntegration)('T5 creating invites', () => {
     expect(ok.status).toBe(201);
     expect(dup.status).toBe(201);
     expect(await dup.text()).not.toMatch(/already/i);
+  });
+});
+
+describe.runIf(runIntegration)('T5 revoke, resend, re-invite (#51)', () => {
+  const mail = () => 'rv-' + Date.now() + '-' + Math.random().toString(36).slice(2) + '@example.test';
+  const row = async (id: string) => (await inWs(W.w1, (c) => c.query(`select token_hash, revoked_at, used_at, expires_at from invites where id=$1`, [id]))).rows[0];
+  it('DELETE soft-revokes: row kept with revoked_at, hidden from list, second revoke 404', async () => {
+    const r = await api(W.A1, 'POST', `${P1}/invites`, { email: mail(), role: 'member' });
+    const { id } = await r.json();
+    expect((await api(W.A1, 'DELETE', `${P1}/invites/${id}`)).status).toBe(204);
+    expect((await row(id)).revoked_at).not.toBeNull();
+    const list = await (await api(W.A1, 'GET', `${P1}/invites`)).json();
+    expect(list.items.map((i: { id: string }) => i.id)).not.toContain(id);
+    expect((await api(W.A1, 'DELETE', `${P1}/invites/${id}`)).status).toBe(404);
+    const a = (await ownerPool.query(`select count(*)::int n from audit_events where entity_id=$1 and action='revoke'`, [id])).rows[0].n;
+    expect(a).toBe(1);
+  });
+  it('resend rotates the token hash, extends expiry, never returns a token', async () => {
+    const { id } = await (await api(W.A1, 'POST', `${P1}/invites`, { email: mail(), role: 'member' })).json();
+    const before = await row(id);
+    const r = await api(W.A1, 'POST', `${P1}/invites/${id}/resend`);
+    expect(r.status).toBe(200);
+    const body = await r.text();
+    expect(body).not.toMatch(/token/i);
+    const after = await row(id);
+    expect(after.token_hash).not.toBe(before.token_hash);
+    expect(new Date(after.expires_at).getTime()).toBeGreaterThanOrEqual(new Date(before.expires_at).getTime());
+  });
+  it('resend of a revoked, used or unknown invite is 404; non-admins cannot resend', async () => {
+    const { id } = await (await api(W.A1, 'POST', `${P1}/invites`, { email: mail(), role: 'member' })).json();
+    for (const u of [W.M1, W.G1]) expect([403, 404]).toContain((await api(u, 'POST', `${P1}/invites/${id}/resend`)).status);
+    await api(W.A1, 'DELETE', `${P1}/invites/${id}`);
+    expect((await api(W.A1, 'POST', `${P1}/invites/${id}/resend`)).status).toBe(404);
+    expect((await api(W.A1, 'POST', `${P1}/invites/${randomUUID()}/resend`)).status).toBe(404);
+  });
+  it('re-inviting the same email revokes the previous pending invite', async () => {
+    const e = mail();
+    const a = await (await api(W.A1, 'POST', `${P1}/invites`, { email: e, role: 'member' })).json();
+    const b = await (await api(W.A1, 'POST', `${P1}/invites`, { email: e.toUpperCase(), role: 'guest' })).json();
+    expect((await row(a.id)).revoked_at).not.toBeNull();
+    expect((await row(b.id)).revoked_at).toBeNull();
+  });
+  it('a revoked token is rejected by accept exactly like an unknown one', async () => {
+    const t = await seed({ email: W.Nemail, revoked: true });
+    const r = await accept(W.N, t);
+    expect([404, 422]).toContain(r.status);
+    expect((await r.json()).error.code).toBe('INVITE_INVALID');
   });
 });
