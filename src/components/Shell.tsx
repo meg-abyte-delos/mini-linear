@@ -50,7 +50,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
-export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list' }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View }) {
+export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
   const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
@@ -125,7 +125,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const returnFocus = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
-  const [pick, setPick] = useState<{ kind: PickKind; id: string; rect: DOMRect | null } | null>(null);
+  const [pick, setPick] = useState<{ kind: PickKind; id: string; ids: string[]; rect: DOMRect | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -145,12 +145,23 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const orderedRef = useRef(ordered);
   const currentIdRef = useRef<string | undefined>(current?.id);
 
+  // Bulk: with a multi-selection, an action applies to every selected issue; otherwise to the current one.
+  const targetIds = () => (multiRef.current.length ? multiRef.current : currentIdRef.current ? [currentIdRef.current] : []);
   function cycleStatus() {
-    if (!current) return;
-    const next = STATUSES[(STATUSES.indexOf(current.status) + 1) % STATUSES.length] as Status;
-    store.current.update(current.id, { status: next });
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
+    for (const id of targetIds()) {
+      const it = store.current.list().find((x) => x.id === id); if (!it) continue;
+      const next = STATUSES[(STATUSES.indexOf(it.status) + 1) % STATUSES.length] as Status;
+      store.current.update(id, { status: next });
+      push(id, { status: next });
+    }
     sync();
-    push(current.id, { status: next });
+  }
+  function setStatusBulk(st: Status) {
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
+    const ids = targetIds();
+    if (ids.length > 1) { for (const id of ids) { const was = store.current.list().find((x) => x.id === id)?.status; store.current.move(id, st, null); if (was && was !== st) push(id, { status: st }); } sync(); setToast(`Moved ${ids.length} issues to ${STATUS_LABEL[st]}`); }
+    else if (ids[0]) moveTo(ids[0], st, null);
   }
   // Drag and drop: drop on a section sets its status (appended); drop on a row/card inserts before it.
   // TODO(M2 ticket): order is client-side only. Only the status change goes to the API until a position field exists.
@@ -182,11 +193,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveTo(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
   function openPick(kind: PickKind) {
-    const id = currentIdRef.current; if (!id) return;
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
+    const ids = targetIds(); const id = ids[0]; if (!id) return;
     // Mock USERS ids are not UUIDs, so an assignment would be local-only: disabled in API mode until GET members exists.
     if (kind === 'assignee' && api) { setToast('Assignee picker needs the members API (not available yet).'); return; }
     const rect = document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.getBoundingClientRect() ?? null;
-    setPick({ kind, id, rect });
+    setPick({ kind, id, ids, rect });
   }
   function closePick() {
     const id = pick?.id; setPick(null);
@@ -194,20 +206,27 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }
   function applyPick(optId: string) {
     if (!pick) return;
-    const cur = store.current.list().find((x) => x.id === pick.id); if (!cur) return;
-    if (pick.kind === 'priority') { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); push(cur.id, { priority: Number(optId) }); sync(); closePick(); }
-    else if (pick.kind === 'assignee') { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); if (isUuid(optId)) push(cur.id, { assignee_id: optId }); else if (optId === 'none') push(cur.id, { assignee_id: null }); /* mock USERS ids are not UUIDs: local only until GET members exists */ sync(); closePick(); }
-    else { const label_ids = cur.label_ids.includes(optId) ? cur.label_ids.filter((l) => l !== optId) : [...cur.label_ids, optId]; store.current.update(cur.id, { label_ids }); push(cur.id, { label_ids }); sync(); }
+    const items = pick.ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x); if (!items.length) return;
+    if (pick.kind === 'priority') { for (const cur of items) { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); push(cur.id, { priority: Number(optId) }); } sync(); closePick(); }
+    else if (pick.kind === 'assignee') { for (const cur of items) { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); if (isUuid(optId)) push(cur.id, { assignee_id: optId }); else if (optId === 'none') push(cur.id, { assignee_id: null }); /* mock USERS ids are not UUIDs: local only until GET members exists */ } sync(); closePick(); }
+    else {
+      // Label toggle on a selection: if every issue has it, remove it from all; otherwise add it to all.
+      const all = items.every((c) => c.label_ids.includes(optId));
+      for (const cur of items) { const label_ids = all ? cur.label_ids.filter((l) => l !== optId) : cur.label_ids.includes(optId) ? cur.label_ids : [...cur.label_ids, optId]; store.current.update(cur.id, { label_ids }); push(cur.id, { label_ids }); }
+      sync();
+    }
   }
   function pickOptions(): PickOption[] {
-    const cur = pick && allIssues.find((x) => x.id === pick.id);
+    const sel = pick ? allIssues.filter((x) => pick.ids.includes(x.id)) : [];
+    const cur = sel[0];
     if (!pick || !cur) return [];
-    if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: cur.priority === n, lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: cur.assignee_id === null, lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: cur.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
-    return LABELS.map((l) => ({ id: l.id, label: l.name, checked: cur.label_ids.includes(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
+    if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: sel.every((x) => x.priority === n), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
+    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    return LABELS.map((l) => ({ id: l.id, label: l.name, checked: sel.every((x) => x.label_ids.includes(l.id)), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
   // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
   function create() {
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
     if (api) {
       void apiCreate(api.slug, api.teamId, 'New issue').then((row) => {
         if (!row) { setToast('Could not create the issue.'); return; }
@@ -243,7 +262,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   function openPalette() { returnFocus.current = document.activeElement as HTMLElement | null; setPalette(true); setQ(''); setPi(0); }
   function closePalette() { setPalette(false); const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
 
-  const [help, setHelp] = useState(false);
+  const [help, setHelpState] = useState(false);
+  function setHelp(v: boolean) {
+    if (v) returnFocus.current = document.activeElement as HTMLElement | null;
+    setHelpState(v);
+    if (!v) { const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
+  }
   const [multi, setMulti] = useState<string[]>([]);
   function toggleSelect(id: string | undefined) { if (id) setMulti((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id])); }
   // Shift+J/K: move the cursor and add both ends to the selection.
@@ -259,7 +283,6 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'help', label: 'Keyboard shortcuts', hint: '?', run: () => setHelp(true) },
     { id: 'toggle-select', label: 'Select / unselect issue', hint: hint('toggle-select'), run: () => toggleSelect(currentIdRef.current) },
     { id: 'clear-select', label: 'Clear selection', run: () => setMulti([]) },
-    { id: 'create', label: 'Create issue', hint: hint('create'), run: create },
     { id: 'list', label: 'Go to issues', hint: hint('go-issues'), run: () => setView('list') },
     { id: 'board', label: 'Go to board view', hint: hint('go-views'), run: () => setView('board') },
     { id: 'cycles', label: 'Go to cycles', run: () => setView('cycles') },
@@ -267,8 +290,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'go-project', label: 'Go to project…', run: () => setTimeout(() => setProjPick(null), 0) },
     { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
     ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => { if (view === 'cycles' || view === 'projects') setView('list'); setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0); } })),
-    { id: 'status', label: 'Change status of selected issue', hint: 'S', run: cycleStatus },
-    ...STATUSES.map((st) => ({ id: `move-${st}`, label: `Move to ${STATUS_LABEL[st]}`, run: () => { if (currentIdRef.current) moveTo(currentIdRef.current, st, null); } })),
+    { id: 'status', label: multi.length > 1 ? `Cycle status of ${multi.length} selected` : 'Change status of selected issue', hint: 'S', run: cycleStatus },
+    ...STATUSES.map((st) => ({ id: `move-${st}`, label: multi.length > 1 ? `Move ${multi.length} selected to ${STATUS_LABEL[st]}` : `Move to ${STATUS_LABEL[st]}`, run: () => setStatusBulk(st) })),
     { id: 'set-priority', label: 'Set priority…', hint: 'P', run: () => setTimeout(() => openPick('priority'), 0) },
     { id: 'set-assignee', label: 'Set assignee…', hint: 'A', run: () => setTimeout(() => openPick('assignee'), 0) },
     { id: 'set-label', label: 'Set label…', hint: 'L', run: () => setTimeout(() => openPick('label'), 0) },
@@ -276,11 +299,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'copy-id', label: 'Copy issue id', run: copyId },
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
+  if (!readOnly) commands.splice(3, 0, { id: 'create', label: 'Create issue', hint: hint('create'), run: create });
   const results = fuzzyFilter(commands, q, (c) => c.label);
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; });
+  const multiRef = useRef<string[]>([]);
+  const readOnlyRef = useRef(readOnly);
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -303,13 +329,21 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); actions.current.reorder(e.key === 'ArrowUp' ? -1 : 1); return; }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (helpOpen.current && e.key !== 'Escape') return;
+      // Bare modifier / navigation keydowns (Shift, Control, Tab...) must not reset a pending g sequence.
+      if (e.key.length > 1 && e.key !== 'Enter' && e.key !== 'Escape') return;
       const key = keyOf(e); if (!key) return;
       if (key === 'Enter' && t.closest('button, a, [role="button"], select')) { matcher.reset(); return; }
       const id = matcher.feed(key);
       if (!id) return;
       if (id === 'pending') { e.preventDefault(); return; }
       switch (id) {
-        case 'escape': setOpen(false); actions.current.setHelp(false); actions.current.clearMulti(); if (paletteOpen.current) actions.current.closePalette(); break;
+        case 'escape':
+          // One layer per press: overlay, then palette, then selection, then the detail panel.
+          if (helpOpen.current) actions.current.setHelp(false);
+          else if (paletteOpen.current) actions.current.closePalette();
+          else if (multiRef.current.length) actions.current.clearMulti();
+          else setOpen(false);
+          break;
         case 'next': case 'prev': {
           const list = orderedRef.current; if (!list.length) break;
           const idx = Math.max(0, list.findIndex((i) => i.id === currentIdRef.current));
@@ -319,7 +353,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         case 'extend-prev': e.preventDefault(); actions.current.extend(-1); break;
         case 'toggle-select': actions.current.toggleSelect(currentIdRef.current); break;
         case 'open': setOpen(true); break;
-        case 'create': e.preventDefault(); actions.current.create(); break;
+        case 'create': e.preventDefault(); if (!readOnlyRef.current) actions.current.create(); break;
         case 'status': actions.current.cycleStatus(); break;
         case 'priority': e.preventDefault(); actions.current.openPick('priority'); break;
         case 'assignee': e.preventDefault(); actions.current.openPick('assignee'); break;
@@ -361,7 +395,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     <div className='shell'>
       <aside className='side' aria-label='Sidebar'>
         <div className='ws'><span className='ws-logo' aria-hidden='true'>D</span><span className='ws-name'>Delos</span></div>
-        <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>
+        {!readOnly && <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
         <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
         <nav aria-label='Primary'>
           <a className='side-link' href='#inbox' onClick={(e) => e.preventDefault()}><Icon name='inbox' /><span>Inbox</span></a>
@@ -402,7 +436,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : allIssues.length === 0 ? (
           <div className='state empty' role='status'>
             <p>No issues yet.</p>
-            <button onClick={create}>Create issue <kbd>C</kbd></button>
+            {!readOnly && <button onClick={create}>Create issue <kbd>C</kbd></button>}
           </div>
         ) : view === 'projects' ? (
           <div className='scroll cycles'>
@@ -491,7 +525,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
       {help && (
         <div className='overlay' onClick={() => setHelp(false)}>
-          <div className='palette' role='dialog' aria-modal='true' aria-label='Keyboard shortcuts' onClick={(e) => e.stopPropagation()} ref={(el) => el?.focus()} tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setHelp(false); } }}>
+          <div className='palette' role='dialog' aria-modal='true' aria-label='Keyboard shortcuts' onClick={(e) => e.stopPropagation()} ref={(el) => el?.focus()} tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setHelp(false); } else if (e.key === 'Tab') e.preventDefault(); /* focus trap: the dialog is the only focusable element */ }}>
             {(['Issues', 'Navigation', 'Selection', 'General'] as const).map((g) => (
               <section key={g}><h3>{g}</h3><ul>{SHORTCUTS.filter((d) => d.group === g).map((d) => <li key={d.id}><span>{d.label}</span><kbd>{formatKeys(d.keys)}</kbd></li>)}</ul></section>
             ))}

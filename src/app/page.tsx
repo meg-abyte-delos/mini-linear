@@ -2,7 +2,7 @@ import { listIssues, parseSimState } from '@/lib/mock-api';
 import { Shell } from '@/components/Shell';
 import { parseFilters, TODAY_RE } from '@/lib/filters';
 import { seedIssues, MOCK_META, type Issue, type Meta } from '@/lib/issues';
-import { apiConfig, loadRemote } from '@/lib/remote';
+import { apiConfig, loadRemote, loadRole } from '@/lib/remote';
 
 const parseView = (v: string | string[] | undefined) => { const x = Array.isArray(v) ? v[0] : v; return x === 'board' || x === 'cycles' || x === 'projects' ? x : 'list'; };
 
@@ -20,12 +20,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   let meta: Meta = MOCK_META;
   let truncated = false;
   const api = apiConfig();
+  // API mode: read-only is derived from the session role (guest); ?role=guest stays a test hook for mock mode only, never in production.
+  let readOnly = seedAllowed && !api && (Array.isArray(sp.role) ? sp.role[0] : sp.role) === 'guest';
   try {
+    if (api && !sim) readOnly = (await loadRole(api)) === 'guest';
     if (api && !sim) ({ issues, meta, truncated } = await loadRemote(api)); else issues = await listIssues(sim);
     if (seed > 0 && !sim) issues = [...issues, ...seedIssues(seed)]; } catch (e) {
     // Log the real cause server-side only; the UI gets a fixed, user-safe message.
     console.error('listIssues failed:', e instanceof Error ? e.message : e);
     error = 'Could not load issues';
   }
-  return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} truncated={truncated} initialFilters={parseFilters(sp, meta, !!api)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} />;
+  return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} truncated={truncated} initialFilters={parseFilters(sp, meta, !!api)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} readOnly={readOnly} />;
 }
