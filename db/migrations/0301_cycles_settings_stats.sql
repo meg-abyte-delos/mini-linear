@@ -15,6 +15,8 @@ CREATE TABLE team_cycle_settings (
   version integer NOT NULL DEFAULT 1, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (team_id, workspace_id) REFERENCES teams(id, workspace_id) ON DELETE CASCADE);
 
+CREATE INDEX team_cycle_settings_team_idx ON team_cycle_settings (workspace_id, team_id); -- S12: workspace_id leads every index
+
 -- One row per cycle per day: scope = issues in the cycle, started = in_progress/in_review, completed = done.
 CREATE TABLE cycle_snapshots (
   cycle_id uuid NOT NULL, workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
