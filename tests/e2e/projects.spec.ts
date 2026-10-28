@@ -50,5 +50,20 @@ test('roadmap shows a month axis and a today marker', async ({ page }) => {
   await page.getByRole('group', { name: 'Projects display' }).getByRole('button', { name: 'Roadmap' }).click();
   await expect(page.getByRole('list', { name: 'Months' }).getByRole('listitem').first()).toContainText(/\w{3} 20\d\d/);
   await expect(page.getByTestId('rm-today').first()).toBeAttached();
-  await expect(page.getByText('Today', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('rm-pill')).toHaveText('Today');
+});
+
+test('roadmap axis: sticky header, pill and month labels pass axe contrast in dark and light', async ({ page }) => {
+  const { default: AxeBuilder } = await import('@axe-core/playwright');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  for (const scheme of ['dark', 'light'] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto('/?view=projects');
+    await page.waitForSelector('html[data-ready]');
+    await page.getByRole('group', { name: 'Projects display' }).getByRole('button', { name: 'Roadmap' }).click();
+    await expect(page.getByTestId('rm-pill')).toBeVisible();
+    const r = await new AxeBuilder({ page }).include('.rm-head').withRules(['color-contrast']).analyze();
+    expect(r.violations.map((v) => `${scheme}: ${v.id}`)).toEqual([]);
+    expect(r.passes.length + r.incomplete.length).toBeGreaterThan(0);
+  }
 });

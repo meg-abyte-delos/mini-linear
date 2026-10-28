@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Avatar } from '@/components/icons';
 import { USERS, fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
-import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
+import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, timelineWidth, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
 
 interface Props { projects: readonly ProjectMeta[]; issues: readonly Issue[]; today: string; canOpen: boolean; onOpen: (id: string) => void; onViewIssues: (id: string) => void }
 
@@ -12,6 +13,14 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
   const dated = sorted.some((p) => p.start_date || p.target_date);
   const range = dated ? roadmapRange([...sorted.map((p) => ({ start: p.start_date, end: p.target_date })), { start: today, end: today }]) : null;
   const tp = range ? todayPct(today, range) : null;
+  const ticks = range ? monthTicks(range) : [];
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || mode !== 'roadmap' || tp === null || !range) return;
+    const x = 240 + (tp / 100) * timelineWidth(range);
+    el.scrollLeft = Math.max(0, x - el.clientWidth / 2);
+  }, [mode, tp, range?.from, range?.to]);
   return (
     <div className='scroll cycles'>
       <div className='pj-toggle' role='group' aria-label='Projects display'>
@@ -36,32 +45,44 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
           );
         }) : (
           <div className='rm' data-testid='roadmap'>
-            {!range ? <p className='col-empty'>No project has a start or target date yet</p> : (
-              <>
-                <div className='rm-axis' data-testid='rm-axis' role='list' aria-label='Months'>
-                  {monthTicks(range).map((t) => <span key={t.label} role='listitem' className='rm-tick' style={{ left: `${t.leftPct}%` }}>{t.label}</span>)}
-                  {tp !== null && <span className='rm-today-label' style={{ left: `${tp}%` }}>Today</span>}
-                </div>
-                {sorted.map((p) => {
-                  const bar = barFor({ start: p.start_date, end: p.target_date }, range);
-                  const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
-                  return (
-                    <div key={p.id} className='rm-row' data-project={p.id}>
-                      <span className='cy-name'>{p.name}</span>
-                      <div className='rm-track'>
-                        {monthTicks(range).map((t) => <span key={t.label} className='rm-grid' style={{ left: `${t.leftPct}%` }} aria-hidden='true' />)}
-                        {tp !== null && <span className='rm-today' data-testid='rm-today' style={{ left: `${tp}%` }} aria-hidden='true' />}
-                        {bar ? (
-                          <span className='rm-bar' data-status={p.status ?? 'backlog'} role='img' style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%` }}
-                            aria-label={`${p.name}: ${p.start_date ? fmtDate(p.start_date) : '?'} to ${p.target_date ? fmtDate(p.target_date) : '?'}, ${pr.pct}% complete`}>
-                            <span style={{ width: `${pr.pct}%` }} />
-                          </span>
-                        ) : <span className='rm-none'>No dates</span>}
-                      </div>
+            {!range ? (
+              <div className='rm-empty'>
+                <svg width='28' height='28' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.2' aria-hidden='true'><rect x='2' y='3' width='12' height='10' rx='1.5' /><path d='M2 6.5h12M5.5 2v2.5M10.5 2v2.5' /></svg>
+                <p>No project has a start or target date yet</p>
+              </div>
+            ) : (
+              <div className='rm-scroll' data-testid='rm-scroll' ref={scrollRef} tabIndex={0} role='region' aria-label='Roadmap timeline'>
+                <div className='rm-inner' style={{ width: `calc(240px + ${timelineWidth(range)}px)` }}>
+                  <div className='rm-head'>
+                    <span className='rm-corner' />
+                    <div className='rm-axis' data-testid='rm-axis' role='list' aria-label='Months'>
+                      {ticks.map((t) => <span key={t.label} role='listitem' className='rm-tick' style={{ left: `${t.leftPct}%` }}>{t.label}</span>)}
+                      {tp !== null && <span className='rm-pill' data-testid='rm-pill' style={{ left: `${tp}%` }}>Today</span>}
                     </div>
-                  );
-                })}
-              </>
+                  </div>
+                  {sorted.map((p) => {
+                    const bar = p.start_date && p.target_date ? barFor({ start: p.start_date, end: p.target_date }, range) : null;
+                    const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
+                    const u = USERS.find((x) => x.id === p.lead_id);
+                    return (
+                      <div key={p.id} className='rm-row' data-project={p.id}>
+                        <span className='rm-name'>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />}<span className='rm-name-t'>{p.name}</span></span>
+                        <div className='rm-track'>
+                          {ticks.map((t) => <span key={t.label} className='rm-grid' style={{ left: `${t.leftPct}%` }} aria-hidden='true' />)}
+                          {tp !== null && <span className='rm-today' data-testid='rm-today' style={{ left: `${tp}%` }} aria-hidden='true' />}
+                          {bar ? (
+                            <span className='rm-bar' data-status={p.status ?? 'backlog'} data-clip-start={bar.clipStart} data-clip-end={bar.clipEnd} role='img' style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%` }}
+                              aria-label={`${p.name}: ${fmtDate(p.start_date!)} to ${fmtDate(p.target_date!)}, ${pr.pct}% complete`}>
+                              <span className='rm-fill' style={{ width: `${pr.pct}%` }} />
+                              <span className='rm-label'>{p.name}</span>
+                            </span>
+                          ) : <span className='rm-none'>No dates</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </div>
         )}

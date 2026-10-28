@@ -8,7 +8,8 @@ describe('roadmap', () => {
     expect(roadmapRange([{ start: '2026-01-08', end: '2026-01-22' }])).toEqual({ from: '2026-01-01', to: '2026-01-29' });
   });
   it('bar positions inside the window, one-date marker, none', () => {
-    expect(barFor({ start: '2026-01-01', end: '2026-01-05' }, range)).toEqual({ leftPct: 0, widthPct: 50 });
+    expect(barFor({ start: '2026-01-01', end: '2026-01-05' }, range)).toMatchObject({ leftPct: 0, widthPct: 50, clipStart: false, clipEnd: false });
+    expect(barFor({ start: '2025-12-20', end: '2026-01-20' }, range)).toMatchObject({ clipStart: true, clipEnd: true });
     expect(barFor({ start: null, end: '2026-01-06' }, range)?.widthPct).toBe(10);
     expect(barFor({ start: null, end: null }, range)).toBeNull();
   });
