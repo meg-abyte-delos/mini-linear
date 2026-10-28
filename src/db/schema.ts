@@ -1,7 +1,7 @@
 // M1 schema (auth/tenancy). Spec v1.1 + Appendix A. Tenant tables carry workspace_id NOT NULL + ENABLE/FORCE RLS
 // with USING + WITH CHECK (see db/migrations/0000_m1_auth_tenancy.sql). IDs are UUIDv7 generated app-side.
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, timestamp, integer, smallint, date, doublePrecision, jsonb, pgEnum, primaryKey, uniqueIndex, index, unique, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, smallint, bigint, date, doublePrecision, jsonb, pgEnum, primaryKey, uniqueIndex, index, unique, foreignKey } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("workspace_role", ["owner", "admin", "member", "guest"]);
 
@@ -140,6 +140,11 @@ export const issueShares = pgTable("issue_shares", {
   workspaceId: wsId(), issueId: uuid("issue_id").notNull(), guestUserId: uuid("guest_user_id").notNull().references(() => users.id),
   sharedBy: uuid("shared_by").notNull().references(() => users.id), createdAt: ts("created_at").notNull().defaultNow(), revokedAt: ts("revoked_at"),
 }, (t) => [primaryKey({ columns: [t.issueId, t.guestUserId] })]);
+export const issueAttachments = pgTable("issue_attachments", {
+  id: uuid("id").primaryKey(), workspaceId: wsId(), issueId: uuid("issue_id").notNull(), kind: text("kind").notNull(), url: text("url").notNull(),
+  title: text("title").notNull(), mimeType: text("mime_type"), sizeBytes: bigint("size_bytes", { mode: "number" }),
+  createdBy: uuid("created_by").notNull().references(() => users.id), createdAt: ts("created_at").notNull().defaultNow(),
+});
 export const auditEvents = pgTable("audit_events", {
   id: uuid("id").primaryKey(), workspaceId: wsId(), actorId: uuid("actor_id").references(() => users.id),
   entity: text("entity").notNull(), entityId: uuid("entity_id"), action: text("action").notNull(),
