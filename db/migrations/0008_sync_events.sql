@@ -19,7 +19,7 @@ CREATE TABLE sync_events (
   actor_id uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (workspace_id, id));
-CREATE INDEX sync_events_created_idx ON sync_events (created_at);
+CREATE INDEX sync_events_created_idx ON sync_events (workspace_id, created_at); -- S12: workspace-leading; retention walks it per workspace
 
 CREATE TABLE issue_presence (
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -38,9 +38,13 @@ BEGIN
     iss := r.id;
     IF TG_OP = 'UPDATE' AND NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN o := 'delete'; END IF;
     IF TG_OP = 'UPDATE' AND NEW.deleted_at IS NULL AND OLD.deleted_at IS NOT NULL THEN o := 'create'; END IF;
-    actor := r.created_by;
+    IF TG_OP = 'UPDATE' AND NEW.sort_key IS DISTINCT FROM OLD.sort_key
+       AND (to_jsonb(NEW) - 'sort_key' - 'version' - 'updated_at') = (to_jsonb(OLD) - 'sort_key' - 'version' - 'updated_at') THEN
+      RETURN NULL; -- drag-reorder only (sort_key): not a content change, no event
+    END IF;
+    actor := coalesce(nullif(current_setting('app.user_id', true), '')::uuid, r.created_by); -- the updater, not the creator
   ELSE
-    iss := r.issue_id; actor := r.author_id;
+    iss := r.issue_id; actor := coalesce(nullif(current_setting('app.user_id', true), '')::uuid, r.author_id);
   END IF;
   INSERT INTO sync_seq AS s (workspace_id, seq) VALUES (r.workspace_id, 1)
     ON CONFLICT (workspace_id) DO UPDATE SET seq = s.seq + 1 RETURNING s.seq INTO n;
@@ -49,18 +53,44 @@ BEGIN
             CASE WHEN TG_OP = 'DELETE' THEN r.version + 1 ELSE r.version END, actor);
   RETURN NULL;
 END $$;
+-- Lock order: the workspace seq row is taken FIRST, by a BEFORE STATEMENT trigger, before the statement locks any
+-- issue/comment row. Every writer therefore goes seq -> rows and two writers can never wait on each other in a cycle
+-- (the old per-row upsert locked seq AFTER the first row, so two bulk updates in opposite order deadlocked).
+CREATE FUNCTION sync_lock() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+DECLARE ws uuid := nullif(current_setting('app.workspace_id', true), '')::uuid;
+BEGIN
+  IF ws IS NOT NULL THEN
+    INSERT INTO sync_seq AS s (workspace_id, seq) VALUES (ws, 0) ON CONFLICT (workspace_id) DO UPDATE SET seq = s.seq;
+  END IF;
+  RETURN NULL;
+END $$;
+CREATE TRIGGER issues_sync_lock BEFORE INSERT OR UPDATE OR DELETE ON issues FOR EACH STATEMENT EXECUTE FUNCTION sync_lock();
+CREATE TRIGGER comments_sync_lock BEFORE INSERT OR UPDATE OR DELETE ON comments FOR EACH STATEMENT EXECUTE FUNCTION sync_lock();
 CREATE TRIGGER issues_sync AFTER INSERT OR UPDATE ON issues FOR EACH ROW EXECUTE FUNCTION sync_emit();
 CREATE TRIGGER comments_sync AFTER INSERT OR UPDATE OR DELETE ON comments FOR EACH ROW EXECUTE FUNCTION sync_emit();
 
--- Retention: owner-run (cron), never app_user. Records the high-water mark so stale cursors get an explicit resync.
-CREATE FUNCTION purge_sync_events(keep interval DEFAULT interval '7 days') RETURNS void LANGUAGE sql SET search_path = pg_catalog, public AS $$
-  UPDATE sync_seq s SET pruned_upto = greatest(s.pruned_upto, x.m)
-    FROM (SELECT workspace_id, max(id) m FROM sync_events WHERE created_at < now() - keep GROUP BY workspace_id) x
-    WHERE x.workspace_id = s.workspace_id;
-  DELETE FROM sync_events WHERE created_at < now() - keep;
-  DELETE FROM issue_presence WHERE seen_at < now() - interval '1 hour';
-$$;
+-- Retention, called by the app purge scheduler (app_user cannot touch other tenants directly, so this is SECURITY DEFINER,
+-- owned by `definer`). Keeps at least 1 day whatever the argument. Per workspace it records the high-water mark
+-- (pruned_upto) so stale cursors get an explicit resync, then deletes. Presence rows expire after an hour.
+CREATE FUNCTION purge_sync_events(keep interval DEFAULT interval '7 days') RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE ws uuid; k interval := greatest(keep, interval '1 day');
+BEGIN
+  FOR ws IN SELECT workspace_id FROM public.sync_seq LOOP
+    UPDATE public.sync_seq s SET pruned_upto = greatest(s.pruned_upto, x.m)
+      FROM (SELECT max(id) m FROM public.sync_events WHERE workspace_id = ws AND created_at < now() - k) x
+      WHERE s.workspace_id = ws AND x.m IS NOT NULL;
+    DELETE FROM public.sync_events WHERE workspace_id = ws AND created_at < now() - k;
+  END LOOP;
+  DELETE FROM public.issue_presence WHERE seen_at < now() - interval '1 hour';
+END $$;
+GRANT CREATE ON SCHEMA public TO definer;
+ALTER FUNCTION purge_sync_events(interval) OWNER TO definer;
+REVOKE CREATE ON SCHEMA public FROM definer;
+GRANT SELECT, UPDATE ON sync_seq TO definer;
+GRANT SELECT, DELETE ON sync_events TO definer;
+GRANT SELECT, DELETE ON issue_presence TO definer;
 REVOKE ALL ON FUNCTION purge_sync_events(interval) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION purge_sync_events(interval) TO app_user;
 
 DO $$ DECLARE t text; BEGIN
   FOREACH t IN ARRAY ARRAY['sync_seq','sync_events','issue_presence'] LOOP

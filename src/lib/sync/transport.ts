@@ -19,7 +19,7 @@ export function httpTransport(slug: string, f: Fetch = (...a) => fetch(...a)): T
       if (m.kind === 'create') {
         const url = m.type === 'comment' ? `${base}/issues/${String(m.fields.issue_id)}/comments` : `${base}/${path}`;
         const body = Object.fromEntries(Object.entries(m.fields).filter(([k]) => k !== 'issue_id'));
-        res = await f(url, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': m.key }, body: JSON.stringify(m.type === 'comment' ? body : m.fields) });
+        res = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(m.type === 'comment' ? body : m.fields) });
       } else {
         res = await f(`${base}/${path}/${m.id}`, { method: m.kind === 'delete' ? 'DELETE' : 'PATCH', headers: { 'content-type': 'application/json', 'if-match': `"${m.baseVersion}"` }, body: m.kind === 'delete' ? undefined : JSON.stringify(m.fields) });
       }

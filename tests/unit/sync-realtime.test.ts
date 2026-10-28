@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { frame } from '@/lib/sync/server/sse';
-import { parseCursor } from '@/lib/sync/server/feed';
+import { openId, sealId } from '@/lib/sync/server/feed';
 import { connectRealtime } from '@/lib/sync/realtime';
 import { SyncStore } from '@/lib/sync/store';
 
@@ -15,9 +15,23 @@ describe('SSE framing (R-6)', () => {
   });
 });
 
-describe('parseCursor (R-3 bad Last-Event-ID never 500)', () => {
-  it.each([[null, null], ['', null], ['abc', null], ['-1', null], ['1.5', null], ['99999999999999999999', null], ['0', 0n], [' 42 ', 42n]])('%s', (v, want) => {
-    expect(parseCursor(v as string | null)).toBe(want);
+describe('sealed cursors (opaque, per user and workspace, unforgeable)', () => {
+  const W = '11111111-1111-4111-8111-111111111111', W2 = '22222222-2222-4222-8222-222222222222', U = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', U2 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  it('round-trips, is deterministic and does not expose the number', () => {
+    const t = sealId(W, U, 12345n);
+    expect(openId(W, U, t)).toBe(12345n);
+    expect(sealId(W, U, 12345n)).toBe(t);
+    expect(t).not.toContain('12345');
+    expect(sealId(W, U, 12346n)).not.toBe(t);
+  });
+  it('absent or empty -> null (start now)', () => {
+    for (const v of [null, undefined, '', '  ']) expect(openId(W, U, v)).toBeNull();
+  });
+  it('anything not minted for this user + workspace throws (caller answers resync, never 500)', () => {
+    const t = sealId(W, U, 7n);
+    for (const v of ['abc', '-1', '1.5', '7', '99999999999999999999', 'A'.repeat(22), t.slice(0, 5) + (t[5] === 'A' ? 'B' : 'A') + t.slice(6)]) expect(() => openId(W, U, v), v).toThrow();
+    expect(() => openId(W2, U, t)).toThrow();
+    expect(() => openId(W, U2, t)).toThrow();
   });
 });
 

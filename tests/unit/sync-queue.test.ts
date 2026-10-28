@@ -135,14 +135,13 @@ describe('httpTransport', () => {
     expect(await httpTransport('w1', (async () => json(422, { error: { message: 'bad' } })) as never)(m({}))).toEqual({ kind: 'rejected', status: 422, message: 'bad' });
     expect((await httpTransport('w1', (async () => { throw new Error('x'); }) as never)(m({}))).kind).toBe('offline');
   });
-  it('create comment posts to the issue and sends an idempotency key; delete sends no body; 204 -> ok(null)', async () => {
+  it('create comment posts to the issue; delete sends no body; 204 -> ok(null)', async () => {
     const f = vi.fn(async () => new Response(null, { status: 204 }));
     const t = httpTransport('w1', f as never);
     await t(m({ type: 'comment', id: 'c1', kind: 'create', fields: { issue_id: 'i9', body: 'hi' } }));
     const [u, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(u).toBe('/api/v1/w/w1/issues/i9/comments');
     expect(JSON.parse(init.body as string)).toEqual({ body: 'hi' });
-    expect((init.headers as Record<string, string>)['idempotency-key']).toBe('k1');
     expect(await t(m({ kind: 'delete' }))).toEqual({ kind: 'ok', row: null });
     expect((f.mock.calls[1] as unknown as [string, RequestInit])[1].body).toBeUndefined();
   });
