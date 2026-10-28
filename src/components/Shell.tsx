@@ -623,7 +623,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                       <div key={c.id} className='cycle' data-cycle={c.id} data-bucket={b.id}>
                         <span className='cy-name'>{c.name}</span>
                         <span className='cy-dates'>{fmtDate(c.start_date)} to {fmtDate(c.end_date)}</span>
-                        <span className='cy-prog' role='img' aria-label={`${pct}% complete, ${done} of ${its.length} issues`}><span style={{ width: `${pct}%` }} /></span>
+                        <svg className='cy-prog' role='img' aria-label={`${pct}% complete, ${done} of ${its.length} issues`}><rect className='cy-prog-fill' x='0' y='0' height='100%' width={`${pct}%`} /></svg>
                         <span className='cy-count'>{done}/{its.length}</span>
                         <button onClick={() => { setFilters({ ...emptyFilters(), cycle: [c.id] }); setView('list'); }}>View issues</button>
                       </div>

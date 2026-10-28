@@ -49,7 +49,7 @@ export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues,
       {proj.description && <p className='pd-desc'>{proj.description}</p>}
       <section aria-labelledby='pd-progress'>
         <h3 id='pd-progress'>Progress</h3>
-        <span className='cy-prog' role='img' aria-label={`${pct}% complete, ${proj.done_count} of ${proj.issue_count} issues`}><span style={{ width: `${pct}%` }} /></span>
+        <svg className='cy-prog' role='img' aria-label={`${pct}% complete, ${proj.done_count} of ${proj.issue_count} issues`}><rect className='cy-prog-fill' x='0' y='0' height='100%' width={`${pct}%`} /></svg>
         <span className='cy-count'>{proj.done_count}/{proj.issue_count} ({pct}%)</span>
         <span className='cy-dates'>{proj.start_date ?? 'No start'} to {proj.target_date ?? 'no target'}</span>
         <p className='pd-meta'>Lead: <strong data-testid='pd-lead'>{leadName ?? 'No lead'}</strong>
