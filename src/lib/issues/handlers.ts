@@ -32,6 +32,7 @@ const filters = listQuery.extend({
   project_id: uuidSchema.optional(), cycle_id: uuidSchema.optional(), label_id: uuidSchema.optional(), parent_id: uuidSchema.optional(),
   state_id: uuidSchema.optional(), estimate: z.coerce.number().int().min(0).max(64).optional(),
   due_before: date.optional(), due_after: date.optional(), has_due_date: z.enum(["true", "false"]).optional(),
+  include_archived: z.enum(["true", "false"]).optional(),
 });
 
 // Lexicographically sortable; new issues go to the end of the board. (Reordering is a later spec item.)
@@ -39,12 +40,36 @@ const newSortKey = () => Date.now().toString(36).padStart(10, "0") + Math.random
 
 type Row = Record<string, unknown>;
 const norm = (r: Row) => { r.due_date = r.due_date_text ?? null; delete r.due_date_text; return r; };
-const dto = (r: Row) => ({
-  id: r.id, identifier: `${r.team_key}-${r.number}`, team_id: r.team_id, number: r.number, title: r.title, description: r.description,
-  status: r.status, priority: r.priority, assignee_id: r.assignee_id, project_id: r.project_id, cycle_id: r.cycle_id, parent_id: r.parent_id,
-  state_id: r.state_id, estimate: r.estimate ?? null, due_date: r.due_date ?? null,
-  label_ids: r.label_ids, version: r.version, created_by: r.created_by, deleted_at: r.deleted_at, created_at: r.created_at, updated_at: r.updated_at,
-});
+/** Per-request values the DTO needs that are not columns: the workspace slug (url) and the requester's handle (branch_name). */
+export type Meta = { slug: string; handle: string };
+
+/** URL-safe lowercase slug: ascii letters/digits, runs of anything else collapsed to one dash, trimmed to max chars without a trailing dash. */
+export function slugify(s: string, max = 60): string {
+  const base = s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return base.slice(0, max).replace(/-+$/g, "");
+}
+/** Linear's git branch format: <user>/<team-key-lower>-<n>-<title-slug (max 60)>. */
+export function branchName(handle: string, teamKey: string, n: number, title: string): string {
+  const t = slugify(title);
+  return `${slugify(handle, 39) || "user"}/${teamKey.toLowerCase()}-${n}${t ? `-${t}` : ""}`;
+}
+export const handleOf = (email: string) => email.split("@")[0] ?? "";
+const dto = (r: Row, m: Meta) => {
+  const identifier = `${r.team_key}-${r.number}`;
+  return {
+    id: r.id, identifier, team_id: r.team_id, number: r.number, title: r.title, description: r.description,
+    status: r.status, priority: r.priority, assignee_id: r.assignee_id, project_id: r.project_id, cycle_id: r.cycle_id, parent_id: r.parent_id,
+    state_id: r.state_id, estimate: r.estimate ?? null, due_date: r.due_date ?? null,
+    label_ids: r.label_ids, version: r.version, created_by: r.created_by, deleted_at: r.deleted_at, archived_at: r.archived_at ?? null,
+    branch_name: branchName(m.handle, r.team_key as string, Number(r.number), r.title as string),
+    url: `/w/${encodeURIComponent(m.slug)}/issue/${identifier}`,
+    created_at: r.created_at, updated_at: r.updated_at,
+  };
+};
+async function meta(ctx: Ctx, slug: string): Promise<Meta> {
+  const u = await ctx.tx<{ email: string }[]>`select email from users where id = ${ctx.userId}`;
+  return { slug, handle: handleOf(u[0]?.email ?? "") };
+}
 
 /** Guests see exactly the issues with an active share (v1.1 2.8); members the issues of their teams; admin+ the whole workspace. */
 function visible(ctx: Ctx) {
@@ -60,7 +85,7 @@ async function load(ctx: Ctx, id: string, deleted = false) {
   if (rows.length === 0) throw new ApiError("not_found");
   return norm(rows[0]!);
 }
-const out = (r: Row, status = 200) => Response.json(dto(r), { status, headers: { ETag: `"${r.version}"` } });
+const out = async (ctx: Ctx, slug: string, r: Row, status = 200) => Response.json(dto(r, await meta(ctx, slug)), { status, headers: { ETag: `"${r.version}"` } });
 async function setLabels(ctx: Ctx, issueId: string, ids: string[]) {
   await ctx.tx`delete from issue_labels where issue_id = ${issueId}`;
   for (const l of new Set(ids)) await ctx.tx`insert into issue_labels (workspace_id, issue_id, label_id) values (${ctx.workspaceId}, ${issueId}, ${l})`; // composite FK rejects foreign-tenant labels
@@ -81,7 +106,7 @@ export const listIssues = (req: Request, slug: string) => withWorkspaceCtx(req, 
   const q = parseQuery(req, filters);
   const cur = q.cursor ? decodeCursor(q.cursor, ctx.workspaceId, SCOPE) : null;
   const t = ctx.tx, none = t``;
-  const rows = await t<Row[]>`${SEL(ctx)} where i.deleted_at is null and ${visible(ctx)}
+  const rows = await t<Row[]>`${SEL(ctx)} where i.deleted_at is null and ${visible(ctx)} ${q.include_archived === "true" ? none : t`and i.archived_at is null`}
       ${q.status ? t`and i.status = ${q.status}` : none} ${q.team_id ? t`and i.team_id = ${q.team_id}` : none}
       ${q.assignee_id ? t`and i.assignee_id = ${q.assignee_id}` : none} ${q.project_id ? t`and i.project_id = ${q.project_id}` : none}
       ${q.cycle_id ? t`and i.cycle_id = ${q.cycle_id}` : none} ${q.parent_id ? t`and i.parent_id = ${q.parent_id}` : none}
@@ -92,8 +117,9 @@ export const listIssues = (req: Request, slug: string) => withWorkspaceCtx(req, 
       ${cur ? t`and (i.sort_key, i.id) > (${cur.k}::text collate "C", ${cur.id}::uuid)` : none}
     order by i.sort_key asc, i.id asc limit ${q.limit + 1}`;
   rows.forEach(norm);
+  const m = await meta(ctx, slug);
   const p = page(rows, q.limit, ctx.workspaceId, SCOPE, (r) => ({ k: r.sort_key as string, id: r.id as string }));
-  return Response.json({ items: p.items.map(dto), next_cursor: p.next_cursor });
+  return Response.json({ items: p.items.map((r) => dto(r, m)), next_cursor: p.next_cursor });
 });
 
 export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -113,12 +139,12 @@ export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req,
   const diff = diffOf(null, row, FIELDS);
   if (b.label_ids.length) diff.label_ids = { before: [], after: row.label_ids };
   await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "create", diff });
-  const res = out(row, 201);
+  const res = await out(ctx, slug, row, 201);
   res.headers.set("Location", `/api/v1/w/${slug}/issues/${id}`);
   return res;
 });
 
-export const getIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => out(await load(ctx, parseId(rawId))));
+export const getIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => out(ctx, slug, await load(ctx, parseId(rawId))));
 
 export const patchIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
@@ -143,7 +169,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
   const diff = diffOf(before, after, FIELDS);
   if (b.label_ids && JSON.stringify(before.label_ids) !== JSON.stringify(after.label_ids)) diff.label_ids = { before: before.label_ids, after: after.label_ids };
   await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff });
-  return out(after);
+  return out(ctx, slug, after);
 });
 
 export const deleteIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -159,8 +185,97 @@ export const deleteIssue = (req: Request, slug: string, rawId: string) => withWo
 export const restoreIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const id = parseId(rawId), row = await load(ctx, id, true);
-  if (Date.now() - new Date(row.deleted_at as string).getTime() > 30 * 86400_000) throw new ApiError("not_found"); // purge window: 30 days
-  await ctx.tx`update issues set deleted_at = null, version = version + 1, updated_at = now() where id = ${id}`;
+  if (Date.now() - new Date(row.deleted_at as string).getTime() > PURGE_MS) throw new ApiError("not_found"); // purge window: 30 days
+  // deleted_at predicate: a concurrent restore (or the purge job) must not be double-applied / resurrect a purged row.
+  const upd = await ctx.tx`update issues set deleted_at = null, version = version + 1, updated_at = now() where id = ${id} and deleted_at is not null returning id`;
+  if (upd.length === 0) throw new ApiError("not_found");
   await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "restore", diff: { deleted_at: { before: "deleted", after: null } } });
-  return out(await load(ctx, id));
+  return out(ctx, slug, await load(ctx, id));
 });
+
+const PURGE_MS = 30 * 86400_000;
+
+/** Archive / unarchive: idempotent, bump version, audited. Archived issues are hidden from lists unless include_archived=true. */
+async function setArchived(ctx: Ctx, id: string, on: boolean) {
+  const row = await load(ctx, id);
+  if (Boolean(row.archived_at) === on) return false;
+  await ctx.tx`update issues set archived_at = ${on ? ctx.tx`now()` : null}, version = version + 1, updated_at = now() where id = ${id}`;
+  await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: on ? "archive" : "unarchive",
+    diff: { archived_at: { before: on ? null : "archived", after: on ? "now" : null } } });
+  return true;
+}
+export const archiveIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "member");
+  const id = parseId(rawId); await setArchived(ctx, id, true); return out(ctx, slug, await load(ctx, id));
+});
+export const unarchiveIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "member");
+  const id = parseId(rawId); await setArchived(ctx, id, false); return out(ctx, slug, await load(ctx, id));
+});
+
+export const BULK_MAX = 250;
+const bulkPatch = z.object({
+  status: z.enum(STATUS), priority: z.number().int().min(0).max(4), assignee_id: uuidSchema.nullable(),
+  project_id: uuidSchema.nullable(), cycle_id: uuidSchema.nullable(),
+  label_ids_add: z.array(uuidSchema).max(50), label_ids_remove: z.array(uuidSchema).max(50),
+}).partial().strict().refine((p) => Object.keys(p).length > 0, "empty patch");
+const bulkBody = z.union([
+  z.object({ ids: z.array(uuidSchema).min(1).max(BULK_MAX), patch: bulkPatch }).strict(),
+  z.object({ ids: z.array(uuidSchema).min(1).max(BULK_MAX), action: z.enum(["archive", "unarchive", "delete", "restore"]) }).strict(),
+]);
+
+/**
+ * POST /issues/bulk. One transaction; each issue runs in its own SAVEPOINT so a per-issue failure (not visible, bad cycle,
+ * foreign label...) is reported and rolled back alone while the others commit. Same visibility/permission checks and one
+ * audit row per issue as the single-issue endpoints. Response: { succeeded: id[], failed: {id, code, message}[] }.
+ */
+export const bulkIssues = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "member");
+  const b = await parseJson(req, bulkBody);
+  const ids = [...new Set(b.ids)];
+  if ("patch" in b && b.patch.assignee_id) await assertAssignee(ctx, b.patch.assignee_id); // request-level: same for every issue
+  const succeeded: string[] = [], failed: { id: string; code: string; message: string }[] = [];
+  for (const id of ids) {
+    try {
+      await ctx.tx.savepoint(async () => {
+        if ("patch" in b) await bulkPatchOne(ctx, id, b.patch);
+        else if (b.action === "archive" || b.action === "unarchive") await setArchived(ctx, id, b.action === "archive");
+        else if (b.action === "delete") {
+          await load(ctx, id);
+          await ctx.tx`update issues set deleted_at = now(), version = version + 1, updated_at = now() where id = ${id}`;
+          await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "delete", diff: { deleted_at: { before: null, after: "now" } } });
+        } else {
+          const row = await load(ctx, id, true);
+          if (Date.now() - new Date(row.deleted_at as string).getTime() > PURGE_MS) throw new ApiError("not_found");
+          await ctx.tx`update issues set deleted_at = null, version = version + 1, updated_at = now() where id = ${id} and deleted_at is not null`;
+          await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "restore", diff: { deleted_at: { before: "deleted", after: null } } });
+        }
+      });
+      succeeded.push(id);
+    } catch (e) {
+      if (e instanceof ApiError) failed.push({ id, code: e.code, message: e.message });
+      else if (typeof e === "object" && e && "code" in e && String((e as { code: unknown }).code).startsWith("23")) failed.push({ id, code: "validation_failed", message: "constraint violation" });
+      else throw e; // unexpected: abort the whole transaction
+    }
+  }
+  return Response.json({ succeeded, failed }, { status: 200 });
+});
+
+async function bulkPatchOne(ctx: Ctx, id: string, p: z.infer<typeof bulkPatch>) {
+  const before = await load(ctx, id);
+  if (p.cycle_id) await assertCycleTeam(ctx, p.cycle_id, before.team_id as string);
+  const v = <K extends keyof typeof p>(k: K, cur: unknown) => (p[k] !== undefined ? p[k] : cur);
+  await ctx.tx`update issues set status = ${v("status", before.status) as never}, priority = ${v("priority", before.priority) as number},
+    assignee_id = ${v("assignee_id", before.assignee_id) as string | null}, project_id = ${v("project_id", before.project_id) as string | null},
+    cycle_id = ${v("cycle_id", before.cycle_id) as string | null}, version = version + 1, updated_at = now() where id = ${id}`;
+  if (p.label_ids_add || p.label_ids_remove) {
+    const cur = new Set(before.label_ids as string[]);
+    for (const l of p.label_ids_add ?? []) cur.add(l);
+    for (const l of p.label_ids_remove ?? []) cur.delete(l);
+    await setLabels(ctx, id, [...cur]);
+  }
+  const after = await load(ctx, id);
+  const diff = diffOf(before, after, FIELDS);
+  if (JSON.stringify(before.label_ids) !== JSON.stringify(after.label_ids)) diff.label_ids = { before: before.label_ids, after: after.label_ids };
+  await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff: { ...diff, bulk: { before: null, after: true } } });
+}

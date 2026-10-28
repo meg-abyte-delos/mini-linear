@@ -125,7 +125,7 @@ export const issues = pgTable("issues", {
   assigneeId: uuid("assignee_id").references(() => users.id), projectId: uuid("project_id"), cycleId: uuid("cycle_id"), parentId: uuid("parent_id"),
   sortKey: text("sort_key").notNull(), version: integer("version").notNull().default(1),
   stateId: uuid("state_id").notNull(), estimate: smallint("estimate"), dueDate: date("due_date"),
-  createdBy: uuid("created_by").notNull().references(() => users.id), deletedAt: ts("deleted_at"),
+  createdBy: uuid("created_by").notNull().references(() => users.id), deletedAt: ts("deleted_at"), archivedAt: ts("archived_at"),
   createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 export const issueLabels = pgTable("issue_labels", {
