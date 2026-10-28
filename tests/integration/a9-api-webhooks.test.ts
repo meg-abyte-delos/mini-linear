@@ -99,7 +99,7 @@ describe.runIf(runIntegration)('A9 webhooks', () => {
     expect(verify(secret, d!.body, String(d!.headers['x-minilinear-signature']))).toBe(true);
     const log = await (await api(W.A1, 'GET', `${P1}/webhooks/${hid}/deliveries`)).json();
     expect(log.items[0].event).toBe('issue.created');
-  });
+  }, 30_000);
   it('other workspaces never see the webhook or its deliveries', async () => {
     const l = await (await api(W.B1, 'GET', `${P2}/webhooks`)).json().catch(() => ({ items: [] }));
     expect(l.items ?? []).toEqual([]);

@@ -30,7 +30,8 @@ CREATE TABLE webhook_deliveries (
   last_status_code integer, last_error text, created_at timestamptz NOT NULL DEFAULT now(), delivered_at timestamptz,
   FOREIGN KEY (webhook_id, workspace_id) REFERENCES webhooks(id, workspace_id) ON DELETE CASCADE);
 CREATE INDEX webhook_deliveries_due_idx ON webhook_deliveries (next_attempt_at) WHERE status = 'pending';
-CREATE INDEX webhook_deliveries_hook_idx ON webhook_deliveries (webhook_id, created_at DESC);
+CREATE INDEX webhook_deliveries_hook_idx ON webhook_deliveries (workspace_id, webhook_id, created_at DESC);
+CREATE INDEX webhooks_ws_idx ON webhooks (workspace_id);
 
 DO $$ DECLARE t text; BEGIN
   FOREACH t IN ARRAY ARRAY['api_keys','webhooks','webhook_deliveries'] LOOP
@@ -49,7 +50,7 @@ DECLARE kind text := TG_ARGV[0]; ev text; r record; act text;
 BEGIN
   IF TG_OP = 'DELETE' THEN r := OLD; act := 'deleted';
   ELSIF TG_OP = 'INSERT' THEN r := NEW; act := 'created';
-  ELSE r := NEW; act := CASE WHEN kind = 'issue' AND OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN 'deleted' ELSE 'updated' END;
+  ELSE r := NEW; act := CASE WHEN kind = 'issue' AND to_jsonb(OLD)->>'deleted_at' IS NULL AND to_jsonb(NEW)->>'deleted_at' IS NOT NULL THEN 'deleted' ELSE 'updated' END;
   END IF;
   ev := kind || '.' || act;
   INSERT INTO webhook_deliveries (workspace_id, webhook_id, event, payload)
