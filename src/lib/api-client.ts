@@ -38,3 +38,16 @@ export async function createIssue(slug: string, teamId: string, title: string, f
     return res.ok ? fromApi((await res.json()) as Record<string, unknown>) : null;
   } catch { return null; }
 }
+
+export interface BulkResult { succeeded: string[]; failed: { id: string; code: string; message: string }[] }
+
+/** POST /issues/bulk (max 250 ids per call; the caller chunks). A transport or HTTP error fails every id. */
+export async function bulkPatch(slug: string, ids: string[], patch: Record<string, unknown>, f: Fetch = fetch): Promise<BulkResult> {
+  const failAll = (message: string): BulkResult => ({ succeeded: [], failed: ids.map((id) => ({ id, code: 'error', message })) });
+  try {
+    const res = await f(`${base(slug)}/issues/bulk`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids, patch }) });
+    if (!res.ok) return failAll(`HTTP ${res.status}`);
+    const j = (await res.json()) as Partial<BulkResult>;
+    return { succeeded: j.succeeded ?? [], failed: j.failed ?? [] };
+  } catch { return failAll('network error'); }
+}

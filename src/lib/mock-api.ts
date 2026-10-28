@@ -17,6 +17,8 @@ export const issuePatch = z.object({
   status: z.enum(STATUSES).optional(),
   priority: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
   assignee_id: z.string().nullable().optional(),
+  project_id: z.string().nullable().optional(),
+  cycle_id: z.string().nullable().optional(),
   label_ids: z.array(z.string()).max(50).optional(),
 }).strict();
 export type IssueInput = z.input<typeof issueInput>;

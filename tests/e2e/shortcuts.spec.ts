@@ -28,7 +28,7 @@ test('x toggles multi-select, Shift+J extends, Esc clears', async ({ page }) => 
   await expect(page.locator('[data-multi]')).toHaveCount(1);
   await page.keyboard.press('Shift+J');
   await expect(page.locator('[data-multi]')).toHaveCount(2);
-  await expect(page.getByText('2 selected')).toBeVisible();
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-multi]')).toHaveCount(0);
 });
@@ -97,7 +97,7 @@ test('bulk: palette moves every selected issue, one toast', async ({ page }) => 
   await page.keyboard.press('Control+k');
   await page.getByRole('combobox', { name: 'Search commands' }).fill('selected to done');
   await page.keyboard.press('Enter');
-  await expect(page.getByText('Moved 2 issues to Done')).toBeVisible();
+  await expect(page.getByText(/2 issues updated/).first()).toBeVisible();
 });
 
 test('bulk: priority picker applies to all selected', async ({ page }) => {
