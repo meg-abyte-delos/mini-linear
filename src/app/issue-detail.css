@@ -7,7 +7,7 @@
 .idp-head .crumbs a{color:var(--muted);text-decoration:none}.idp-head .crumbs a:hover{color:var(--fg)}
 .idp .id{color:var(--muted);font-variant-numeric:tabular-nums}
 .idp button,.idp select,.idp input[type=date]{background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:var(--r-sm);padding:3px 8px;font:inherit;cursor:pointer}
-.idp button:hover:not(:disabled){background:var(--hover)}.idp button:disabled{cursor:default;opacity:.7}
+.idp button:hover:not(:disabled){background:var(--hover)}.idp button:disabled{cursor:default}
 .idp button:focus-visible,.idp input:focus-visible,.idp textarea:focus-visible,.idp select:focus-visible,.idp a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .idp-actions{display:flex;gap:var(--sp-1);flex-wrap:wrap}.idp .danger{color:var(--danger)}
 .idp-banner{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);color:var(--muted-strong)}
@@ -31,7 +31,7 @@
 .rel-add{position:relative}.menu{position:absolute;z-index:20;top:100%;left:0;margin-top:4px;background:var(--raised);border:1px solid var(--line);border-radius:var(--r-md);padding:4px;display:flex;flex-direction:column;min-width:160px}
 .menu button{border:0;text-align:left}
 .inline-add{display:flex;gap:var(--sp-2)}.inline-add input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);color:var(--fg);padding:4px 8px;font:inherit}
-.feed{list-style:none;padding:0;margin:0 0 var(--sp-3);color:var(--muted)}.feed .ev{padding:3px 0;font-size:var(--fs-sm)}.feed .who,.cmt .who{color:var(--fg);font-weight:500}.feed time,.cmt time{color:var(--dim);margin-left:4px}
+.feed{list-style:none;padding:0;margin:0 0 var(--sp-3);color:var(--muted)}.feed .ev{padding:3px 0;font-size:var(--fs-sm)}.feed .who,.cmt .who{color:var(--fg);font-weight:500}.feed time,.cmt time{color:var(--muted);margin-left:4px}
 .threads,.replies{list-style:none;padding:0;margin:0}.replies{margin-left:var(--sp-4);border-left:1px solid var(--line);padding-left:var(--sp-3)}
 .cmt{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-2)}
 .cmt header{font-size:var(--fs-sm);margin-bottom:4px}
