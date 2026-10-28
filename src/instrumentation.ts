@@ -9,5 +9,12 @@ export async function register() {
     const { startPurgeScheduler } = await import('./lib/auth/ratelimit');
     const { db } = await import('./lib/http/ctx');
     startPurgeScheduler(db());
+    if (process.env.WEBHOOKS_DISABLED !== '1') {
+      const { startWebhookDispatcher } = await import('./lib/integrations/webhooks');
+      // Own LOGIN role (member of webhook_dispatcher) when configured; otherwise the app pool + SET LOCAL ROLE (dev/CI).
+      const url = process.env.WEBHOOK_DISPATCHER_DATABASE_URL;
+      const postgres = (await import('postgres')).default;
+      startWebhookDispatcher(url ? postgres(url, { max: 2 }) : db(), { asRole: !url });
+    }
   }
 }
