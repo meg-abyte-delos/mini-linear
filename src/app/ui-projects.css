@@ -4,9 +4,10 @@
 .pj-toggle button:hover { color:var(--fg); background:color-mix(in srgb, var(--fg) 4%, transparent); }
 .pj-toggle button[aria-pressed=true] { background:color-mix(in srgb, var(--fg) 8%, transparent); color:var(--fg); }
 .pj-toggle button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-.pj-row { min-height:36px; padding:0 var(--sp-4); gap:var(--sp-4); }
-.pj-row:hover { background:color-mix(in srgb, var(--fg) 4%, transparent); }
-.pj-row:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+/* .project.pj-row (0,2,0) beats .cycle (0,1,0) whatever the import order; cycles (no .project) are untouched. */
+.project.pj-row { min-height:36px; padding:0 var(--sp-4); gap:var(--sp-4); }
+.project.pj-row:hover { background:color-mix(in srgb, var(--fg) 4%, transparent); }
+.project.pj-row:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .pj-late { font-weight:500; color:var(--danger); }
 .pdetail { max-width:880px; padding:24px 32px; gap:24px; }
 .pd-head h2 { font-size:24px; font-weight:600; letter-spacing:-.01em; }
