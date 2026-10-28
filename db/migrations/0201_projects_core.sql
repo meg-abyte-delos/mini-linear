@@ -15,6 +15,7 @@ CREATE TABLE project_members (
   project_id uuid NOT NULL, user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (project_id, user_id),
   FOREIGN KEY (project_id, workspace_id) REFERENCES projects(id, workspace_id) ON DELETE CASCADE);
+CREATE INDEX project_members_project_idx ON project_members (workspace_id, project_id);
 
 CREATE TABLE project_milestones (
   id uuid PRIMARY KEY, workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
