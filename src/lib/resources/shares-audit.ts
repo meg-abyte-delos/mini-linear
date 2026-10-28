@@ -2,13 +2,13 @@ import { z } from "zod";
 import { withWorkspaceCtx, requireRole, type Ctx } from "../http/ctx";
 import { ApiError } from "../http/errors";
 import { listQuery, parseId, parseJson, parseQuery, uuidSchema } from "../http/validate";
-import { type Row, audit } from "./common";
+import { type Row, audit, teamVisible } from "./common";
 import { decodeCursor, page } from "../http/cursor";
 
 const body = z.object({ guest_user_id: uuidSchema }).strict();
 const SHARE = (ctx: Ctx, issueId: string) => ctx.tx<Row[]>`select issue_id, guest_user_id, shared_by, created_at from issue_shares where issue_id = ${issueId} and revoked_at is null order by guest_user_id`;
 async function liveIssue(ctx: Ctx, id: string) {
-  const r = await ctx.tx`select id from issues where id = ${id} and deleted_at is null`;
+  const r = await ctx.tx`select i.id from issues i where i.id = ${id} and i.deleted_at is null and ${teamVisible(ctx, "i.team_id")}`;
   if (r.length === 0) throw new ApiError("not_found");
 }
 

@@ -15,6 +15,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     await owner.begin(async (tx) => {
       await tx`select set_config('app.workspace_id', ${seed.a.id}, true)`;
       await tx`insert into teams (id, workspace_id, name, key) values (${team}, ${seed.a.id}, 'Eng', 'ENG')`;
+      await tx`insert into team_memberships (workspace_id, team_id, user_id) values (${seed.a.id}, ${team}, ${seed.a.member})`;
     });
     process.env.ML_DEV_AUTH = "1"; process.env.ML_DEV_USER_ID = seed.a.member;
     installDevAuth();

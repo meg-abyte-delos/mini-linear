@@ -17,7 +17,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     seed = await seedTwoWorkspaces(owner);
     setSessionResolver(async (r) => r.headers.get("x-u"));
     team = randomUUID();
-    await owner.begin(async (tx) => { await tx`select set_config('app.workspace_id', ${seed.a.id}, true)`; await tx`insert into teams (id, workspace_id, name, key) values (${team}, ${seed.a.id}, 'Eng', 'ENG')`; });
+    await owner.begin(async (tx) => { await tx`select set_config('app.workspace_id', ${seed.a.id}, true)`; await tx`insert into teams (id, workspace_id, name, key) values (${team}, ${seed.a.id}, 'Eng', 'ENG')`; await tx`insert into team_memberships (workspace_id, team_id, user_id) values (${seed.a.id}, ${team}, ${seed.a.member})`; });
     issue = (await (await send(I.createIssue as Fn, seed.a.member, "POST", { team_id: team, title: "s" }, seed.a.slug)).json()).id;
   });
   afterAll(async () => { await db().end(); await owner.end(); });

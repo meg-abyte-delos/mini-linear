@@ -19,6 +19,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     teamA = randomUUID(); teamB = randomUUID(); labelA = randomUUID(); labelB = randomUUID();
     for (const [ws, t, l] of [[seed.a.id, teamA, labelA], [seed.b.id, teamB, labelB]] as const) await asOwner(ws, async (tx) => {
       await tx`insert into teams (id, workspace_id, name, key) values (${t}, ${ws}, 'Eng', 'ENG')`;
+      await tx`insert into team_memberships (workspace_id, team_id, user_id) values (${ws}, ${t}, ${ws === seed.a.id ? seed.a.member : seed.b.member})`;
       await tx`insert into labels (id, workspace_id, name) values (${l}, ${ws}, 'bug')`;
     });
   });

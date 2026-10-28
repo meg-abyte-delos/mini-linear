@@ -6,7 +6,7 @@ import { ifMatchVersion, listQuery, parseId, parseJson, parseQuery, uuidSchema }
 import { recordAudit, diffOf } from "../audit";
 import { allocateIssueNumber } from "../../db/issues";
 import { uuidv7 } from "../uuid7";
-import { assertAssignee } from "../resources/common";
+import { assertAssignee, assertTeamVisible, teamVisible } from "../resources/common";
 
 const STATUS = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 const FIELDS = ["title", "description", "status", "priority", "assignee_id", "project_id", "cycle_id", "parent_id"];
@@ -39,11 +39,11 @@ const dto = (r: Row) => ({
   label_ids: r.label_ids, version: r.version, created_by: r.created_by, deleted_at: r.deleted_at, created_at: r.created_at, updated_at: r.updated_at,
 });
 
-/** Guests see exactly the issues with an active share (v1.1 2.8); everyone else sees the whole workspace. */
+/** Guests see exactly the issues with an active share (v1.1 2.8); members the issues of their teams; admin+ the whole workspace. */
 function visible(ctx: Ctx) {
   return ctx.role === "guest"
     ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = i.id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)`
-    : ctx.tx`true`;
+    : teamVisible(ctx, "i.team_id");
 }
 const SEL = (ctx: Ctx) => ctx.tx`select i.*, t.key as team_key, coalesce((select array_agg(label_id order by label_id) from issue_labels where issue_id = i.id), '{}') as label_ids
     from issues i join teams t on t.id = i.team_id and t.workspace_id = i.workspace_id`;
@@ -82,6 +82,7 @@ export const listIssues = (req: Request, slug: string) => withWorkspaceCtx(req, 
 export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const b = await parseJson(req, createBody);
+  await assertTeamVisible(ctx, b.team_id); // same 422 for a team the member is not in as for an unknown one
   const n = await allocateIssueNumber(ctx.tx, b.team_id).catch(() => { throw new ApiError("validation_failed", "unknown team"); });
   const id = uuidv7();
   if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
@@ -125,7 +126,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
 
 export const deleteIssue = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
-  const id = parseId(rawId), want = ifMatchVersion(req), row = await load(ctx, id);
+  const id = parseId(rawId), row = await load(ctx, id), want = ifMatchVersion(req); // 404 (visibility) before 428
   if (Number(row.version) !== want) throw stale(row);
   const upd = await ctx.tx`update issues set deleted_at = now(), version = version + 1, updated_at = now() where id = ${id} and version = ${want} returning id`;
   if (upd.length === 0) throw stale(row);

@@ -68,7 +68,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect((await mut(L.patchCycle as Fn, seed.a.admin, "PATCH", 1, { start_date: "2026-01-20" }, seed.a.slug, c.id)).status).toBe(409);
     const ok = await mut(L.patchCycle as Fn, seed.a.admin, "PATCH", 1, { end_date: "2026-05-12" }, seed.a.slug, c.id);
     expect(ok.status).toBe(200); expect((await ok.json()).end_date).toBe("2026-05-12");
-    const l = await (await call(L.listCycles as Fn, seed.a.member, { q: `?team_id=${teamA2}` }, seed.a.slug)).json();
+    const l = await (await call(L.listCycles as Fn, seed.a.admin, { q: `?team_id=${teamA2}` }, seed.a.slug)).json();
     expect(l.items).toHaveLength(1);
     // deleting a cycle detaches its issues
     const iss = await (await send(I.createIssue as Fn, seed.a.member, "POST", { team_id: teamA, title: "in cycle", cycle_id: c.id }, seed.a.slug)).json();
