@@ -135,7 +135,19 @@ export const comments = pgTable("comments", {
   id: uuid("id").primaryKey(), workspaceId: wsId(), issueId: uuid("issue_id").notNull(), authorId: uuid("author_id").notNull().references(() => users.id),
   body: text("body").notNull(), version: integer("version").notNull().default(1),
   createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
+  parentCommentId: uuid("parent_comment_id"), editedAt: ts("edited_at"), resolvedAt: ts("resolved_at"), resolvedBy: uuid("resolved_by").references(() => users.id),
 });
+export const commentReactions = pgTable("comment_reactions", {
+  id: uuid("id").primaryKey(), workspaceId: wsId(), commentId: uuid("comment_id").notNull(), userId: uuid("user_id").notNull().references(() => users.id),
+  emoji: text("emoji").notNull(), createdAt: ts("created_at").notNull().defaultNow(),
+});
+export const commentMentions = pgTable("comment_mentions", {
+  workspaceId: wsId(), commentId: uuid("comment_id").notNull(), userId: uuid("user_id").notNull().references(() => users.id), createdAt: ts("created_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.commentId, t.userId] })]);
+export const issueSubscribers = pgTable("issue_subscribers", {
+  workspaceId: wsId(), issueId: uuid("issue_id").notNull(), userId: uuid("user_id").notNull().references(() => users.id),
+  reason: text("reason").notNull(), createdAt: ts("created_at").notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.issueId, t.userId] })]);
 export const issueShares = pgTable("issue_shares", {
   workspaceId: wsId(), issueId: uuid("issue_id").notNull(), guestUserId: uuid("guest_user_id").notNull().references(() => users.id),
   sharedBy: uuid("shared_by").notNull().references(() => users.id), createdAt: ts("created_at").notNull().defaultNow(), revokedAt: ts("revoked_at"),

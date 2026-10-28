@@ -5,6 +5,8 @@ import { ifMatchVersion, listQuery, parseId, parseJson, parseQuery, uuidSchema }
 import { diffOf } from "../audit";
 import { uuidv7 } from "../uuid7";
 import { type Row, stale, out, audit, listPage, afterId, assertAssignee } from "./common";
+import { subscribe } from "./subscriptions";
+import { parseMentions, normalizeEmoji, MAX_MENTIONS } from "../comments/mentions";
 
 // ------------------------------------------------ projects (span teams)
 const PROJECT_F = ["name", "description", "team_ids", "icon", "color", "lead_id", "status", "start_date", "target_date", "member_ids"];
@@ -99,47 +101,86 @@ export const deleteProject = (req: Request, slug: string, rawId: string) => with
   return new Response(null, { status: 204 });
 });
 
-// ------------------------------------------------ comments (on an issue)
-const COMMENT_F = ["body"];
-const commentBody = z.object({ body: z.string().min(1).max(100000) }).strict();
+// ------------------------------------------------ comments (on an issue): one level of threads, resolve, reactions, mentions
+const COMMENT_F = ["body", "parent_comment_id"];
+const commentBody = z.object({ body: z.string().min(1).max(100000), parent_comment_id: uuidSchema.nullable().optional() }).strict();
+const editBody = z.object({ body: z.string().min(1).max(100000) }).strict();
+const reactionBody = z.object({ emoji: z.string().min(1).max(64) }).strict();
 const issueVisible = async (ctx: Ctx, issueId: string) => {
   const r = await ctx.tx`select 1 from issues i where i.id = ${issueId} and i.deleted_at is null and ${ctx.role === "guest"
     ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = i.id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)` : ctx.tx`true`}`;
   if (!r.length) throw new ApiError("not_found");
 };
-const CMSEL = (ctx: Ctx) => ctx.tx`select id, issue_id, author_id, body, version, created_at, updated_at from comments`;
+const CMSEL = (ctx: Ctx) => ctx.tx`select c.id, c.issue_id, c.parent_comment_id, c.author_id, c.body, c.version, c.created_at, c.updated_at,
+  c.edited_at, c.resolved_at, c.resolved_by,
+  coalesce((select array_agg(m.user_id order by m.user_id) from comment_mentions m where m.comment_id = c.id), '{}') as mention_ids,
+  coalesce((select json_agg(json_build_object('emoji', g.emoji, 'count', g.n, 'user_ids', g.u) order by g.first)
+    from (select r.emoji, count(*)::int as n, array_agg(r.user_id order by r.created_at) as u, min(r.created_at) as first
+      from comment_reactions r where r.comment_id = c.id group by r.emoji) g), '[]') as reactions
+  from comments c`;
 const getComment = async (ctx: Ctx, id: string) => {
-  const r = await ctx.tx<Row[]>`${CMSEL(ctx)} where id = ${id}`;
+  const r = await ctx.tx<Row[]>`${CMSEL(ctx)} where c.id = ${id}`;
   if (!r[0]) throw new ApiError("not_found");
   await issueVisible(ctx, r[0].issue_id as string); // hidden issue => hidden comment
   return r[0];
 };
+/** Resolve @mentions to workspace members (RLS-scoped). Ambiguous handles are dropped; unknown ones ignored (no oracle). */
+async function resolveMentions(ctx: Ctx, body: string): Promise<string[]> {
+  const { ids, handles } = parseMentions(body);
+  const found = new Set<string>();
+  if (ids.length) for (const r of await ctx.tx`select user_id from memberships where user_id in ${ctx.tx(ids)}`) found.add(r.user_id as string);
+  if (handles.length) {
+    const rows = await ctx.tx`select split_part(lower(u.email), '@', 1) as h, array_agg(u.id) as ids from memberships m join users u on u.id = m.user_id
+      where split_part(lower(u.email), '@', 1) in ${ctx.tx(handles)} group by 1`;
+    for (const r of rows) if ((r.ids as string[]).length === 1) found.add((r.ids as string[])[0]!);
+  }
+  found.delete(ctx.userId); // self-mention is a no-op
+  return [...found].slice(0, MAX_MENTIONS);
+}
+async function syncMentions(ctx: Ctx, commentId: string, issueId: string, body: string) {
+  const ids = await resolveMentions(ctx, body);
+  await ctx.tx`delete from comment_mentions where comment_id = ${commentId} ${ids.length ? ctx.tx`and user_id not in ${ctx.tx(ids)}` : ctx.tx``}`;
+  for (const u of ids) await ctx.tx`insert into comment_mentions (workspace_id, comment_id, user_id) values (${ctx.workspaceId}, ${commentId}, ${u}) on conflict do nothing`;
+  await subscribe(ctx, issueId, ids, "mention");
+  return ids;
+}
 export const listComments = (req: Request, slug: string, rawIssue: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const issueId = parseId(rawIssue), q = parseQuery(req, listQuery), scope = `comments:${issueId}`, c = afterId(ctx, scope, q);
   await issueVisible(ctx, issueId);
-  const rows = await ctx.tx<Row[]>`${CMSEL(ctx)} where issue_id = ${issueId} ${c ? ctx.tx`and id > ${c}::uuid` : ctx.tx``} order by id limit ${q.limit + 1}`;
+  // Flat, creation-ordered list; clients nest replies under parent_comment_id (one level).
+  const rows = await ctx.tx<Row[]>`${CMSEL(ctx)} where c.issue_id = ${issueId} ${c ? ctx.tx`and c.id > ${c}::uuid` : ctx.tx``} order by c.id limit ${q.limit + 1}`;
   return listPage(ctx, scope, q, rows);
 });
 export const createComment = (req: Request, slug: string, rawIssue: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member"); // guests are read-only
-  const issueId = parseId(rawIssue), b = await parseJson(req, commentBody), id = uuidv7();
+  const issueId = parseId(rawIssue), b = await parseJson(req, commentBody), id = uuidv7(), parent = b.parent_comment_id ?? null;
   await issueVisible(ctx, issueId);
-  await ctx.tx`insert into comments (id, workspace_id, issue_id, author_id, body) values (${id}, ${ctx.workspaceId}, ${issueId}, ${ctx.userId}, ${b.body})`;
+  if (parent) {
+    const p = await ctx.tx`select issue_id, parent_comment_id from comments where id = ${parent}`;
+    if (!p[0] || p[0].issue_id !== issueId) throw new ApiError("validation_failed", "invalid parent_comment_id");
+    if (p[0].parent_comment_id) throw new ApiError("validation_failed", "comment threads are one level deep");
+  }
+  await ctx.tx`insert into comments (id, workspace_id, issue_id, parent_comment_id, author_id, body) values (${id}, ${ctx.workspaceId}, ${issueId}, ${parent}, ${ctx.userId}, ${b.body})`;
+  if (parent) await ctx.tx`update comments set resolved_at = null, resolved_by = null where id = ${parent} and resolved_at is not null`; // a reply reopens the thread
+  await subscribe(ctx, issueId, [ctx.userId], "commenter");
+  const mentioned = await syncMentions(ctx, id, issueId, b.body);
   const row = await getComment(ctx, id);
-  await audit(ctx, "comment", id, "create", { ...diffOf(null, row, COMMENT_F), issue_id: { before: null, after: issueId } });
+  await audit(ctx, "comment", id, "create", { ...diffOf(null, row, COMMENT_F), issue_id: { before: null, after: issueId },
+    ...(mentioned.length ? { mention_ids: { before: [], after: mentioned } } : {}) });
   return out(row, 201);
 });
 export const getCommentH = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => out(await getComment(ctx, parseId(rawId))));
 export const patchComment = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
-  const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, commentBody);
+  const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, editBody);
   const before = await getComment(ctx, id);
   if (before.author_id !== ctx.userId) throw new ApiError("forbidden"); // only the author edits
   if (Number(before.version) !== want) throw stale(before);
-  const u = await ctx.tx`update comments set body = ${b.body}, version = version + 1, updated_at = now() where id = ${id} and version = ${want} returning id`;
+  const u = await ctx.tx`update comments set body = ${b.body}, version = version + 1, updated_at = now(), edited_at = now() where id = ${id} and version = ${want} returning id`;
   if (!u.length) throw stale(before);
+  await syncMentions(ctx, id, before.issue_id as string, b.body);
   const row = await getComment(ctx, id);
-  await audit(ctx, "comment", id, "update", diffOf(before, row, COMMENT_F));
+  await audit(ctx, "comment", id, "update", diffOf(before, row, ["body"]));
   return out(row);
 });
 export const deleteComment = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -147,7 +188,57 @@ export const deleteComment = (req: Request, slug: string, rawId: string) => with
   const id = parseId(rawId), want = ifMatchVersion(req), before = await getComment(ctx, id);
   if (before.author_id !== ctx.userId && !atLeast(ctx.role, "admin")) throw new ApiError("forbidden"); // author or admin
   if (Number(before.version) !== want) throw stale(before);
-  await ctx.tx`delete from comments where id = ${id}`;
-  await audit(ctx, "comment", id, "delete", diffOf(before, null, COMMENT_F));
+  const replies = await ctx.tx`select id from comments where parent_comment_id = ${id}`;
+  await ctx.tx`delete from comments where id = ${id}`; // replies, reactions, mentions cascade
+  await audit(ctx, "comment", id, "delete", { ...diffOf(before, null, COMMENT_F), ...(replies.length ? { reply_ids: { before: replies.map((r) => r.id), after: [] } } : {}) });
+  return new Response(null, { status: 204 });
+});
+/** Resolve / reopen a thread (root comments only). Any member; idempotent; no If-Match (state toggle). */
+const setResolved = (resolved: boolean) => (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "member");
+  const id = parseId(rawId), before = await getComment(ctx, id);
+  if (before.parent_comment_id) throw new ApiError("validation_failed", "only a thread root can be resolved");
+  if (resolved === (before.resolved_at !== null)) return out(before);
+  if (resolved) await ctx.tx`update comments set resolved_at = now(), resolved_by = ${ctx.userId}, version = version + 1 where id = ${id}`;
+  else await ctx.tx`update comments set resolved_at = null, resolved_by = null, version = version + 1 where id = ${id}`;
+  const row = await getComment(ctx, id);
+  await audit(ctx, "comment", id, resolved ? "resolve" : "unresolve", { resolved_at: { before: before.resolved_at, after: row.resolved_at } });
+  return out(row);
+});
+export const resolveComment = setResolved(true);
+export const unresolveComment = setResolved(false);
+
+// ------------------------------------------------ reactions (one per user per emoji)
+const RSEL = (ctx: Ctx) => ctx.tx`select id, comment_id, user_id, emoji, created_at from comment_reactions`;
+export const listReactions = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  const id = parseId(rawId);
+  await getComment(ctx, id);
+  const items = await ctx.tx<Row[]>`${RSEL(ctx)} where comment_id = ${id} order by created_at, id`;
+  return Response.json({ items });
+});
+export const addReaction = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "member");
+  const id = parseId(rawId), b = await parseJson(req, reactionBody), emoji = normalizeEmoji(b.emoji);
+  if (!emoji) throw new ApiError("validation_failed", "invalid emoji");
+  await getComment(ctx, id);
+  const ins = await ctx.tx<Row[]>`insert into comment_reactions (id, workspace_id, comment_id, user_id, emoji) values (${uuidv7()}, ${ctx.workspaceId}, ${id}, ${ctx.userId}, ${emoji})
+    on conflict (comment_id, user_id, emoji) do nothing returning id, comment_id, user_id, emoji, created_at`;
+  if (!ins[0]) { // idempotent: already reacted
+    const ex = await ctx.tx<Row[]>`${RSEL(ctx)} where comment_id = ${id} and user_id = ${ctx.userId} and emoji = ${emoji}`;
+    return Response.json(ex[0], { status: 200 });
+  }
+  await audit(ctx, "comment_reaction", ins[0].id as string, "create", { comment_id: { before: null, after: id }, emoji: { before: null, after: emoji } });
+  return Response.json(ins[0], { status: 201 });
+});
+/** Removes the caller's own reaction; emoji from ?emoji= or the JSON body. */
+export const removeReaction = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "member");
+  const id = parseId(rawId), qe = new URL(req.url).searchParams.get("emoji");
+  const emoji = normalizeEmoji(qe ?? (await parseJson(req, reactionBody)).emoji);
+  if (!emoji) throw new ApiError("validation_failed", "invalid emoji");
+  await getComment(ctx, id);
+  const d = await ctx.tx<Row[]>`delete from comment_reactions where comment_id = ${id} and user_id = ${ctx.userId} and emoji = ${emoji} returning id`;
+  if (!d[0]) throw new ApiError("not_found");
+  await audit(ctx, "comment_reaction", d[0].id as string, "delete", { comment_id: { before: id, after: null }, emoji: { before: emoji, after: null } });
   return new Response(null, { status: 204 });
 });

@@ -7,6 +7,7 @@ import { recordAudit, diffOf } from "../audit";
 import { allocateIssueNumber } from "../../db/issues";
 import { uuidv7 } from "../uuid7";
 import { assertAssignee, assertTeamVisible, teamVisible } from "../resources/common";
+import { subscribe } from "../resources/subscriptions";
 
 const STATUS = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 const FIELDS = ["title", "description", "status", "priority", "assignee_id", "project_id", "cycle_id", "parent_id", "state_id", "estimate", "due_date"];
@@ -135,6 +136,8 @@ export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req,
     values (${id}, ${ctx.workspaceId}, ${b.team_id}, ${n}, ${b.title}, ${b.description}, ${b.status}, ${b.priority}, ${b.assignee_id}, ${b.project_id}, ${b.cycle_id}, ${b.parent_id}, ${newSortKey()}, ${ctx.userId},
       ${b.state_id ?? null}, ${b.estimate}, ${b.due_date})`;
   await setLabels(ctx, id, b.label_ids);
+  await subscribe(ctx, id, [ctx.userId], "creator");
+  await subscribe(ctx, id, [b.assignee_id], "assignee");
   const row = await load(ctx, id);
   const diff = diffOf(null, row, FIELDS);
   if (b.label_ids.length) diff.label_ids = { before: [], after: row.label_ids };
@@ -165,6 +168,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
     version = version + 1, updated_at = now() where id = ${id} and version = ${want} returning id`;
   if (upd.length === 0) throw stale(before);
   if (b.label_ids) await setLabels(ctx, id, b.label_ids);
+  if (b.assignee_id && b.assignee_id !== before.assignee_id) await subscribe(ctx, id, [b.assignee_id], "assignee");
   const after = await load(ctx, id);
   const diff = diffOf(before, after, FIELDS);
   if (b.label_ids && JSON.stringify(before.label_ids) !== JSON.stringify(after.label_ids)) diff.label_ids = { before: before.label_ids, after: after.label_ids };
