@@ -50,7 +50,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
-export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list' }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View }) {
+export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
   const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
@@ -208,6 +208,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }
   // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
   function create() {
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
     if (api) {
       void apiCreate(api.slug, api.teamId, 'New issue').then((row) => {
         if (!row) { setToast('Could not create the issue.'); return; }
@@ -243,7 +244,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   function openPalette() { returnFocus.current = document.activeElement as HTMLElement | null; setPalette(true); setQ(''); setPi(0); }
   function closePalette() { setPalette(false); const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
 
-  const [help, setHelp] = useState(false);
+  const [help, setHelpState] = useState(false);
+  function setHelp(v: boolean) {
+    if (v) returnFocus.current = document.activeElement as HTMLElement | null;
+    setHelpState(v);
+    if (!v) { const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
+  }
   const [multi, setMulti] = useState<string[]>([]);
   function toggleSelect(id: string | undefined) { if (id) setMulti((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id])); }
   // Shift+J/K: move the cursor and add both ends to the selection.
@@ -259,7 +265,6 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'help', label: 'Keyboard shortcuts', hint: '?', run: () => setHelp(true) },
     { id: 'toggle-select', label: 'Select / unselect issue', hint: hint('toggle-select'), run: () => toggleSelect(currentIdRef.current) },
     { id: 'clear-select', label: 'Clear selection', run: () => setMulti([]) },
-    { id: 'create', label: 'Create issue', hint: hint('create'), run: create },
     { id: 'list', label: 'Go to issues', hint: hint('go-issues'), run: () => setView('list') },
     { id: 'board', label: 'Go to board view', hint: hint('go-views'), run: () => setView('board') },
     { id: 'cycles', label: 'Go to cycles', run: () => setView('cycles') },
@@ -276,11 +281,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'copy-id', label: 'Copy issue id', run: copyId },
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
   ];
+  if (!readOnly) commands.splice(3, 0, { id: 'create', label: 'Create issue', hint: hint('create'), run: create });
   const results = fuzzyFilter(commands, q, (c) => c.label);
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; });
+  const multiRef = useRef<string[]>([]);
+  const readOnlyRef = useRef(readOnly);
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -303,13 +311,21 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); actions.current.reorder(e.key === 'ArrowUp' ? -1 : 1); return; }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (helpOpen.current && e.key !== 'Escape') return;
+      // Bare modifier / navigation keydowns (Shift, Control, Tab...) must not reset a pending g sequence.
+      if (e.key.length > 1 && e.key !== 'Enter' && e.key !== 'Escape') return;
       const key = keyOf(e); if (!key) return;
       if (key === 'Enter' && t.closest('button, a, [role="button"], select')) { matcher.reset(); return; }
       const id = matcher.feed(key);
       if (!id) return;
       if (id === 'pending') { e.preventDefault(); return; }
       switch (id) {
-        case 'escape': setOpen(false); actions.current.setHelp(false); actions.current.clearMulti(); if (paletteOpen.current) actions.current.closePalette(); break;
+        case 'escape':
+          // One layer per press: overlay, then palette, then selection, then the detail panel.
+          if (helpOpen.current) actions.current.setHelp(false);
+          else if (paletteOpen.current) actions.current.closePalette();
+          else if (multiRef.current.length) actions.current.clearMulti();
+          else setOpen(false);
+          break;
         case 'next': case 'prev': {
           const list = orderedRef.current; if (!list.length) break;
           const idx = Math.max(0, list.findIndex((i) => i.id === currentIdRef.current));
@@ -319,7 +335,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         case 'extend-prev': e.preventDefault(); actions.current.extend(-1); break;
         case 'toggle-select': actions.current.toggleSelect(currentIdRef.current); break;
         case 'open': setOpen(true); break;
-        case 'create': e.preventDefault(); actions.current.create(); break;
+        case 'create': e.preventDefault(); if (!readOnlyRef.current) actions.current.create(); break;
         case 'status': actions.current.cycleStatus(); break;
         case 'priority': e.preventDefault(); actions.current.openPick('priority'); break;
         case 'assignee': e.preventDefault(); actions.current.openPick('assignee'); break;
@@ -361,7 +377,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     <div className='shell'>
       <aside className='side' aria-label='Sidebar'>
         <div className='ws'><span className='ws-logo' aria-hidden='true'>D</span><span className='ws-name'>Delos</span></div>
-        <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>
+        {!readOnly && <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
         <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
         <nav aria-label='Primary'>
           <a className='side-link' href='#inbox' onClick={(e) => e.preventDefault()}><Icon name='inbox' /><span>Inbox</span></a>
@@ -402,7 +418,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : allIssues.length === 0 ? (
           <div className='state empty' role='status'>
             <p>No issues yet.</p>
-            <button onClick={create}>Create issue <kbd>C</kbd></button>
+            {!readOnly && <button onClick={create}>Create issue <kbd>C</kbd></button>}
           </div>
         ) : view === 'projects' ? (
           <div className='scroll cycles'>
@@ -491,7 +507,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
       {help && (
         <div className='overlay' onClick={() => setHelp(false)}>
-          <div className='palette' role='dialog' aria-modal='true' aria-label='Keyboard shortcuts' onClick={(e) => e.stopPropagation()} ref={(el) => el?.focus()} tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setHelp(false); } }}>
+          <div className='palette' role='dialog' aria-modal='true' aria-label='Keyboard shortcuts' onClick={(e) => e.stopPropagation()} ref={(el) => el?.focus()} tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setHelp(false); } else if (e.key === 'Tab') e.preventDefault(); /* focus trap: the dialog is the only focusable element */ }}>
             {(['Issues', 'Navigation', 'Selection', 'General'] as const).map((g) => (
               <section key={g}><h3>{g}</h3><ul>{SHORTCUTS.filter((d) => d.group === g).map((d) => <li key={d.id}><span>{d.label}</span><kbd>{formatKeys(d.keys)}</kbd></li>)}</ul></section>
             ))}
