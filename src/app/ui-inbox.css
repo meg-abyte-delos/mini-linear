@@ -1,0 +1,20 @@
+/* Inbox aligned on Linear: 32px rows, tinted hover/selection, accent token instead of hard-coded teal. */
+.nrow { height:32px; gap:8px; padding:0 16px; border-radius:0; }
+.nrow:hover { background:color-mix(in srgb, var(--fg) 4%, transparent); }
+.nrow.sel { background:color-mix(in srgb, var(--fg) 8%, transparent); outline:0; box-shadow:inset 2px 0 0 var(--accent); }
+.nrow .ndot { width:6px; height:6px; }
+.nrow.unread .ndot { background:var(--accent); }
+.nrow.unread .ntitle { font-weight:500; }
+.nid { width:56px; font-variant-numeric:tabular-nums; }
+.ntime { width:48px; text-align:right; font-variant-numeric:tabular-nums; }
+.badge { background:var(--accent); color:var(--accent-fg); font-weight:500; }
+.inbox-bar { height:36px; padding:0 16px; border-bottom:1px solid var(--line-soft); }
+.inbox-tabs { padding:8px 16px; gap:2px; }
+.inbox-tabs button { height:24px; padding:0 8px; font-size:12px; }
+.inbox-tabs button:hover { color:var(--fg); background:color-mix(in srgb, var(--fg) 4%, transparent); }
+.inbox-tabs button.on { background:color-mix(in srgb, var(--fg) 8%, transparent); }
+.snooze-menu { background:var(--panel); box-shadow:0 16px 48px rgba(0,0,0,.5); padding:4px; }
+.snooze-menu button { height:28px; padding:0 8px; border:0; border-radius:6px; background:none; color:var(--fg); cursor:pointer; }
+.snooze-menu button:hover { background:color-mix(in srgb, var(--fg) 6%, transparent); }
+.inbox-detail { width:360px; background:var(--panel); }
+.inbox-detail h2 { font-size:16px; font-weight:600; }
