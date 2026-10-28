@@ -46,7 +46,7 @@ describe.runIf(runIntegration)('T5 valid accept', () => {
     await accept(W.N, t);
     const m = (await inWs(W.w1, (c) => c.query(`select role from memberships m join users u on u.id=m.user_id where u.email=$1 and m.workspace_id=$2`, [W.Nemail, W.w1]))).rows;
     expect(m).toEqual([{ role: 'member' }]);
-    const a = (await ownerPool.query(`select count(*)::int n from audit_events where workspace_id=$1 and action ilike '%invite%accept%'`, [W.w1])).rows[0].n;
+    const a = (await inWs(W.w1, (c) => c.query(`select count(*)::int n from audit_events where workspace_id=$1 and action ilike '%invite%accept%'`, [W.w1]))).rows[0].n;
     expect(a).toBeGreaterThanOrEqual(1);
   });
   it('SECURITY DEFINER lookup returns only workspace_id and email', async () => {
@@ -89,7 +89,7 @@ describe.runIf(runIntegration)('T5 revoke, resend, re-invite (#51)', () => {
     const list = await (await api(W.A1, 'GET', `${P1}/invites`)).json();
     expect(list.items.map((i: { id: string }) => i.id)).not.toContain(id);
     expect((await api(W.A1, 'DELETE', `${P1}/invites/${id}`)).status).toBe(404);
-    const a = (await ownerPool.query(`select count(*)::int n from audit_events where entity_id=$1 and action='revoke'`, [id])).rows[0].n;
+    const a = (await inWs(W.w1, (c) => c.query(`select count(*)::int n from audit_events where entity_id=$1 and action='revoke'`, [id]))).rows[0].n;
     expect(a).toBe(1);
   });
   it('resend rotates the token hash, extends expiry, never returns a token', async () => {
