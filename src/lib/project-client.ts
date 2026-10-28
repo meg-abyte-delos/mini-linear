@@ -23,6 +23,7 @@ export function projectClient(slug: string, id: string, f: Fetch = fetch) {
     get: async () => json<ProjectDetail>(await f(base(slug, id))),
     milestones: async () => (await json<{ items: Milestone[] }>(await f(`${base(slug, id)}/milestones?limit=100`))).items,
     updates: async () => (await json<{ items: ProjectUpdate[] }>(await f(`${base(slug, id)}/updates?limit=100`))).items,
+    patch: async (version: number, body: Partial<Pick<ProjectDetail, 'status' | 'target_date' | 'lead_id'>>) => json<ProjectDetail>(await f(base(slug, id), { method: 'PATCH', headers: { 'content-type': 'application/json', 'if-match': `"${version}"` }, body: JSON.stringify(body) })),
     addUpdate: async (health: Health, body: string) => json<ProjectUpdate>(await post('/updates', { health, body })),
     addMilestone: async (name: string, target_date: string | null) => json<Milestone>(await post('/milestones', { name, description: '', target_date, sort_order: 0 })),
   };
@@ -31,3 +32,6 @@ export function projectClient(slug: string, id: string, f: Fetch = fetch) {
 /** Updates are listed oldest first by the API (id order): show the newest first. */
 export const newestFirst = (u: ProjectUpdate[]): ProjectUpdate[] => [...u].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
 export const byTarget = (m: Milestone[]): Milestone[] => [...m].sort((a, b) => (a.target_date ?? '9999') < (b.target_date ?? '9999') ? -1 : (a.target_date ?? '9999') > (b.target_date ?? '9999') ? 1 : a.sort_order - b.sort_order);
+
+export const PROJECT_STATUSES = ['backlog', 'planned', 'in_progress', 'paused', 'completed', 'canceled'] as const;
+export const statusLabel = (s: string): string => { const t = s.replace(/_/g, ' '); return t.charAt(0).toUpperCase() + t.slice(1); };

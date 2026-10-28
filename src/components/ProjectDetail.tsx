@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { byTarget, HEALTH_LABEL, newestFirst, projectClient, type Health, type Milestone, type ProjectDetail as Detail, type ProjectUpdate } from '@/lib/project-client';
+import { PROJECT_STATUSES, statusLabel, byTarget, HEALTH_LABEL, newestFirst, projectClient, type Health, type Milestone, type ProjectDetail as Detail, type ProjectUpdate } from '@/lib/project-client';
 
-interface Props { slug: string; projectId: string; canWrite: boolean; onBack: () => void; onViewIssues: (id: string) => void }
+export interface PdIssue { id: string; identifier: string; title: string; done: boolean }
+interface Props { issues?: PdIssue[]; leadName?: string | null; onOpenIssue?: (id: string) => void; slug: string; projectId: string; canWrite: boolean; onBack: () => void; onViewIssues: (id: string) => void }
 
 // Project detail: progress, milestones and status updates, on the project endpoints (API mode only).
-export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues }: Props) {
+export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues, issues = [], leadName = null, onOpenIssue }: Props) {
   const client = useMemo(() => projectClient(slug, projectId), [slug, projectId]);
   const [proj, setProj] = useState<Detail | null>(null);
   const [ms, setMs] = useState<Milestone[]>([]);
@@ -36,7 +37,11 @@ export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues 
       <div className='pd-head'>
         <button onClick={onBack}>← Projects</button>
         <h2>{proj.name}</h2>
-        <span className='pd-status'>{proj.status.replace('_', ' ')}</span>
+        {canWrite ? (
+          <select aria-label='Project status' className='pd-status' value={proj.status} disabled={busy} onChange={(e) => void run(() => client.patch(proj.version, { status: e.target.value }))}>
+            {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
+          </select>
+        ) : <span className='pd-status'>{statusLabel(proj.status)}</span>}
         {proj.health && <span className={`pd-health ${proj.health}`}>{HEALTH_LABEL[proj.health]}</span>}
         <button onClick={() => onViewIssues(proj.id)}>View issues</button>
       </div>
@@ -47,6 +52,13 @@ export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues 
         <span className='cy-prog' role='img' aria-label={`${pct}% complete, ${proj.done_count} of ${proj.issue_count} issues`}><span style={{ width: `${pct}%` }} /></span>
         <span className='cy-count'>{proj.done_count}/{proj.issue_count} ({pct}%)</span>
         <span className='cy-dates'>{proj.start_date ?? 'No start'} to {proj.target_date ?? 'no target'}</span>
+        <p className='pd-meta'>Lead: <strong data-testid='pd-lead'>{leadName ?? 'No lead'}</strong>
+          {canWrite && <label> Target date <input type='date' aria-label='Target date' value={proj.target_date ?? ''} disabled={busy} onChange={(e) => void run(() => client.patch(proj.version, { target_date: e.target.value || null }))} /></label>}
+        </p>
+      </section>
+      <section aria-labelledby='pd-issues'>
+        <h3 id='pd-issues'>Issues <span className='count'>{issues.length}</span></h3>
+        {issues.length === 0 ? <p className='col-empty'>No issues in this project</p> : <ul className='pd-issues'>{issues.map((i) => <li key={i.id}><button onClick={() => onOpenIssue?.(i.id)}><span className='id'>{i.identifier}</span> <span className={i.done ? 'pd-done' : undefined}>{i.title}</span></button></li>)}</ul>}
       </section>
       <section aria-labelledby='pd-ms'>
         <h3 id='pd-ms'>Milestones <span className='count'>{ms.length}</span></h3>
