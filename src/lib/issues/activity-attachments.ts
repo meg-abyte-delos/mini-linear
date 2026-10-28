@@ -99,7 +99,7 @@ const fmt = (field: string, v: unknown): string => {
 export type Change = { field: string; label: string; before: unknown; after: unknown; text: string };
 /** One readable line per changed field. Long text fields (description, comment body) are reported as "updated", not quoted. */
 export function describeChanges(diff: Diff): Change[] {
-  return Object.entries(diff ?? {}).filter(([f]) => f !== "issue_id").map(([f, { before, after }]) => {
+  return Object.entries(diff ?? {}).filter(([f]) => f !== "issue_id" && !(f === "state_id" && diff && "status" in diff)).map(([f, { before, after }]) => {
     const label = LABEL[f] ?? f.replace(/_id$/, "").replace(/_/g, " ");
     let text: string;
     if (f === "description" || f === "body") text = `updated the ${label}`;
