@@ -196,3 +196,11 @@ export const labelGroups = pgTable("label_groups", {
   id: uuid("id").primaryKey(), workspaceId: wsId(), teamId: uuid("team_id"), name: text("name").notNull(), color: text("color").notNull().default("#888888"),
   version: integer("version").notNull().default(1), createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
 });
+
+// --- Area 1 part 2 (0102): issue relations. 'blocked_by' is derived (inverse of 'blocks'); one relation per unordered pair. ---
+export const issueRelationTypeEnum = pgEnum("issue_relation_type", ["blocks", "related", "duplicate"]);
+export const issueRelations = pgTable("issue_relations", {
+  id: uuid("id").primaryKey(), workspaceId: wsId(), type: issueRelationTypeEnum("type").notNull(),
+  issueId: uuid("issue_id").notNull(), relatedIssueId: uuid("related_issue_id").notNull(),
+  createdBy: uuid("created_by").notNull().references(() => users.id), createdAt: ts("created_at").notNull().defaultNow(),
+}, (t) => [index("issue_relations_issue_idx").on(t.issueId), index("issue_relations_related_idx").on(t.relatedIssueId)]);

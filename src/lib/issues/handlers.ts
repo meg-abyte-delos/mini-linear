@@ -57,7 +57,7 @@ const filters = listQuery.extend({
 const newSortKey = () => Date.now().toString(36).padStart(10, "0") + Math.random().toString(36).slice(2, 8).padStart(6, "0");
 
 type Row = Record<string, unknown>;
-const norm = (r: Row) => { r.due_date = r.due_date_text ?? null; delete r.due_date_text; return r; };
+export const norm = (r: Row) => { r.due_date = r.due_date_text ?? null; delete r.due_date_text; return r; };
 /** Per-request values the DTO needs that are not columns: the workspace slug (url) and the requester's handle (branch_name). */
 export type Meta = { slug: string; handle: string };
 
@@ -72,31 +72,33 @@ export function branchName(handle: string, teamKey: string, n: number, title: st
   return `${slugify(handle, 39) || "user"}/${teamKey.toLowerCase()}-${n}${t ? `-${t}` : ""}`;
 }
 export const handleOf = (email: string) => email.split("@")[0] ?? "";
-const dto = (r: Row, m: Meta) => {
+export const dto = (r: Row, m: Meta) => {
   const identifier = `${r.team_key}-${r.number}`;
   return {
     id: r.id, identifier, team_id: r.team_id, number: r.number, title: r.title, description: r.description,
     status: r.status, priority: r.priority, assignee_id: r.assignee_id, project_id: r.project_id, cycle_id: r.cycle_id, parent_id: r.parent_id,
     state_id: r.state_id, estimate: r.estimate ?? null, due_date: r.due_date ?? null,
-    label_ids: r.label_ids, version: r.version, created_by: r.created_by, deleted_at: r.deleted_at, archived_at: r.archived_at ?? null,
+    label_ids: r.label_ids, sub_issues: { total: Number(r.sub_total ?? 0), done: Number(r.sub_done ?? 0) }, version: r.version, created_by: r.created_by, deleted_at: r.deleted_at, archived_at: r.archived_at ?? null,
     branch_name: branchName(m.handle, r.team_key as string, Number(r.number), r.title as string),
     url: `/w/${encodeURIComponent(m.slug)}/issue/${identifier}`,
     created_at: r.created_at, updated_at: r.updated_at,
   };
 };
-async function meta(ctx: Ctx, slug: string): Promise<Meta> {
+export async function meta(ctx: Ctx, slug: string): Promise<Meta> {
   const u = await ctx.tx<{ email: string }[]>`select email from users where id = ${ctx.userId}`;
   return { slug, handle: handleOf(u[0]?.email ?? "") };
 }
 
 /** Guests see exactly the issues with an active share (v1.1 2.8); members the issues of their teams; admin+ the whole workspace. */
-function visible(ctx: Ctx) {
+export function visible(ctx: Ctx) {
   return ctx.role === "guest"
     ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = i.id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)`
     : teamVisible(ctx, "i.team_id");
 }
-const SEL = (ctx: Ctx) => ctx.tx`select i.*, t.key as team_key, coalesce((select array_agg(label_id order by label_id) from issue_labels where issue_id = i.id), '{}') as label_ids,
-    i.due_date::text as due_date_text
+export const SEL = (ctx: Ctx) => ctx.tx`select i.*, t.key as team_key, coalesce((select array_agg(label_id order by label_id) from issue_labels where issue_id = i.id), '{}') as label_ids,
+    i.due_date::text as due_date_text,
+    (select count(*) from issues c where c.parent_id = i.id and c.deleted_at is null) as sub_total,
+    (select count(*) from issues c where c.parent_id = i.id and c.deleted_at is null and c.status = 'done') as sub_done
     from issues i join teams t on t.id = i.team_id and t.workspace_id = i.workspace_id`;
 export async function load(ctx: Ctx, id: string, deleted = false) {
   const rows = await ctx.tx<Row[]>`${SEL(ctx)} where i.id = ${id} and ${visible(ctx)} and ${deleted ? ctx.tx`i.deleted_at is not null` : ctx.tx`i.deleted_at is null`}`;
@@ -118,7 +120,7 @@ async function assertStateTeam(ctx: Ctx, stateId: string, teamId: string) {
   const r = await ctx.tx`select 1 from workflow_states where id = ${stateId} and team_id = ${teamId}`;
   if (r.length === 0) throw new ApiError("validation_failed", "state must belong to the issue's team");
 }
-const stale = (r: Row) => new ApiError("precondition_failed", "stale version", { current_version: r.version });
+export const stale = (r: Row) => new ApiError("precondition_failed", "stale version", { current_version: r.version });
 
 export const listIssues = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const q = parseQuery(req, filters);
