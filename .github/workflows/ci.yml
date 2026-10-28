@@ -21,6 +21,8 @@ jobs:
       PGSUPER_URL: postgres://postgres:ci_super@localhost:5432/mini_linear
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
       DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
+      TEST_BASE_URL: http://localhost:3000
+      TEST_BASE_URL_2: http://localhost:3001
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -48,7 +50,16 @@ jobs:
           for f in db/migrations/*.sql; do psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f "$f"; done
           psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f db/roles/900_grants.sql
       - run: pnpm check:rls
-      - run: pnpm test
       - run: pnpm build
+      - name: Start app (2 instances, for T6 cross-instance rate limit)
+        run: |
+          PORT=3000 TRUSTED_PROXIES=127.0.0.1 nohup pnpm start > app1.log 2>&1 &
+          PORT=3001 TRUSTED_PROXIES=127.0.0.1 nohup pnpm start > app2.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:3000 && curl -sf -o /dev/null http://localhost:3001 && exit 0
+            sleep 1
+          done
+          echo "app did not come up within 60 s"; tail -50 app1.log app2.log; exit 1
+      - run: pnpm test
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
