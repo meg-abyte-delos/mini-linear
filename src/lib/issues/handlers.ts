@@ -8,6 +8,7 @@ import { allocateIssueNumber } from "../../db/issues";
 import { uuidv7 } from "../uuid7";
 import { assertAssignee, assertTeamVisible, assertTeamWrite, teamVisible } from "../resources/common";
 import { subscribe } from "../resources/subscriptions";
+import { getTemplateRow } from "../resources/templates";
 
 const STATUS = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 const FIELDS = ["title", "description", "status", "priority", "assignee_id", "project_id", "cycle_id", "parent_id", "state_id", "estimate", "due_date"];
@@ -23,6 +24,21 @@ const createBody = z.object({
   label_ids: z.array(uuidSchema).max(50).default([]),
   state_id: uuidSchema.optional(), estimate: estimate.nullable().default(null), due_date: date.nullable().default(null),
 }).strict();
+// Optional issue template (area 9): its fields fill whatever the request left at its default; the request always wins.
+const createBodyT = createBody.extend({ title: z.string().min(1).max(255).optional(), template_id: uuidSchema.optional() });
+async function applyTemplate(ctx: Parameters<typeof assertTeamVisible>[0], raw: z.infer<typeof createBodyT>) {
+  const { template_id, ...b } = raw;
+  let title = b.title;
+  if (template_id) {
+    const t = (await getTemplateRow(ctx, b.team_id, template_id).catch(() => { throw new ApiError("validation_failed", "unknown template"); })) as { title: string; description: string; priority: number; label_ids: string[] };
+    title = title ?? (t.title || undefined);
+    if (b.description === "") b.description = t.description;
+    if (b.priority === 0) b.priority = t.priority;
+    if (!b.label_ids.length) b.label_ids = t.label_ids;
+  }
+  if (!title) throw new ApiError("validation_failed", "title required");
+  return { ...b, title };
+}
 const patchBody = z.object({
   title: z.string().min(1).max(255), description: z.string().max(100000), status: z.enum(STATUS), priority: z.number().int().min(0).max(4),
   assignee_id: uuidSchema.nullable(), project_id: uuidSchema.nullable(), cycle_id: uuidSchema.nullable(), parent_id: uuidSchema.nullable(),
@@ -125,9 +141,10 @@ export const listIssues = (req: Request, slug: string) => withWorkspaceCtx(req, 
 
 export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
-  const b = await parseJson(req, createBody);
-  await assertTeamVisible(ctx, b.team_id); // same 422 for a team the member is not in as for an unknown one
-  await assertTeamWrite(ctx, b.team_id); // team guests are read-only
+  const raw = await parseJson(req, createBodyT);
+  await assertTeamVisible(ctx, raw.team_id); // same 422 for a team the member is not in as for an unknown one
+  await assertTeamWrite(ctx, raw.team_id); // team guests are read-only
+  const b = await applyTemplate(ctx, raw);
   const n = await allocateIssueNumber(ctx.tx, b.team_id).catch(() => { throw new ApiError("validation_failed", "unknown team"); });
   const id = uuidv7();
   if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
