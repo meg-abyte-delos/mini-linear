@@ -15,6 +15,7 @@ import { SelectionBar, type BulkKind } from './SelectionBar';
 import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
 import { ProjectDetail } from '@/components/ProjectDetail';
+import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
 
@@ -602,25 +603,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : view === 'projects' && detailId && api ? (
           <ProjectDetail slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }} />
         ) : view === 'projects' ? (
-          <div className='scroll cycles'>
-            <section className='group' aria-labelledby='pj-all'>
-              <h2 id='pj-all'><span>All projects</span><span className='count'>{PROJECTS.length}</span></h2>
-              {PROJECTS.length === 0 ? <p className='col-empty'>No projects</p> : PROJECTS.map((p) => {
-                const its = allIssues.filter((i) => i.project_id === p.id);
-                const done = its.filter((i) => i.status === 'done' || i.status === 'canceled').length;
-                const pct = its.length ? Math.round((done / its.length) * 100) : 0;
-                return (
-                  <div key={p.id} className='cycle project' data-project={p.id}>
-                    <span className='cy-name'>{p.name}</span>
-                    <span className='cy-dates'>{its.length} {its.length === 1 ? 'issue' : 'issues'}</span>
-                    <span className='cy-prog' role='img' aria-label={`${pct}% complete, ${done} of ${its.length} issues`}><span style={{ width: `${pct}%` }} /></span>
-                    <span className='cy-count'>{done}/{its.length}</span>
-                    {api && <button onClick={() => setDetailId(p.id)}>Open</button>}<button onClick={() => goToProject(p.id)}>View issues</button>
-                  </div>
-                );
-              })}
-            </section>
-          </div>
+          <ProjectsList projects={PROJECTS} issues={allIssues} today={today} canOpen={!!api} onOpen={setDetailId} onViewIssues={goToProject} />
         ) : view === 'cycles' ? (
           <div className='scroll cycles'>
             {BUCKETS.map((b) => {
