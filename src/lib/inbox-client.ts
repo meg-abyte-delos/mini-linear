@@ -7,8 +7,27 @@ export type Notif = {
   actor: { id: string; email: string } | null;
 };
 export type InboxAction = 'read' | 'unread' | 'archive' | 'unarchive' | 'snooze';
+export type InboxTab = 'all' | 'unread' | 'archived' | 'snoozed';
+export const TABS: { id: InboxTab; label: string }[] = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }, { id: 'archived', label: 'Archived' }, { id: 'snoozed', label: 'Snoozed' }];
+export type PrefMap = Record<NotifType, { in_app: boolean; email: boolean }>;
+export const NOTIF_TYPES: NotifType[] = ['assigned', 'mention', 'comment', 'status_change', 'due_soon'];
+
+/** Snooze presets, computed from a given clock so they are testable. */
+export function snoozePresets(now = new Date()): { id: string; label: string; until: string }[] {
+  const at = (d: Date, h: number) => { const x = new Date(d); x.setHours(h, 0, 0, 0); return x; };
+  const later = new Date(now.getTime() + 3 * 3600e3);
+  const tomorrow = at(new Date(now.getTime() + 86400e3), 9);
+  const mon = new Date(now); mon.setDate(mon.getDate() + (((8 - mon.getDay()) % 7) || 7));
+  return [
+    { id: 'later', label: 'Later today (3h)', until: later.toISOString() },
+    { id: 'tomorrow', label: 'Tomorrow 9:00', until: tomorrow.toISOString() },
+    { id: 'nextweek', label: 'Next Monday 9:00', until: at(mon, 9).toISOString() },
+  ];
+}
 export interface InboxClient {
-  list(): Promise<{ items: Notif[]; unread_count: number }>;
+  list(tab?: InboxTab): Promise<{ items: Notif[]; unread_count: number }>;
+  getPrefs(): Promise<PrefMap | null>;
+  putPrefs(p: Partial<Record<NotifType, Partial<{ in_app: boolean; email: boolean }>>>): Promise<PrefMap | null>;
   unreadCount(): Promise<number>;
   act(id: string, action: InboxAction, until?: string): Promise<Notif | null>;
   readAll(): Promise<boolean>;
@@ -19,8 +38,9 @@ export const TYPE_LABEL: Record<NotifType, string> = { assigned: 'assigned you',
 export function httpInboxClient(slug: string, f: typeof fetch = fetch): InboxClient {
   const b = `/api/v1/w/${slug}/notifications`;
   return {
-    async list() {
-      const r = await f(`${b}?limit=100`);
+    async list(tab = 'all') {
+      const qs = tab === 'unread' ? '&unread=true' : tab === 'archived' ? '&archived=true' : tab === 'snoozed' ? '&snoozed=true' : '';
+      const r = await f(`${b}?limit=100${qs}`);
       if (!r.ok) throw new Error('list failed');
       const j = (await r.json()) as { items: Notif[]; unread_count: number };
       return { items: j.items, unread_count: j.unread_count };
@@ -35,6 +55,15 @@ export function httpInboxClient(slug: string, f: typeof fetch = fetch): InboxCli
       } catch { return null; }
     },
     async readAll() { try { return (await f(`${b}/read-all`, { method: 'POST' })).ok; } catch { return false; } },
+    async getPrefs() {
+      try { const r = await f(`/api/v1/w/${slug}/notification-preferences`); return r.ok ? ((await r.json()) as { preferences: PrefMap }).preferences : null; } catch { return null; }
+    },
+    async putPrefs(p) {
+      try {
+        const r = await f(`/api/v1/w/${slug}/notification-preferences`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preferences: p }) });
+        return r.ok ? ((await r.json()) as { preferences: PrefMap }).preferences : null;
+      } catch { return null; }
+    },
   };
 }
 
@@ -46,10 +75,17 @@ export function mockInboxClient(): InboxClient {
     created_at: new Date(now - ago).toISOString(), issue: { id: `i${n}`, number: n, title, status: 'todo', team_id: 't1', identifier: `DEL-${n}` }, actor: { id: 'u2', email: 'sam@example.com' },
   });
   let rows: Notif[] = [mk(1, 'assigned', 'Fix login redirect', 60e3, false), mk(2, 'comment', 'Board drag jitter', 3600e3, false), mk(3, 'status_change', 'Cron parser edge cases', 86400e3, true)];
-  const active = () => rows.filter((n) => !n.archived_at && !(n.snoozed_until && new Date(n.snoozed_until).getTime() > Date.now()));
+  const isSnoozed = (n: Notif) => !!n.snoozed_until && new Date(n.snoozed_until).getTime() > Date.now();
+  const active = () => rows.filter((n) => !n.archived_at && !isSnoozed(n));
+  let prefs = Object.fromEntries(NOTIF_TYPES.map((t) => [t, { in_app: true, email: false }])) as PrefMap;
   const unread = () => active().filter((n) => !n.read_at).length;
   return {
-    async list() { return { items: active(), unread_count: unread() }; },
+    async list(tab = 'all') {
+      const items = tab === 'archived' ? rows.filter((n) => n.archived_at) : tab === 'snoozed' ? rows.filter((n) => !n.archived_at && isSnoozed(n)) : tab === 'unread' ? active().filter((n) => !n.read_at) : active();
+      return { items, unread_count: unread() };
+    },
+    async getPrefs() { return prefs; },
+    async putPrefs(p) { for (const t of NOTIF_TYPES) if (p[t]) prefs = { ...prefs, [t]: { ...prefs[t], ...p[t] } }; return prefs; },
     async unreadCount() { return unread(); },
     async act(id, action, until) {
       const t = new Date().toISOString();

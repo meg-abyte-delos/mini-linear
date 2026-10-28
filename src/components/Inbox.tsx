@@ -1,73 +1,138 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
-import { TYPE_LABEL, relTime, type InboxAction, type InboxClient, type Notif } from '@/lib/inbox-client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { TABS, TYPE_LABEL, relTime, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
 
-/** Inbox list. Keys: j/k move, e archive, h snooze until tomorrow 9:00, u toggle read, Enter open issue. */
+/**
+ * Inbox. Tabs All/Unread/Archived/Snoozed, bulk read/archive on checked rows, detail panel on the right.
+ * Keys: j/k move, x check, e archive, u toggle read, s snooze menu (1-3 pick a preset), h snooze until tomorrow, Enter open issue, Esc closes menus.
+ */
 export function Inbox({ client, onUnread, onOpenIssue }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void }) {
+  const [tab, setTab] = useState<InboxTab>('all');
   const [items, setItems] = useState<Notif[] | null>(null);
   const [err, setErr] = useState(false);
   const [cur, setCur] = useState(0);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [fail, setFail] = useState<string | null>(null);
   const load = useCallback(async () => {
-    try { const r = await client.list(); setItems(r.items); onUnread(r.unread_count); setErr(false); } catch { setErr(true); }
-  }, [client, onUnread]);
-  useEffect(() => { void load(); }, [load]);
-  const unread = (items ?? []).filter((n) => !n.read_at).length;
+    try { const r = await client.list(tab); setItems(r.items); onUnread(r.unread_count); setErr(false); setChecked(new Set()); } catch { setErr(true); }
+  }, [client, onUnread, tab]);
+  useEffect(() => { setItems(null); setCur(0); void load(); }, [load]);
+  const list = items ?? [];
+  const unread = list.filter((n) => !n.read_at).length;
+  const presets = useMemo(() => snoozePresets(), [snoozeOpen]);
+  const sel = list[cur] as Notif | undefined;
+  // Targets of an action: the checked rows, else the focused row.
+  const targets = (): Notif[] => (checked.size > 0 ? list.filter((n) => checked.has(n.id)) : sel ? [sel] : []);
 
-  async function act(n: Notif, action: InboxAction, until?: string) {
+  async function actMany(ns: Notif[], action: InboxAction, until?: string) {
+    if (ns.length === 0) return;
     const prev = items ?? [];
+    const ids = new Set(ns.map((n) => n.id));
     const t = new Date().toISOString();
-    // Optimistic: archive and snooze drop the row; read/unread flip it. Rolled back if the server refuses.
-    setItems(action === 'archive' || action === 'snooze' ? prev.filter((x) => x.id !== n.id) : prev.map((x) => x.id === n.id ? { ...x, read_at: action === 'read' ? t : null } : x));
-    const r = await client.act(n.id, action, until);
-    if (!r) { setItems(prev); return; }
+    const leaves = action === 'archive' || action === 'snooze' || action === 'unarchive';
+    // Optimistic update; the list is reloaded if any request fails.
+    setItems(leaves ? prev.filter((x) => !ids.has(x.id)) : prev.map((x) => ids.has(x.id) ? { ...x, read_at: action === 'read' ? t : null } : x));
+    setChecked(new Set());
+    if (leaves) setCur((c) => Math.max(0, Math.min(c, prev.length - ids.size - 1)));
+    const res = await Promise.all(ns.map((n) => client.act(n.id, action, until)));
+    const failed = res.filter((r) => !r).length;
+    if (failed) { setFail(`${failed} action${failed > 1 ? 's' : ''} failed`); await load(); } else setFail(null);
     onUnread(await client.unreadCount());
   }
-  const tomorrow9 = () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d.toISOString(); };
+  const act = (n: Notif, action: InboxAction, until?: string) => actMany([n], action, until);
+  const open = (n: Notif) => { if (!n.read_at) void act(n, 'read'); onOpenIssue?.(n.issue_id); };
+  const toggle = (id: string) => setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       if (document.querySelector('[role=dialog]')) return;
-      const list = items ?? [];
-      const n = list[cur];
+      if (e.key === 'Escape') { setSnoozeOpen(false); setChecked(new Set()); return; }
+      if (snoozeOpen) {
+        const p = presets[Number(e.key) - 1];
+        if (p) { e.preventDefault(); setSnoozeOpen(false); void actMany(targets(), 'snooze', p.until); }
+        return;
+      }
       if (e.key === 'j') { setCur(Math.min(list.length - 1, cur + 1)); e.preventDefault(); }
       else if (e.key === 'k') { setCur(Math.max(0, cur - 1)); e.preventDefault(); }
-      else if (n && e.key === 'e') { e.preventDefault(); void act(n, 'archive'); setCur(Math.max(0, Math.min(cur, list.length - 2))); }
-      else if (n && e.key === 'h') { e.preventDefault(); void act(n, 'snooze', tomorrow9()); setCur(Math.max(0, Math.min(cur, list.length - 2))); }
-      else if (n && e.key === 'u') { e.preventDefault(); void act(n, n.read_at ? 'unread' : 'read'); }
-      else if (n && e.key === 'Enter' && !(t && t.tagName === 'BUTTON')) { e.preventDefault(); void act(n, 'read'); onOpenIssue?.(n.issue_id); }
+      else if (sel && e.key === 'x') { e.preventDefault(); toggle(sel.id); }
+      else if (sel && e.key === 'e') { e.preventDefault(); void actMany(targets(), tab === 'archived' ? 'unarchive' : 'archive'); }
+      else if (sel && e.key === 's') { e.preventDefault(); setSnoozeOpen(true); }
+      else if (sel && e.key === 'h') { e.preventDefault(); void actMany(targets(), 'snooze', presets[1]?.until); }
+      else if (sel && e.key === 'u') { e.preventDefault(); const ns = targets(); void actMany(ns, ns.every((n) => n.read_at) ? 'unread' : 'read'); }
+      else if (sel && e.key === 'Enter' && !(t && t.tagName === 'BUTTON')) { e.preventDefault(); open(sel); }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const tabs = (
+    <div role='tablist' aria-label='Inbox views' className='inbox-tabs'>
+      {TABS.map((x) => <button key={x.id} role='tab' aria-selected={tab === x.id} className={tab === x.id ? 'on' : ''} onClick={() => setTab(x.id)}>{x.label}</button>)}
+    </div>
+  );
   if (err) return <div className='state error' role='alert'><p>Could not load notifications.</p><button onClick={() => void load()}>Retry</button></div>;
   if (!items) return <div className='state' role='status'><p>Loading…</p></div>;
-  if (items.length === 0) return <div className='state empty' role='status'><p>Inbox zero. Nothing needs your attention.</p></div>;
+  const emptyMsg = tab === 'all' ? 'Inbox zero. Nothing needs your attention.' : tab === 'unread' ? 'No unread notifications.' : tab === 'archived' ? 'Nothing archived.' : 'Nothing snoozed.';
   return (
-    <div className='scroll inbox'>
-      <div className='inbox-bar'>
-        <span>{unread} unread</span>
-        <button disabled={unread === 0} onClick={async () => { if (await client.readAll()) { await load(); } }}>Mark all as read</button>
-      </div>
-      <ul role='listbox' aria-label='Notifications'>
-        {items.map((n, i) => (
-          <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => { void act(n, 'read'); onOpenIssue?.(n.issue_id); }}>
-            <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
-            <span className='nid'>{n.issue?.identifier ?? 'Deleted'}</span>
-            <span className='ntitle'>{n.issue?.title ?? ''}</span>
-            <span className='nwho'>{n.actor?.email.split('@')[0] ?? 'Someone'} {TYPE_LABEL[n.type]}</span>
-            <span className='ntime'>{relTime(n.created_at)}</span>
-            <span className='nact'>
-              <button aria-label={`Archive ${n.issue?.identifier ?? ''}`} onClick={(e) => { e.stopPropagation(); void act(n, 'archive'); }}>Archive</button>
-              <button aria-label={`Snooze ${n.issue?.identifier ?? ''}`} onClick={(e) => { e.stopPropagation(); void act(n, 'snooze', tomorrow9()); }}>Snooze</button>
-              <button aria-label={`Mark ${n.issue?.identifier ?? ''} ${n.read_at ? 'unread' : 'read'}`} onClick={(e) => { e.stopPropagation(); void act(n, n.read_at ? 'unread' : 'read'); }}>{n.read_at ? 'Unread' : 'Read'}</button>
+    <div className='inbox-wrap'>
+      <div className='scroll inbox'>
+        {tabs}
+        <div className='inbox-bar'>
+          {checked.size > 0 ? (
+            <span className='bulk' role='toolbar' aria-label='Bulk actions'>
+              <span>{checked.size} selected</span>
+              <button onClick={() => void actMany(targets(), 'read')}>Mark read</button>
+              <button onClick={() => void actMany(targets(), 'unread')}>Mark unread</button>
+              <button onClick={() => void actMany(targets(), tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
+              <button onClick={() => setSnoozeOpen(true)}>Snooze…</button>
+              <button onClick={() => setChecked(new Set())}>Clear</button>
             </span>
-          </li>
-        ))}
-      </ul>
+          ) : <span>{unread} unread</span>}
+          {tab === 'all' && checked.size === 0 && <button disabled={unread === 0} onClick={async () => { if (await client.readAll()) { await load(); } }}>Mark all as read</button>}
+        </div>
+        {snoozeOpen && (
+          <div className='snooze-menu' role='menu' aria-label='Snooze until'>
+            {presets.map((p, i) => <button key={p.id} role='menuitem' onClick={() => { setSnoozeOpen(false); void actMany(targets(), 'snooze', p.until); }}>{p.label} <kbd>{i + 1}</kbd></button>)}
+            <button role='menuitem' onClick={() => setSnoozeOpen(false)}>Cancel</button>
+          </div>
+        )}
+        {fail && <p role='alert' className='toast'>{fail}</p>}
+        {list.length === 0 ? <div className='state empty' role='status'><p>{emptyMsg}</p></div> : (
+          <ul role='listbox' aria-label='Notifications'>
+            {list.map((n, i) => (
+              <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
+                <input type='checkbox' aria-label={`Select ${n.issue?.identifier ?? 'notification'}`} checked={checked.has(n.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(n.id)} />
+                <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
+                <span className='nid'>{n.issue?.identifier ?? 'Deleted'}</span>
+                <span className='ntitle'>{n.issue?.title ?? ''}</span>
+                <span className='nwho'>{n.actor?.email.split('@')[0] ?? 'Someone'} {TYPE_LABEL[n.type]}</span>
+                <span className='ntime'>{relTime(n.created_at)}</span>
+                <span className='nact'>
+                  <button aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${n.issue?.identifier ?? ''}`} onClick={(e) => { e.stopPropagation(); void act(n, tab === 'archived' ? 'unarchive' : 'archive'); }}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
+                  <button aria-label={`Snooze ${n.issue?.identifier ?? ''}`} onClick={(e) => { e.stopPropagation(); setCur(i); setSnoozeOpen(true); }}>Snooze</button>
+                  <button aria-label={`Mark ${n.issue?.identifier ?? ''} ${n.read_at ? 'unread' : 'read'}`} onClick={(e) => { e.stopPropagation(); void act(n, n.read_at ? 'unread' : 'read'); }}>{n.read_at ? 'Unread' : 'Read'}</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {sel && (
+        <aside className='inbox-detail' aria-label='Notification detail'>
+          <h2>{sel.issue ? `${sel.issue.identifier} ${sel.issue.title}` : 'Issue deleted'}</h2>
+          <dl>
+            <dt>Event</dt><dd>{sel.actor?.email.split('@')[0] ?? 'Someone'} {TYPE_LABEL[sel.type]}</dd>
+            {sel.issue && <><dt>Status</dt><dd>{sel.issue.status}</dd></>}
+            <dt>When</dt><dd>{new Date(sel.created_at).toLocaleString()}</dd>
+            {sel.snoozed_until && <><dt>Snoozed until</dt><dd>{new Date(sel.snoozed_until).toLocaleString()}</dd></>}
+          </dl>
+          {sel.issue && <button onClick={() => open(sel)}>Open issue</button>}
+        </aside>
+      )}
     </div>
   );
 }
