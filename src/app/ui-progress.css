@@ -1,0 +1,3 @@
+.cy-prog { height:4px; width:100%; max-width:128px; justify-self:start; border-radius:2px; background:color-mix(in srgb, var(--fg) 14%, transparent); }
+.cy-prog > span { border-radius:2px; transition:width .2s ease; }
+.cycle[data-bucket='past'] .cy-prog > span { background:var(--muted); }

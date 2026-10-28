@@ -1,6 +1,7 @@
 import '@fontsource-variable/inter';
 import './theme.css';
 import './globals.css';
+import './ui-progress.css';
 import { cookies } from 'next/headers';
 
 export const metadata = { title: 'Mini-Linear' };
