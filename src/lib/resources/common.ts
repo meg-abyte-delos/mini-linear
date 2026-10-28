@@ -25,3 +25,22 @@ export async function assertAssignee(ctx: Ctx, userId: string) {
   const r = await ctx.tx`select 1 from memberships where user_id = ${userId} and role <> 'guest'`;
   if (r.length === 0) throw new ApiError("validation_failed", "invalid assignee_id");
 }
+
+/**
+ * Team scoping (spec): admins/owners see every team; members only the teams they belong to. Guests have no team access
+ * (they reach issues through shares only). `col` is the SQL column holding the team id, e.g. "i.team_id".
+ */
+export const teamVisible = (ctx: Ctx, col: "i.team_id" | "team_id") => {
+  const t = ctx.tx;
+  if (ctx.role === "owner" || ctx.role === "admin") return t`true`;
+  if (ctx.role === "guest") return t`false`;
+  return col === "i.team_id"
+    ? t`exists (select 1 from team_memberships tm where tm.team_id = i.team_id and tm.user_id = ${ctx.userId})`
+    : t`exists (select 1 from team_memberships tm where tm.team_id = cycles.team_id and tm.user_id = ${ctx.userId})`;
+};
+/** Same 422 "unknown team" for a nonexistent team and one the caller cannot see (no existence oracle). */
+export async function assertTeamVisible(ctx: Ctx, teamId: string) {
+  if (ctx.role === "owner" || ctx.role === "admin") return;
+  const r = await ctx.tx`select 1 from team_memberships where team_id = ${teamId} and user_id = ${ctx.userId}`;
+  if (r.length === 0) throw new ApiError("validation_failed", "unknown team");
+}
