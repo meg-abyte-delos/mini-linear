@@ -13,3 +13,6 @@ A small Linear clone built by the Delos Dev Swarm (Meg, Ada, Linus, Tess, Rex). 
 - M4 UI, M5 search/notifications: Linus
 - Tests (from spec only): Tess
 - Review, security, global consistency: Rex
+
+## Public API & webhooks
+Personal API keys, REST API and outbound webhooks: see [docs/API.md](docs/API.md).
