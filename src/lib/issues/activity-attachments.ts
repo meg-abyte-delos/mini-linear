@@ -110,6 +110,8 @@ export function describeChanges(diff: Diff): Change[] {
     } else if (before == null) text = `set ${label} to ${fmt(f, after)}`;
     else if (after == null) text = `cleared ${label} (was ${fmt(f, before)})`;
     else text = `changed ${label} from ${fmt(f, before)} to ${fmt(f, after)}`;
+    // Rex #68: never expose raw description/comment bodies in the activity feed (guests, deleted comments).
+    if (f === "description" || f === "body") return { field: f, label, before: null, after: null, text };
     return { field: f, label, before, after, text };
   });
 }
