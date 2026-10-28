@@ -58,7 +58,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     const j = await ok.json(); expect(j.version).toBe(2); expect(j.title).toBe("q");
     expect((await patch('"1"', { title: "again" })).status).toBe(412);
     const a = await asOwner(seed.a.id, (tx) => tx`select diff from audit_events where entity_id = ${i.id} and action = 'update'`);
-    expect(Object.keys(a[0]!.diff as object).sort()).toEqual(["status", "title"]);
+    expect(Object.keys(a[0]!.diff as object).sort()).toEqual(["state_id", "status", "title"]); // a status change moves the issue to the matching workflow state (0101)
   });
 
   it("soft delete hides, restore brings back; 404 across tenants", async () => {

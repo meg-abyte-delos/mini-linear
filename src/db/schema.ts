@@ -1,7 +1,7 @@
 // M1 schema (auth/tenancy). Spec v1.1 + Appendix A. Tenant tables carry workspace_id NOT NULL + ENABLE/FORCE RLS
 // with USING + WITH CHECK (see db/migrations/0000_m1_auth_tenancy.sql). IDs are UUIDv7 generated app-side.
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, timestamp, integer, smallint, date, jsonb, pgEnum, primaryKey, uniqueIndex, index, unique, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, smallint, date, doublePrecision, jsonb, pgEnum, primaryKey, uniqueIndex, index, unique, foreignKey } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("workspace_role", ["owner", "admin", "member", "guest"]);
 
@@ -124,6 +124,7 @@ export const issues = pgTable("issues", {
   status: issueStatusEnum("status").notNull().default("backlog"), priority: smallint("priority").notNull().default(0),
   assigneeId: uuid("assignee_id").references(() => users.id), projectId: uuid("project_id"), cycleId: uuid("cycle_id"), parentId: uuid("parent_id"),
   sortKey: text("sort_key").notNull(), version: integer("version").notNull().default(1),
+  stateId: uuid("state_id").notNull(), estimate: smallint("estimate"), dueDate: date("due_date"),
   createdBy: uuid("created_by").notNull().references(() => users.id), deletedAt: ts("deleted_at"),
   createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
 });
@@ -143,4 +144,11 @@ export const auditEvents = pgTable("audit_events", {
   id: uuid("id").primaryKey(), workspaceId: wsId(), actorId: uuid("actor_id").references(() => users.id),
   entity: text("entity").notNull(), entityId: uuid("entity_id"), action: text("action").notNull(),
   diff: jsonb("diff").notNull().default({}), createdAt: ts("created_at").notNull().defaultNow(),
+});
+export const workflowStateCategoryEnum = pgEnum("workflow_state_category", ["backlog", "unstarted", "started", "completed", "canceled"]);
+export const workflowStates = pgTable("workflow_states", {
+  id: uuid("id").primaryKey(), workspaceId: wsId(), teamId: uuid("team_id").notNull(), name: text("name").notNull(),
+  color: text("color").notNull().default("#888888"), category: workflowStateCategoryEnum("category").notNull(),
+  position: doublePrecision("position").notNull(), legacyStatus: issueStatusEnum("legacy_status"),
+  version: integer("version").notNull().default(1), createdAt: ts("created_at").notNull().defaultNow(), updatedAt: ts("updated_at").notNull().defaultNow(),
 });
