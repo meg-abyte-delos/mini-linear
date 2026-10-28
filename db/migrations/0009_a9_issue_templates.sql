@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS issue_templates (
   created_by uuid NOT NULL REFERENCES users(id), version integer NOT NULL DEFAULT 1,
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
   FOREIGN KEY (team_id, workspace_id) REFERENCES teams(id, workspace_id) ON DELETE CASCADE);
+CREATE INDEX IF NOT EXISTS issue_templates_ws_team_idx ON issue_templates (workspace_id, team_id);
 CREATE UNIQUE INDEX IF NOT EXISTS issue_templates_team_name_uq ON issue_templates (team_id, lower(name));
 ALTER TABLE issue_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE issue_templates FORCE ROW LEVEL SECURITY;
