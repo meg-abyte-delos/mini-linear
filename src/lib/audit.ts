@@ -1,7 +1,7 @@
 import type postgres from "postgres";
 import { uuidv7 } from "./uuid7";
 
-const SECRET_KEYS = /(^|_)(password|hash|token|secret|cookie)(_|$)/i;
+const SECRET_KEYS = /password|hash|token|secret|cookie/i;
 export type Diff = Record<string, { before: unknown; after: unknown }>;
 
 /** Field-level diff of two plain objects, restricted to `fields`; secret-looking fields are dropped. */

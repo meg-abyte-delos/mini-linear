@@ -37,3 +37,12 @@ describe('filters', () => {
     expect(cycleBucket(c, '2026-11-02')).toBe('past');
   });
 });
+
+describe('parseFilters in API mode (#28)', () => {
+  const uid = '0192f3a0-0000-7000-8000-000000000001';
+  it('keeps ?assignee=<uuid> and none, drops junk', () => {
+    const sp = new URLSearchParams(`assignee=${uid},none,bogus`);
+    expect(parseFilters(sp, undefined, true).assignee).toEqual([uid, 'none']);
+    expect(parseFilters(sp).assignee).toEqual(['none']);
+  });
+});
