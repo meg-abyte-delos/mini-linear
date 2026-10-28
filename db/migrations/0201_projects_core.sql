@@ -24,7 +24,7 @@ CREATE TABLE project_milestones (
   version integer NOT NULL DEFAULT 1, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (id, workspace_id),
   FOREIGN KEY (project_id, workspace_id) REFERENCES projects(id, workspace_id) ON DELETE CASCADE);
-CREATE INDEX project_milestones_project_idx ON project_milestones (project_id);
+CREATE INDEX project_milestones_project_idx ON project_milestones (workspace_id, project_id);
 
 CREATE TABLE project_updates (
   id uuid PRIMARY KEY, workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
