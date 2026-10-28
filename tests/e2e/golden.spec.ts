@@ -94,7 +94,7 @@ test('a11y: detail panel and filter picker have no wcag2a/aa violations', async 
   await page.getByRole('option').first().click();
   await expect(page.getByRole('complementary', { name: 'Issue detail' })).toBeVisible();
   let r = await wcag(page);
-  expect(r.violations.map((x) => `panel: ${x.id} x${x.nodes.length}`)).toEqual([]);
+  expect(r.violations.map((x) => `panel: ${x.id} x${x.nodes.length} ${x.nodes.map((n) => n.target.join(' ') + ' :: ' + (n.any[0]?.message ?? '')).join(' | ')}`)).toEqual([]);
   await page.getByRole('button', { name: 'Close detail panel' }).click();
   await page.locator('#fb-status').click();
   r = await wcag(page);
