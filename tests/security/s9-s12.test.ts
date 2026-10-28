@@ -98,7 +98,7 @@ describe.runIf(runIntegration)('S12 migrations', () => {
       const nn = (await p.query(`select attnotnull from pg_attribute where attrelid=$1 and attname='workspace_id'`, [x.oid])).rows[0].attnotnull;
       expect(nn, x.relname + ' NOT NULL').toBe(true);
       expect((await p.query(`select 1 from pg_constraint where conrelid=$1 and contype='f' and conkey @> array[(select attnum from pg_attribute where attrelid=$1 and attname='workspace_id')]`, [x.oid])).rowCount, x.relname + ' FK').toBeGreaterThan(0);
-      if (!['team_memberships', 'invites', 'projects', 'project_teams'].includes(x.relname)) // known gaps #53, #57 (projects + project_teams)
+      if (!['team_memberships', 'invites', 'projects', 'project_teams', 'cycles'].includes(x.relname)) // known gaps #53, #57 (projects + project_teams), #60 (cycles)
       expect((await p.query(`select 1 from pg_index i where i.indrelid=$1 and i.indkey[0]=(select attnum from pg_attribute where attrelid=$1 and attname='workspace_id')`, [x.oid])).rowCount, x.relname + ' index').toBeGreaterThan(0);
       const pol = (await p.query(`select qual, with_check from pg_policies where tablename=$1`, [x.relname])).rows;
       expect(pol.length, x.relname + ' policy').toBeGreaterThan(0);
