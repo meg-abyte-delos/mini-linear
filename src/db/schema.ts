@@ -86,7 +86,7 @@ export const invites = pgTable("invites", {
   tokenHash: text("token_hash").notNull().unique(),
   invitedBy: uuid("invited_by").notNull().references(() => users.id),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  usedAt: timestamp("used_at", { withTimezone: true }),
+  usedAt: timestamp("used_at", { withTimezone: true }), revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

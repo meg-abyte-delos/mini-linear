@@ -107,7 +107,7 @@ export const listInvites = (req: Request, slug: string) => withWorkspaceCtx(req,
   requireRole(ctx, "admin");
   const q = parseQuery(req, listQuery), c = afterId(ctx, "invites", q);
   const rows = await ctx.tx<Row[]>`select id, email, role, invited_by, expires_at, created_at from invites
-    where used_at is null and expires_at > now() and ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} order by id limit ${q.limit + 1}`;
+    where used_at is null and revoked_at is null and expires_at > now() and ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} order by id limit ${q.limit + 1}`;
   return listPage(ctx, "invites", q, rows);
 });
 
@@ -115,6 +115,8 @@ export const createInvite = (req: Request, slug: string) => withWorkspaceCtx(req
   requireRole(ctx, "admin");
   const b = await parseJson(req, z.object({ email: emailS, role: z.enum(["admin", "member", "guest"]) }).strict());
   if (ctx.role === "admin" && b.role === "admin") throw new ApiError("forbidden", "only owners invite admins");
+  // One pending invite per email: re-inviting revokes the previous token, so only the newest mail link works.
+  await ctx.tx`update invites set revoked_at = now() where lower(email) = ${b.email} and used_at is null and revoked_at is null`;
   const id = uuidv7(), t = newToken();
   await ctx.tx`insert into invites (id, workspace_id, email, role, token_hash, invited_by, expires_at) values (${id}, ${ctx.workspaceId}, ${b.email}, ${b.role}, ${hashToken(t)}, ${ctx.userId}, ${new Date(Date.now() + INVITE_DAYS * 86400_000)})`;
   await audit(ctx, "invite", id, "create", { email: { before: null, after: b.email }, role: { before: null, after: b.role } });
@@ -122,12 +124,29 @@ export const createInvite = (req: Request, slug: string) => withWorkspaceCtx(req
   return Response.json({ id, email: b.email, role: b.role }, { status: 201 });
 });
 
+/** Resend: rotates the token (the old link dies) and restarts the expiry window. Never returns the token. */
+export const resendInvite = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "admin");
+  const id = parseId(rawId);
+  const cur = (await ctx.tx<{ role: Role }[]>`select role from invites where id = ${id} and used_at is null and revoked_at is null`)[0];
+  if (!cur) throw new ApiError("not_found");
+  if (ctx.role === "admin" && cur.role === "admin") throw new ApiError("forbidden", "only owners invite admins");
+  const t = newToken();
+  const r = await ctx.tx<{ email: string; role: Role }[]>`update invites set token_hash = ${hashToken(t)}, expires_at = ${new Date(Date.now() + INVITE_DAYS * 86400_000)}
+    where id = ${id} and used_at is null and revoked_at is null returning email, role`;
+  if (!r.length) throw new ApiError("not_found");
+  await audit(ctx, "invite", id, "resend", {});
+  await sendMail({ to: r[0]!.email, kind: "invite", token: t });
+  return Response.json({ id, email: r[0]!.email, role: r[0]!.role });
+});
+
 export const deleteInvite = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "admin");
   const id = parseId(rawId);
-  const d = await ctx.tx`delete from invites where id = ${id} and used_at is null returning email`;
+  // Soft revoke (#51): the row stays for the audit trail; lookup_invite ignores it, so the token is dead.
+  const d = await ctx.tx`update invites set revoked_at = now() where id = ${id} and used_at is null and revoked_at is null returning email`;
   if (!d.length) throw new ApiError("not_found");
-  await audit(ctx, "invite", id, "delete", { email: { before: d[0]!.email, after: null } });
+  await audit(ctx, "invite", id, "revoke", { email: { before: d[0]!.email, after: null } });
   return new Response(null, { status: 204 });
 });
 
@@ -142,11 +161,12 @@ export const acceptInvite = (req: Request) => withUser(req, async (tx, userId) =
   if (!inv || !u || !u.email_verified_at || u.email.toLowerCase() !== inv.email.toLowerCase()) throw new ApiError("INVITE_INVALID", "invalid invite");
   await tx`select set_config('app.workspace_id', ${inv.workspace_id}, true)`;
   // id and role are read under RLS, not via the definer function (#56)
-  const used = await tx<{ id: string; role: Role }[]>`update invites set used_at = now() where token_hash = ${hashToken(token)} and used_at is null and expires_at > now() returning id, role`;
+  const used = await tx<{ id: string; role: Role }[]>`update invites set used_at = now() where token_hash = ${hashToken(token)} and used_at is null and revoked_at is null and expires_at > now() returning id, role`;
   if (!used.length) throw new ApiError("INVITE_INVALID", "invalid invite");
   const role = used[0]!.role;
   const ins = await tx`insert into memberships (id, workspace_id, user_id, role) values (${randomUUID()}, ${inv.workspace_id}, ${userId}, ${role}) on conflict (workspace_id, user_id) do nothing returning id`;
   if (!ins.length) throw new ApiError("conflict", "already a member");
+  await recordAudit(tx, { workspaceId: inv.workspace_id, actorId: userId, entity: "invite", entityId: used[0]!.id, action: "invite_accept", diff: { used: { before: false, after: true } } });
   await recordAudit(tx, { workspaceId: inv.workspace_id, actorId: userId, entity: "member", entityId: userId, action: "create", diff: { role: { before: null, after: role } } });
   const ws = (await tx<Row[]>`select id, slug, name, role from list_my_workspaces(${userId}) where id = ${inv.workspace_id}`)[0];
   return Response.json(ws ?? { id: inv.workspace_id, role });
