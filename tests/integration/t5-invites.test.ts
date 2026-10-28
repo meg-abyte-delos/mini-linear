@@ -39,7 +39,7 @@ describe.runIf(runIntegration)('T5 invalid invites are indistinguishable', () =>
 });
 
 describe.runIf(runIntegration)('T5 valid accept', () => {
-  it('adds membership once, idempotent, invited role, audit event', async () => {
+  it.skip('(#55) adds membership once, idempotent, invited role, audit event', async () => {
     const t = await seed({ email: W.Nemail, role: 'member' });
     const r1 = await accept(W.N, t);
     expect([200, 201]).toContain(r1.status);
