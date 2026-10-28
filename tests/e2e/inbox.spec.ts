@@ -50,3 +50,15 @@ test('inbox: tabs, snooze menu, bulk archive, detail panel', async ({ page }) =>
   await page.getByRole('tab', { name: 'Archived' }).click();
   await expect(page.getByRole('option')).toHaveCount(2);
 });
+
+test('inbox: x toggles selection of the focused notification', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  await page.keyboard.press('x');
+  await expect(page.getByText('1 selected')).toBeVisible();
+  await page.keyboard.press('j');
+  await page.keyboard.press('x');
+  await expect(page.getByText('2 selected')).toBeVisible();
+  await page.keyboard.press('x');
+  await expect(page.getByText('1 selected')).toBeVisible();
+});
