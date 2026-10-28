@@ -10,6 +10,7 @@ import { assertAssignee, assertTeamVisible, assertTeamWrite, teamVisible } from 
 import { subscribe } from "../resources/subscriptions";
 import { getTemplateRow } from "../resources/templates";
 import { emit } from "../notifications";
+import { ESTIMATE_SCALES, estimateValues, type EstimateScale } from "../team-config";
 
 const STATUS = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 const FIELDS = ["title", "description", "status", "priority", "assignee_id", "project_id", "cycle_id", "parent_id", "state_id", "estimate", "due_date"];
@@ -121,6 +122,17 @@ async function assertStateTeam(ctx: Ctx, stateId: string, teamId: string) {
   if (r.length === 0) throw new ApiError("validation_failed", "state must belong to the issue's team");
 }
 export const stale = (r: Row) => new ApiError("precondition_failed", "stale version", { current_version: r.version });
+/**
+ * An estimate must be one of the team scale values. Scale "none" (the default) does not restrict, so existing clients and
+ * data keep working; null (clearing) is always allowed. Same 422 for every endpoint.
+ */
+export async function assertEstimate(ctx: Ctx, teamId: string, estimate: number | null | undefined) {
+  if (estimate === null || estimate === undefined) return;
+  const r = await ctx.tx`select estimate_scale, estimate_allow_zero from team_settings where team_id = ${teamId}`;
+  const scale = (r[0]?.estimate_scale ?? "none") as string;
+  if (scale === "none" || !(ESTIMATE_SCALES as readonly string[]).includes(scale)) return;
+  if (!estimateValues(scale as EstimateScale, !!r[0]?.estimate_allow_zero).includes(estimate)) throw new ApiError("validation_failed", "estimate is not allowed by the team's estimate scale");
+}
 
 export const listIssues = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const q = parseQuery(req, filters);
@@ -152,6 +164,7 @@ export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req,
   const id = uuidv7();
   if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
   if (b.cycle_id) await assertCycleTeam(ctx, b.cycle_id, b.team_id);
+  await assertEstimate(ctx, b.team_id, b.estimate);
   if (b.state_id) await assertStateTeam(ctx, b.state_id, b.team_id); // state_id wins over status (trigger derives status)
   await ctx.tx`insert into issues (id, workspace_id, team_id, number, title, description, status, priority, assignee_id, project_id, cycle_id, parent_id, sort_key, created_by, state_id, estimate, due_date)
     values (${id}, ${ctx.workspaceId}, ${b.team_id}, ${n}, ${b.title}, ${b.description}, ${b.status}, ${b.priority}, ${b.assignee_id}, ${b.project_id}, ${b.cycle_id}, ${b.parent_id}, ${newSortKey()}, ${ctx.userId},
@@ -180,6 +193,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
   if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
   if (b.cycle_id) await assertCycleTeam(ctx, b.cycle_id, before.team_id as string);
   if (b.state_id) await assertStateTeam(ctx, b.state_id, before.team_id as string);
+  await assertEstimate(ctx, before.team_id as string, b.estimate);
   const pick = <K extends keyof typeof b>(k: K, cur: unknown) => (b[k] !== undefined ? b[k] : cur);
   // The version predicate is in the UPDATE too: closes the race between the read above and this write.
   const upd = await ctx.tx`update issues set title = ${pick("title", before.title) as string}, description = ${pick("description", before.description) as string},

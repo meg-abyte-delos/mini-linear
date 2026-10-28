@@ -58,6 +58,21 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect(a[0]!.diff).toHaveProperty("state_id"); expect(a[0]!.diff).toHaveProperty("status");
   });
 
+  it("validates estimates against the team scale on create and patch (scale none = unrestricted)", async () => {
+    expect((await newIssue({ estimate: 7 })).status).toBe(201); // default scale none
+    await asOwner(seed.a.id, (tx) => tx`update team_settings set estimate_scale = 'fibonacci', estimate_allow_zero = false where team_id = ${teamA}`);
+    expect((await newIssue({ estimate: 4 })).status).toBe(422);
+    expect((await newIssue({ estimate: 0 })).status).toBe(422);
+    const ok = await newIssue({ estimate: 5 });
+    expect(ok.status).toBe(201);
+    const i = await ok.json();
+    expect((await patch(i.id, i.version, { estimate: 4 })).status).toBe(422);
+    expect((await patch(i.id, i.version, { estimate: 8 })).status).toBe(200);
+    await asOwner(seed.a.id, (tx) => tx`update team_settings set estimate_allow_zero = true where team_id = ${teamA}`);
+    expect((await newIssue({ estimate: 0 })).status).toBe(201);
+    await asOwner(seed.a.id, (tx) => tx`update team_settings set estimate_scale = 'none', estimate_allow_zero = false where team_id = ${teamA}`);
+  });
+
   it("rejects a state of another team, bad estimate and bad due date with 422", async () => {
     const other = (await states(seed.a.admin, teamA2))[0]!.id;
     expect((await newIssue({ state_id: other })).status).toBe(422);
