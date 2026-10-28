@@ -13,7 +13,7 @@ const json = (r: unknown, status = 200) => Response.json(r, { status });
 
 // ------------------------------------------------ personal API keys (session-only management)
 const KSEL = (ctx: Ctx) => ctx.tx`select id, user_id, name, prefix, scope, expires_at, last_used_at, revoked_at, created_at from api_keys`;
-const keyBody = z.object({ name: z.string().trim().min(1).max(100), scope: z.enum(["read", "write"]).default("write"), expires_in_days: z.number().int().min(1).max(3650).optional() }).strict();
+const keyBody = z.object({ name: z.string().trim().min(1).max(100), scope: z.enum(["read", "write", "admin"]).default("write"), expires_in_days: z.number().int().min(1).max(3650).optional() }).strict();
 
 /** Own keys; admins/owners may list every key of the workspace with ?all=1 (to audit and revoke). */
 export const listApiKeys = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -27,6 +27,7 @@ export const listApiKeys = (req: Request, slug: string) => withWorkspaceCtx(req,
 export const createApiKey = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireSession(ctx);
   const b = await parseJson(req, keyBody), id = uuidv7(), k = newApiKey();
+  if (b.scope === "admin") requireRole(ctx, "admin"); // only admins can mint keys that keep admin powers
   const live = await ctx.tx`select count(*)::int n from api_keys where user_id = ${ctx.userId} and revoked_at is null`;
   if ((live[0]!.n as number) >= 25) throw new ApiError("conflict", "too many active API keys (max 25)");
   const exp = b.expires_in_days ? new Date(Date.now() + b.expires_in_days * 86400_000) : null;

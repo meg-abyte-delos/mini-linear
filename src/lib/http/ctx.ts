@@ -3,7 +3,7 @@ import { ApiError, errorResponse, isDeadlock } from "./errors";
 import { resolveSession } from "../auth/session";
 import { originAllowed } from "../auth/origin";
 import { hashToken } from "../auth/tokens";
-import { hit } from "../auth/ratelimit";
+import { hit, clientIp } from "../auth/ratelimit";
 import { API_RATE_LIMIT, SAFE_METHODS, bearerApiKey } from "../integrations/apikey";
 
 export type Role = "owner" | "admin" | "member" | "guest";
@@ -48,7 +48,9 @@ export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx
       const rows = await tx<{ workspace_id: string; role: Role }[]>`select workspace_id, role from resolve_workspace(${slug}, ${userId})`;
       // A key only opens its own workspace (and only while its owner is still a member): else 404, like a non-member.
       if (rows.length === 0 || (key && rows[0]!.workspace_id !== key.workspace_id)) throw new ApiError("not_found");
-      const { workspace_id, role } = rows[0]!;
+      const { workspace_id } = rows[0]!;
+      // read/write keys act as at most a member; only an admin-scope key (minted by an admin) keeps admin/owner powers.
+      const role: Role = key && key.scope !== 'admin' && atLeast(rows[0]!.role, 'admin') ? 'member' : rows[0]!.role;
       await tx`select set_config('app.workspace_id', ${workspace_id}, true)`;
       // Session-derived user for the role RLS helpers (has_team_role / is_workspace_admin). Never client-supplied.
       await tx`select set_config('app.user_id', ${userId}, true)`;
@@ -77,7 +79,8 @@ export async function withUser(req: Request, fn: (tx: postgres.TransactionSql, u
   }
 }
 
-type KeyRow = { key_id: string; workspace_id: string; user_id: string; scope: "read" | "write" };
+const BAD_KEY_LIMIT = Number(process.env.API_BAD_KEY_LIMIT ?? 30);
+type KeyRow = { key_id: string; workspace_id: string; user_id: string; scope: 'read' | 'write' | 'admin' };
 /**
  * API-key auth (Authorization: Bearer mlk_...). undefined header -> null (fall back to the session cookie).
  * Malformed / unknown / revoked / expired -> 401. Read-only key on an unsafe method -> 403. Rate limited per key (429).
@@ -85,10 +88,12 @@ type KeyRow = { key_id: string; workspace_id: string; user_id: string; scope: "r
 export async function resolveApiKey(req: Request, sql: postgres.Sql = db()): Promise<KeyRow | null> {
   const tok = bearerApiKey(req);
   if (tok === undefined) return null;
-  if (tok === null) throw new ApiError("unauthenticated", "invalid API key");
+  // Invalid credentials are rate limited per client IP (key guessing): 429 after BAD_KEY_LIMIT misses a minute.
+  const bad = async () => { await hit(sql, `api:badkey:${clientIp(req)}`, BAD_KEY_LIMIT, 60); return new ApiError('unauthenticated', 'invalid API key'); };
+  if (tok === null) throw await bad();
   const rows = await sql<KeyRow[]>`select key_id, workspace_id, user_id, scope from resolve_api_key(${hashToken(tok)})`;
   const k = rows[0];
-  if (!k) throw new ApiError("unauthenticated", "invalid API key");
+  if (!k) throw await bad();
   await hit(sql, `api:key:${k.key_id}`, API_RATE_LIMIT.limit, API_RATE_LIMIT.windowSec);
   if (k.scope === "read" && !SAFE_METHODS.has(req.method)) throw new ApiError("forbidden", "read-only API key");
   return k;

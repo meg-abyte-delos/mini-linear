@@ -2,13 +2,20 @@
 -- Keys: only sha256(token) is stored; the plain token (mlk_<prefix>_<secret>) is returned once at creation.
 -- A key belongs to (workspace, user) and acts with that user's CURRENT role (resolve_workspace), never more.
 BEGIN;
+-- Dispatcher role: the ONLY role allowed to run claim_/complete_/purge_ webhook functions (they expose url+secret across tenants).
+-- Prod: create a LOGIN role that is a member of it and point WEBHOOK_DISPATCHER_DATABASE_URL at it (see docs/API.md).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'webhook_dispatcher') THEN
+    CREATE ROLE webhook_dispatcher NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+  END IF;
+END $$;
 CREATE TABLE api_keys (
   id uuid PRIMARY KEY, workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 100),
   prefix text NOT NULL CHECK (prefix ~ '^[a-z0-9]{8}$'),
   key_hash text NOT NULL UNIQUE,
-  scope text NOT NULL DEFAULT 'write' CHECK (scope IN ('read','write')),
+  scope text NOT NULL DEFAULT 'write' CHECK (scope IN ('read','write','admin')), -- read/write keys act as at most 'member'; admin-level actions need an 'admin' key
   expires_at timestamptz, last_used_at timestamptz, revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX api_keys_user_idx ON api_keys (workspace_id, user_id);
@@ -32,6 +39,7 @@ CREATE TABLE webhook_deliveries (
 CREATE INDEX webhook_deliveries_due_idx ON webhook_deliveries (next_attempt_at) WHERE status = 'pending';
 CREATE INDEX webhook_deliveries_hook_idx ON webhook_deliveries (workspace_id, webhook_id, created_at DESC);
 CREATE INDEX webhooks_ws_idx ON webhooks (workspace_id);
+CREATE INDEX webhook_deliveries_retention_idx ON webhook_deliveries (created_at) WHERE status <> 'pending';
 
 DO $$ DECLARE t text; BEGIN
   FOREACH t IN ARRAY ARRAY['api_keys','webhooks','webhook_deliveries'] LOOP
@@ -43,6 +51,7 @@ DO $$ DECLARE t text; BEGIN
   END LOOP;
 END $$;
 
+-- Event payload = the changed row as to_jsonb(row) (all its columns, as stored) minus internal search vectors ('tsv'); see docs/API.md.
 -- Event fan-out: one delivery row per matching active webhook, written in the SAME tx as the change (no lost events,
 -- rolled back with it). Runs as the invoker (app_user) under the tenant RLS already set for the request.
 CREATE FUNCTION enqueue_webhook_event() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
@@ -54,7 +63,7 @@ BEGIN
   END IF;
   ev := kind || '.' || act;
   INSERT INTO webhook_deliveries (workspace_id, webhook_id, event, payload)
-    SELECT w.workspace_id, w.id, ev, jsonb_build_object('event', ev, 'workspace_id', r.workspace_id, 'occurred_at', now(), 'data', to_jsonb(r))
+    SELECT w.workspace_id, w.id, ev, jsonb_build_object('event', ev, 'workspace_id', r.workspace_id, 'occurred_at', now(), 'data', to_jsonb(r) - 'tsv')
     FROM webhooks w WHERE w.workspace_id = r.workspace_id AND w.active AND ev = ANY (w.events);
   RETURN NULL;
 END $$;
@@ -80,7 +89,7 @@ BEGIN
 END $$;
 
 -- Dispatcher (background, no tenant): claim due deliveries with a 2-minute lease (SKIP LOCKED: safe with N instances),
--- then report the outcome. Exposes url+secret only to the server-side dispatcher role (app_user).
+-- then report the outcome. These expose url+secret across tenants, so only webhook_dispatcher may execute them.
 CREATE FUNCTION claim_webhook_deliveries(p_limit integer)
 RETURNS TABLE (id uuid, workspace_id uuid, webhook_id uuid, event text, payload jsonb, attempts integer, url text, secret text)
 LANGUAGE sql SECURITY DEFINER VOLATILE SET search_path = pg_catalog, public AS $$
@@ -92,8 +101,9 @@ LANGUAGE sql SECURITY DEFINER VOLATILE SET search_path = pg_catalog, public AS $
   SELECT u.id, u.workspace_id, u.webhook_id, u.event, u.payload, u.attempts, w.url, w.secret
   FROM upd u JOIN public.webhooks w ON w.id = u.webhook_id AND w.workspace_id = u.workspace_id WHERE w.active $$;
 
--- Backoff: 30s * 2^(attempts-1), capped at 6h; after 8 attempts the delivery is 'failed'.
-CREATE FUNCTION complete_webhook_delivery(p_id uuid, p_ok boolean, p_status integer, p_error text)
+-- Backoff: 30s * 2^(attempts-1), capped at 6h; after 8 attempts the delivery is 'failed'. The tenant (p_workspace_id)
+-- must match the delivery row, so an id from another tenant is a no-op.
+CREATE FUNCTION complete_webhook_delivery(p_id uuid, p_workspace_id uuid, p_ok boolean, p_status integer, p_error text)
 RETURNS void LANGUAGE sql SECURITY DEFINER VOLATILE SET search_path = pg_catalog, public AS $$
   UPDATE public.webhook_deliveries d SET
     status = CASE WHEN p_ok THEN 'succeeded' WHEN d.attempts >= 8 THEN 'failed' ELSE 'pending' END,
@@ -101,19 +111,35 @@ RETURNS void LANGUAGE sql SECURITY DEFINER VOLATILE SET search_path = pg_catalog
     next_attempt_at = CASE WHEN p_ok OR d.attempts >= 8 THEN d.next_attempt_at
       ELSE now() + least(interval '30 seconds' * power(2, d.attempts - 1), interval '6 hours') END,
     last_status_code = p_status, last_error = left(p_error, 500)
-  WHERE d.id = p_id $$;
+  WHERE d.id = p_id AND d.workspace_id = p_workspace_id AND d.status = 'pending' $$;
+
+-- Retention: finished deliveries (succeeded/failed) older than p_days (min 1) are deleted, in bounded batches.
+CREATE FUNCTION purge_webhook_deliveries(p_days integer)
+RETURNS integer LANGUAGE sql SECURITY DEFINER VOLATILE SET search_path = pg_catalog, public AS $$
+  WITH del AS (DELETE FROM public.webhook_deliveries WHERE id IN (
+    SELECT id FROM public.webhook_deliveries WHERE status <> 'pending' AND created_at < now() - make_interval(days => greatest(p_days, 1))
+    ORDER BY created_at LIMIT 5000) RETURNING 1)
+  SELECT count(*)::int FROM del $$;
 
 GRANT CREATE ON SCHEMA public TO definer;
 ALTER FUNCTION resolve_api_key(text) OWNER TO definer;
 ALTER FUNCTION claim_webhook_deliveries(integer) OWNER TO definer;
-ALTER FUNCTION complete_webhook_delivery(uuid, boolean, integer, text) OWNER TO definer;
+ALTER FUNCTION complete_webhook_delivery(uuid, uuid, boolean, integer, text) OWNER TO definer;
+ALTER FUNCTION purge_webhook_deliveries(integer) OWNER TO definer;
 REVOKE CREATE ON SCHEMA public FROM definer;
 GRANT SELECT, UPDATE ON api_keys, webhooks, webhook_deliveries TO definer;
+GRANT DELETE ON webhook_deliveries TO definer;
 REVOKE ALL ON FUNCTION resolve_api_key(text), claim_webhook_deliveries(integer),
-  complete_webhook_delivery(uuid, boolean, integer, text), enqueue_webhook_event() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION resolve_api_key(text), claim_webhook_deliveries(integer),
-  complete_webhook_delivery(uuid, boolean, integer, text) TO app_user;
+  complete_webhook_delivery(uuid, uuid, boolean, integer, text), purge_webhook_deliveries(integer), enqueue_webhook_event() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION resolve_api_key(text) TO app_user;
+GRANT EXECUTE ON FUNCTION claim_webhook_deliveries(integer), complete_webhook_delivery(uuid, uuid, boolean, integer, text),
+  purge_webhook_deliveries(integer) TO webhook_dispatcher;
+GRANT USAGE ON SCHEMA public TO webhook_dispatcher;
 GRANT SELECT, INSERT, UPDATE ON api_keys TO app_user; -- revoke = UPDATE revoked_at (no hard delete: audit trail)
-GRANT SELECT, INSERT, UPDATE, DELETE ON webhooks TO app_user;
+-- webhooks: column grants WITHOUT the secret. app_user can write it (INSERT) but never read it back; only the definer functions can.
+GRANT SELECT (id, workspace_id, url, events, active, created_by, created_at, updated_at) ON webhooks TO app_user;
+GRANT INSERT ON webhooks TO app_user;
+GRANT UPDATE (url, events, active, updated_at) ON webhooks TO app_user;
+GRANT DELETE ON webhooks TO app_user;
 GRANT SELECT, INSERT ON webhook_deliveries TO app_user;
 COMMIT;

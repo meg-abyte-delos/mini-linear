@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
+
+const dns = vi.hoisted(() => ({ answers: {} as Record<string, { address: string; family: number }[]> }));
+vi.mock("node:dns", async (orig) => {
+  const real = await orig<typeof import("node:dns")>();
+  const lookup = (host: string, _o: unknown, cb: (e: Error | null, a?: unknown) => void) => { const a = dns.answers[host]; return a ? cb(null, a) : cb(Object.assign(new Error(`ENOTFOUND ${host}`), { code: "ENOTFOUND" })); };
+  return { ...real, default: { ...real, lookup }, lookup };
+});
 import { KEY_RE, bearerApiKey, newApiKey } from "../../src/lib/integrations/apikey";
 import { hashToken } from "../../src/lib/auth/tokens";
-import { backoffSec, dispatchOnce, isPrivateIp, sign, verify, webhookUrlError } from "../../src/lib/integrations/webhooks";
+import { backoffSec, destinationError, dispatchOnce, guardedLookup, isPrivateIp, safeFetch, sign, verify, webhookUrlError } from "../../src/lib/integrations/webhooks";
 
 const req = (h?: string) => new Request("http://x/api", { headers: h === undefined ? {} : { authorization: h } });
 
@@ -80,14 +87,68 @@ describe("dispatchOnce", () => {
     expect(h["x-minilinear-event"]).toBe("issue.created");
     expect(JSON.parse(init.body as string)).toMatchObject({ id: "d1", data: { id: "i1" } });
     expect(init.redirect).toBe("manual");
-    expect(calls[1]!.slice(1)).toEqual(["d1", true, 200, null]);
+    expect(calls[1]!.slice(1)).toEqual(["d1", "w", true, 200, null]);
   });
   it("records non-2xx and network errors as failures (retried by the DB backoff)", async () => {
     const a = fakeSql([d]);
     await dispatchOnce(a.sql, { fetcher: async () => new Response("", { status: 500 }) });
-    expect(a.calls[1]!.slice(1)).toEqual(["d1", false, 500, "HTTP 500"]);
+    expect(a.calls[1]!.slice(1)).toEqual(["d1", "w", false, 500, "HTTP 500"]);
     const b = fakeSql([d]);
     await dispatchOnce(b.sql, { fetcher: async () => { throw new Error("ECONNREFUSED"); } });
-    expect(b.calls[1]!.slice(1)).toEqual(["d1", false, null, "ECONNREFUSED"]);
+    expect(b.calls[1]!.slice(1)).toEqual(["d1", "w", false, null, "ECONNREFUSED"]);
+  });
+});
+
+describe("SSRF bypasses (Rex review of #70)", () => {
+  it("strips the trailing dot: localhost. and friends", () => {
+    for (const u of ["https://localhost./", "https://LOCALHOST../", "https://foo.localhost./", "https://db.internal./", "https://127.0.0.1./"])
+      expect(webhookUrlError(u, "production"), u).toBe("url host not allowed");
+  });
+  it("blocks the missing ranges (v4 and v6, also in mapped forms)", () => {
+    for (const ip of ["192.0.0.8", "192.0.0.255", "198.18.0.1", "198.19.255.255", "224.0.0.1", "239.255.255.250", "240.0.0.1", "255.255.255.255", "64:ff9b::7f00:1", "64:ff9b::a00:1", "2002:7f00:1::1", "2002::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:10.0.0.1", "::127.0.0.1", "fe80::1", "ff02::1", "::", "100.64.0.1"])
+      expect(isPrivateIp(ip), ip).toBe(true);
+    for (const ip of ["8.8.8.8", "198.17.255.255", "198.20.0.1", "192.0.1.1", "223.255.255.255", "2606:4700::1111", "::ffff:8.8.8.8"])
+      expect(isPrivateIp(ip), ip).toBe(false);
+    for (const u of ["https://192.0.0.8/", "https://198.18.0.1/", "https://224.0.0.1/", "https://[64:ff9b::7f00:1]/", "https://[2002:7f00:1::1]/"])
+      expect(webhookUrlError(u, "production"), u).toBe("url host not allowed");
+  });
+  it("numeric host spellings normalise to the blocked IP", () => {
+    for (const u of ["https://2130706433/", "https://0x7f.1/", "https://0177.0.0.1/", "https://127.1/"]) expect(webhookUrlError(u, "production"), u).toBe("url host not allowed");
+  });
+  it("port allowlist: 443 or above 1024", () => {
+    expect(webhookUrlError("https://example.com/", "production")).toBeNull();
+    expect(webhookUrlError("https://example.com:443/", "production")).toBeNull();
+    expect(webhookUrlError("https://example.com:8443/", "production")).toBeNull();
+    expect(webhookUrlError("https://example.com:1025/", "production")).toBeNull();
+    for (const port of [22, 25, 80, 1000, 1024]) expect(webhookUrlError(`https://example.com:${port}/`, "production"), String(port)).toMatch(/port not allowed/);
+    expect(webhookUrlError("http://example.com/", "development")).toMatch(/port not allowed/);
+  });
+  const look = (host: string, all = false) => new Promise<unknown[]>((res) => guardedLookup(host, { all }, (...a) => res(a), false));
+  it("send time: a name resolving to a private IP is refused (nip.io style, rebinding, metadata)", async () => {
+    dns.answers["127.0.0.1.nip.io"] = [{ address: "127.0.0.1", family: 4 }];
+    dns.answers["meta.evil.test"] = [{ address: "169.254.169.254", family: 4 }];
+    dns.answers["six.evil.test"] = [{ address: "::ffff:10.0.0.5", family: 6 }];
+    dns.answers["mixed.evil.test"] = [{ address: "93.184.216.34", family: 4 }, { address: "10.0.0.5", family: 4 }];
+    for (const h of ["127.0.0.1.nip.io", "meta.evil.test", "six.evil.test", "mixed.evil.test"]) {
+      const [err] = await look(h);
+      expect((err as Error).message, h).toMatch(/non-public address/);
+      expect(((await look(h, true))[0] as Error).message).toMatch(/non-public/);
+    }
+  });
+  it("send time: a public name is allowed and the connection is pinned to the validated address", async () => {
+    dns.answers["hooks.example.test"] = [{ address: "93.184.216.34", family: 4 }];
+    expect(await look("hooks.example.test")).toEqual([null, "93.184.216.34", 4]);
+    expect(await look("hooks.example.test", true)).toEqual([null, [{ address: "93.184.216.34", family: 4 }]]);
+  });
+  it("send time: literal IPs, localhost, odd ports and http are refused before any socket opens (safeFetch)", async () => {
+    const init = { method: "POST", body: "{}", headers: {} } as RequestInit;
+    for (const u of ["https://127.0.0.1/", "https://[::1]/", "https://localhost./", "https://169.254.169.254/latest", "https://198.18.0.1/", "https://example.com:22/", "http://example.com:8080/", "https://u:p@example.com/"])
+      await expect(safeFetch(u, init), u).rejects.toThrow(/not allowed|must be https|credentials/);
+    dns.answers["rebind.evil.test"] = [{ address: "127.0.0.1", family: 4 }];
+    await expect(safeFetch("https://rebind.evil.test/", init)).rejects.toThrow(/non-public address/);
+  });
+  it("ML_WEBHOOKS_ALLOW_PRIVATE only relaxes the send-time check when explicitly set", () => {
+    expect(destinationError(new URL("http://127.0.0.1:4000/"), false)).not.toBeNull();
+    expect(destinationError(new URL("http://127.0.0.1:4000/"), true)).toBeNull();
   });
 });

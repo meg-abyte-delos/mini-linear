@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { inWs, api, world } from './helpers/world';
+import { inWs, api, world, appPool } from './helpers/world';
 import { runIntegration } from './helpers/gate';
 import { verify } from '../../src/lib/integrations/webhooks';
 
@@ -103,5 +103,84 @@ describe.runIf(runIntegration)('A9 webhooks', () => {
   it('other workspaces never see the webhook or its deliveries', async () => {
     const l = await (await api(W.B1, 'GET', `${P2}/webhooks`)).json().catch(() => ({ items: [] }));
     expect(l.items ?? []).toEqual([]);
+  });
+});
+
+
+describe.runIf(runIntegration)('A9 rework: key scope, invalid-key rate limit, header handling', () => {
+  it('read/write keys act as at most member; an admin-scope key keeps admin powers; only admins mint admin keys', async () => {
+    const w = await (await api(W.A1, 'POST', `${P1}/api-keys`, { name: 'adm-write', scope: 'write' })).json();
+    expect((await api(null, 'GET', `${P1}/audit`, undefined, bearer(w.token))).status).toBe(403);
+    const a = await api(W.A1, 'POST', `${P1}/api-keys`, { name: 'adm', scope: 'admin' });
+    expect(a.status).toBe(201);
+    expect((await api(null, 'GET', `${P1}/audit`, undefined, bearer((await a.json()).token))).status).toBe(200);
+    expect((await api(W.M1, 'POST', `${P1}/api-keys`, { name: 'x', scope: 'admin' })).status).toBe(403);
+  });
+  it('non-Bearer / empty Authorization is 401, never the cookie session', async () => {
+    for (const h of ['Basic abc', 'Token abc', 'Bearer', '']) {
+      const r = await api(W.M1, 'GET', `${P1}/issues`, undefined, { authorization: h });
+      expect(r.status, `Authorization: "${h}"`).toBe(401);
+    }
+  });
+  it('invalid keys are rate limited (429) per client', async () => {
+    const codes: number[] = [];
+    for (let i = 0; i < 40; i++) codes.push((await api(null, 'GET', `${P1}/issues`, undefined, bearer(`mlk_abcdefgh_${'B'.repeat(43)}`), process.env.TEST_BASE_URL_2 ?? undefined)).status);
+    expect(codes[0]).toBe(401);
+    expect(codes).toContain(429);
+  }, 30_000);
+});
+
+describe.runIf(runIntegration)('A9 rework: webhook secrets and dispatcher role', () => {
+  const asApp = async <T,>(f: (c: import('pg').PoolClient) => Promise<T>) => { const c = await appPool.connect(); try { return await f(c); } finally { c.release(); } };
+  it('app_user cannot read webhooks.secret (column grants) nor run the dispatcher functions', async () => {
+    await expect(asApp((c) => c.query('select secret from webhooks'))).rejects.toThrow(/permission denied/);
+    await expect(asApp((c) => c.query('select * from webhooks'))).rejects.toThrow(/permission denied/);
+    await expect(asApp((c) => c.query('select * from claim_webhook_deliveries(10)'))).rejects.toThrow(/permission denied/);
+    await expect(asApp((c) => c.query("select complete_webhook_delivery(gen_random_uuid(), gen_random_uuid(), true, 200, null)"))).rejects.toThrow(/permission denied/);
+    await expect(asApp((c) => c.query('select purge_webhook_deliveries(1)'))).rejects.toThrow(/permission denied/);
+    await expect(asApp((c) => c.query('update webhooks set secret = $1', ['x']))).rejects.toThrow(/permission denied/);
+  });
+  it('complete_webhook_delivery checks the tenant: another workspace id is a no-op', async () => {
+    const hid = randomUUID(), did = randomUUID();
+    await inWs(W.w1, async (c) => {
+      await c.query('insert into webhooks (id, workspace_id, url, secret, events, created_by) values ($1,$2,$3,$4,$5,$6)', [hid, W.w1, 'https://example.com/x', 'whsec_t', ['issue.created'], W.A1id]);
+      await c.query("insert into webhook_deliveries (id, workspace_id, webhook_id, event, payload, attempts) values ($1,$2,$3,'issue.created','{}',1)", [did, W.w1, hid]);
+    });
+    const c = await appPool.connect();
+    try {
+      await c.query('begin'); await c.query('set local role webhook_dispatcher');
+      await c.query('select complete_webhook_delivery($1,$2,true,200,null)', [did, W.w2]); // wrong tenant
+      await c.query('commit');
+    } finally { c.release(); }
+    const st = (await inWs(W.w1, (x) => x.query('select status from webhook_deliveries where id=$1', [did]))).rows[0].status;
+    expect(st).toBe('pending');
+    const c2 = await appPool.connect();
+    try {
+      await c2.query('begin'); await c2.query('set local role webhook_dispatcher');
+      await c2.query('select complete_webhook_delivery($1,$2,true,200,null)', [did, W.w1]);
+      await c2.query('commit');
+    } finally { c2.release(); }
+    expect((await inWs(W.w1, (x) => x.query('select status from webhook_deliveries where id=$1', [did]))).rows[0].status).toBe('succeeded');
+  });
+  it('retention deletes finished deliveries older than the window, keeps pending and recent ones', async () => {
+    const hid = randomUUID();
+    const ids = { old: randomUUID(), recent: randomUUID(), pend: randomUUID() };
+    await inWs(W.w1, async (c) => {
+      await c.query('insert into webhooks (id, workspace_id, url, secret, events, created_by) values ($1,$2,$3,$4,$5,$6)', [hid, W.w1, 'https://example.com/y', 'whsec_t', ['issue.created'], W.A1id]);
+      await c.query("insert into webhook_deliveries (id, workspace_id, webhook_id, event, payload, status, created_at) values ($1,$4,$5,'issue.created','{}','succeeded', now() - interval '90 days'), ($2,$4,$5,'issue.created','{}','succeeded', now()), ($3,$4,$5,'issue.created','{}','pending', now() - interval '90 days')", [ids.old, ids.recent, ids.pend, W.w1, hid]);
+    });
+    const c = await appPool.connect();
+    try { await c.query('begin'); await c.query('set local role webhook_dispatcher'); await c.query('select purge_webhook_deliveries(30)'); await c.query('commit'); } finally { c.release(); }
+    const left = (await inWs(W.w1, (x) => x.query('select id from webhook_deliveries where webhook_id=$1', [hid]))).rows.map((r) => r.id);
+    expect(left.sort()).toEqual([ids.recent, ids.pend].sort());
+  });
+  it('payload omits the internal tsv column', async () => {
+    const k = await mkKey(W.M1);
+    const hid = randomUUID();
+    await inWs(W.w1, (c) => c.query('insert into webhooks (id, workspace_id, url, secret, events, created_by) values ($1,$2,$3,$4,$5,$6)', [hid, W.w1, 'https://example.com/z', 'whsec_t', ['issue.created'], W.A1id]));
+    await api(null, 'POST', `${P1}/issues`, { title: 'payload', team_id: W.t1 }, bearer(k.token));
+    const p = (await inWs(W.w1, (c) => c.query('select payload from webhook_deliveries where webhook_id=$1', [hid]))).rows[0].payload;
+    expect(p.data.title).toBe('payload');
+    expect(p.data).not.toHaveProperty('tsv');
   });
 });
