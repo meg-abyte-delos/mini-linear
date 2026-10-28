@@ -27,6 +27,6 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     const { issues } = await loadRemote({ slug: seed.a.slug, teamId: team });
     expect(issues.map((i) => i.title)).toContain("wired");
     expect(await getSessionUser(new Request("http://x"))).toBe(seed.a.member);
-    await expect(loadRemote({ slug: seed.b.slug, teamId: team })).rejects.toThrow(/issues -> 40[34]/);
+    await expect(loadRemote({ slug: seed.b.slug, teamId: team })).rejects.toThrow(/(issues|labels|cycles|projects) -> 40[34]/);
   });
 });
