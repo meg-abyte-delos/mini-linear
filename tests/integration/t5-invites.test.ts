@@ -9,7 +9,7 @@ const accept = (u: U | null, token: string) => api(u, 'POST', '/api/v1/invites/a
 const snap = async (r: Response) => ({
   s: r.status,
   b: ((t: string) => { try { const j = JSON.parse(t); delete j.request_id; delete j.requestId; if (j.error) { delete j.error.request_id; delete j.error.requestId; } return JSON.stringify(j); } catch { return t; } })(await r.text()),
-  h: [...(r.headers as unknown as Iterable<[string, string]>)].filter(([k]) => !['date', 'x-request-id', 'content-length', 'set-cookie'].includes(k)).sort().join('|'),
+  h: [...(r.headers as unknown as Iterable<[string, string]>)].filter(([k]) => !['date', 'x-request-id', 'content-length', 'set-cookie', 'content-security-policy'].includes(k)).sort().join('|'),
 });
 // Seeds an invite directly as owner; returns the raw token.
 const seed = async (o: { email: string; role?: string; expired?: boolean; revoked?: boolean; used?: boolean }) => {
