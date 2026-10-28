@@ -8,7 +8,7 @@ const P1 = '/api/v1/w/w1';
 const accept = (u: U | null, token: string) => api(u, 'POST', '/api/v1/invites/accept', { token });
 const snap = async (r: Response) => ({
   s: r.status,
-  b: (await r.text()).replace(/"request_?id":"[^"]*"/i, ''),
+  b: ((t: string) => { try { const j = JSON.parse(t); delete j.request_id; delete j.requestId; if (j.error) { delete j.error.request_id; delete j.error.requestId; } return JSON.stringify(j); } catch { return t; } })(await r.text()),
   h: [...(r.headers as unknown as Iterable<[string, string]>)].filter(([k]) => !['date', 'x-request-id', 'content-length', 'set-cookie'].includes(k)).sort().join('|'),
 });
 // Seeds an invite directly as owner; returns the raw token.
@@ -34,7 +34,7 @@ describe.runIf(runIntegration)('T5 invalid invites are indistinguishable', () =>
     const snaps = [];
     for (const t of tokens) snaps.push(await snap(await accept(W.N, t)));
     for (const s of snaps) { expect([404, 422]).toContain(s.s); expect(JSON.parse(s.b).error.code).toBe('INVITE_INVALID'); }
-    expect(new Set(snaps.map((s) => s.b + s.h)).size).toBe(1);
+    for (const s of snaps.slice(1)) expect({ s: s.s, b: s.b, h: s.h }).toEqual({ s: snaps[0].s, b: snaps[0].b, h: snaps[0].h });
   });
 });
 
