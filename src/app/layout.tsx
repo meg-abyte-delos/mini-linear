@@ -4,6 +4,7 @@ import './globals.css';
 import './ui-progress.css';
 import './ui-search.css';
 import './ui-projects.css';
+import './ui-list.css';
 import { cookies } from 'next/headers';
 
 export const metadata = { title: 'Mini-Linear' };
