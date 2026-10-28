@@ -14,7 +14,7 @@ CREATE TABLE workflow_states (
   UNIQUE (id, workspace_id), UNIQUE (id, team_id),
   FOREIGN KEY (team_id, workspace_id) REFERENCES teams(id, workspace_id) ON DELETE CASCADE);
 CREATE UNIQUE INDEX workflow_states_team_name_uq ON workflow_states (team_id, lower(name));
-CREATE INDEX workflow_states_team_pos_idx ON workflow_states (team_id, position);
+CREATE INDEX workflow_states_team_pos_idx ON workflow_states (workspace_id, team_id, position);
 
 -- Category default for a state without legacy_status.
 CREATE FUNCTION workflow_state_status(c workflow_state_category, legacy issue_status) RETURNS issue_status
@@ -46,7 +46,7 @@ DECLARE s record; cat workflow_state_category;
 BEGIN
   IF NEW.state_id IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.state_id IS DISTINCT FROM OLD.state_id) THEN
     SELECT category, legacy_status INTO s FROM workflow_states WHERE id = NEW.state_id AND team_id = NEW.team_id;
-    IF NOT FOUND THEN RAISE EXCEPTION 'state does not belong to the issue team' USING ERRCODE = 'foreign_key_violation'; END IF;
+    IF NOT FOUND THEN RAISE EXCEPTION 'issues violates foreign key issues_state_team_fk: state does not belong to the issue team' USING ERRCODE = 'foreign_key_violation'; END IF;
     NEW.status := workflow_state_status(s.category, s.legacy_status);
     RETURN NEW;
   END IF;
@@ -58,7 +58,8 @@ BEGIN
     WHEN 'in_review' THEN 'started' WHEN 'done' THEN 'completed' ELSE 'canceled' END;
   SELECT id INTO NEW.state_id FROM workflow_states WHERE team_id = NEW.team_id AND category = cat
     ORDER BY (legacy_status = NEW.status) DESC NULLS LAST, position, id LIMIT 1;
-  IF NEW.state_id IS NULL THEN RAISE EXCEPTION 'team has no workflow state for status %', NEW.status USING ERRCODE = 'check_violation'; END IF;
+  IF NEW.state_id IS NULL THEN -- unknown or cross-tenant team: report it as the FK violation it is (the team FK would reject it anyway)
+    RAISE EXCEPTION 'issues violates foreign key constraint: team % has no workflow state for status %', NEW.team_id, NEW.status USING ERRCODE = 'foreign_key_violation'; END IF;
   RETURN NEW;
 END $$;
 CREATE TRIGGER issues_sync_state BEFORE INSERT OR UPDATE OF status, state_id, team_id ON issues
