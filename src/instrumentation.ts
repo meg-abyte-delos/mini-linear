@@ -5,4 +5,9 @@ export async function register() {
   installDevAuth();
   const { warnIfNoSocketResolver } = await import('./lib/auth/ratelimit');
   warnIfNoSocketResolver();
+  if (process.env.DATABASE_URL) {
+    const { startPurgeScheduler } = await import('./lib/auth/ratelimit');
+    const { db } = await import('./lib/http/ctx');
+    startPurgeScheduler(db());
+  }
 }

@@ -68,3 +68,22 @@ export const clientIp = (req: Request): string => {
 
 /** Housekeeping: drop windows older than a day. Safe to call from anywhere. */
 export const purgeOld = (sql: postgres.Sql) => sql`delete from rate_limits where window_start < now() - interval '1 day'`;
+
+
+export const PURGE_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * Schedules purgeOld: once now, then every PURGE_INTERVAL_MS. The timer is unref'd (never keeps the process alive) and a failed
+ * purge is logged, never thrown. Safe with several app instances: the delete is idempotent. Returns a stop function.
+ */
+export const startPurgeScheduler = (
+  sql: postgres.Sql,
+  opts: { intervalMs?: number; log?: (m: string) => void } = {},
+): (() => void) => {
+  const log = opts.log ?? ((m: string) => console.error(m));
+  const run = () => { void Promise.resolve(purgeOld(sql)).catch((e: unknown) => log(`[mini-linear] rate_limits purge failed: ${e instanceof Error ? e.message : String(e)}`)); };
+  run();
+  const timer = setInterval(run, opts.intervalMs ?? PURGE_INTERVAL_MS);
+  timer.unref?.();
+  return () => clearInterval(timer);
+};
