@@ -88,6 +88,11 @@ test('a11y: cycles and projects views have no wcag2a/aa violations', async ({ pa
     const r = await wcag(page);
     expect(r.violations.map((x) => `${v}: ${x.id} x${x.nodes.length}`)).toEqual([]);
   }
+  await page.goto('/?view=projects');
+  await page.waitForSelector('html[data-ready]');
+  await page.getByRole('group', { name: 'Projects display' }).getByRole('button', { name: 'Roadmap' }).click();
+  const r = await wcag(page);
+  expect(r.violations.map((x) => `roadmap: ${x.id} x${x.nodes.length}`)).toEqual([]);
 });
 
 test('a11y: detail panel and filter picker have no wcag2a/aa violations', async ({ page }) => {

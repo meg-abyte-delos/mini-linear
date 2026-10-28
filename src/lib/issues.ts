@@ -75,7 +75,7 @@ export function seedIssues(n: number): Issue[] {
 
 // Lookup data for filters, pickers and the cycles view. Mocks by default; API mode fills it from /labels, /cycles, /projects.
 export interface LabelMeta { id: string; name: string; hue: string; scope?: 'team' | 'workspace' }
-export interface ProjectMeta { id: string; name: string; description: string; team_ids: readonly string[]; status?: string; lead_id?: string | null; start_date?: string | null; target_date?: string | null }
+export interface ProjectMeta { id: string; name: string; description: string; team_ids: readonly string[]; status?: string; lead_id?: string | null; start_date?: string | null; target_date?: string | null; progress_pct?: number; issue_count?: number; done_count?: number }
 export interface CycleMeta { id: string; team_id: string; name: string; start_date: string; end_date: string }
 export const scopeBadge = (s?: 'team' | 'workspace'): string | undefined => (s === 'team' ? 'Team' : s === 'workspace' ? 'Workspace' : undefined);
 export interface Meta { labels: readonly LabelMeta[]; projects: readonly ProjectMeta[]; cycles: readonly CycleMeta[] }

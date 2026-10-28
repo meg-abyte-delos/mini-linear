@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { USERS, fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
-import { barFor, isOverdue, progress, roadmapRange, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
+import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
 
 interface Props { projects: readonly ProjectMeta[]; issues: readonly Issue[]; today: string; canOpen: boolean; onOpen: (id: string) => void; onViewIssues: (id: string) => void }
 
@@ -9,7 +9,8 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
   const [mode, setMode] = useState<'list' | 'roadmap'>('list');
   const sorted = sortProjects(projects);
   const lead = (id?: string | null) => USERS.find((u) => u.id === id)?.name ?? (id ? 'Unknown' : 'No lead');
-  const range = roadmapRange(sorted.map((p) => ({ start: p.start_date, end: p.target_date })));
+  const dated = sorted.some((p) => p.start_date || p.target_date);
+  const range = dated ? roadmapRange([...sorted.map((p) => ({ start: p.start_date, end: p.target_date })), { start: today, end: today }]) : null;
   const tp = range ? todayPct(today, range) : null;
   return (
     <div className='scroll cycles'>
@@ -20,7 +21,7 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
       <section className='group' aria-labelledby='pj-all'>
         <h2 id='pj-all'><span>All projects</span><span className='count'>{projects.length}</span></h2>
         {sorted.length === 0 ? <p className='col-empty'>No projects</p> : mode === 'list' ? sorted.map((p) => {
-          const pr = progress(issues.filter((i) => i.project_id === p.id));
+          const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
           const late = isOverdue(p.target_date, p.status, today);
           return (
             <div key={p.id} className='cycle project pj-row' data-project={p.id}>
@@ -37,15 +38,19 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
           <div className='rm' data-testid='roadmap'>
             {!range ? <p className='col-empty'>No project has a start or target date yet</p> : (
               <>
-                <div className='rm-axis'><span>{fmtDate(range.from)}</span><span>{fmtDate(range.to)}</span></div>
+                <div className='rm-axis' data-testid='rm-axis' role='list' aria-label='Months'>
+                  {monthTicks(range).map((t) => <span key={t.label} role='listitem' className='rm-tick' style={{ left: `${t.leftPct}%` }}>{t.label}</span>)}
+                  {tp !== null && <span className='rm-today-label' style={{ left: `${tp}%` }}>Today</span>}
+                </div>
                 {sorted.map((p) => {
                   const bar = barFor({ start: p.start_date, end: p.target_date }, range);
-                  const pr = progress(issues.filter((i) => i.project_id === p.id));
+                  const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
                   return (
                     <div key={p.id} className='rm-row' data-project={p.id}>
                       <span className='cy-name'>{p.name}</span>
                       <div className='rm-track'>
-                        {tp !== null && <span className='rm-today' style={{ left: `${tp}%` }} aria-hidden='true' />}
+                        {monthTicks(range).map((t) => <span key={t.label} className='rm-grid' style={{ left: `${t.leftPct}%` }} aria-hidden='true' />)}
+                        {tp !== null && <span className='rm-today' data-testid='rm-today' style={{ left: `${tp}%` }} aria-hidden='true' />}
                         {bar ? (
                           <span className='rm-bar' data-status={p.status ?? 'backlog'} role='img' style={{ left: `${bar.leftPct}%`, width: `${bar.widthPct}%` }}
                             aria-label={`${p.name}: ${p.start_date ? fmtDate(p.start_date) : '?'} to ${p.target_date ? fmtDate(p.target_date) : '?'}, ${pr.pct}% complete`}>

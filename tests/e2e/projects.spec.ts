@@ -43,3 +43,12 @@ test('projects list shows status, lead, target date; roadmap toggle draws bars',
   await page.getByRole('group', { name: 'Projects display' }).getByRole('button', { name: 'List' }).click();
   await expect(page.locator('.pj-row')).toHaveCount(2);
 });
+
+test('roadmap shows a month axis and a today marker', async ({ page }) => {
+  await page.goto('/?view=projects');
+  await page.waitForSelector('html[data-ready]');
+  await page.getByRole('group', { name: 'Projects display' }).getByRole('button', { name: 'Roadmap' }).click();
+  await expect(page.getByRole('list', { name: 'Months' }).getByRole('listitem').first()).toContainText(/\w{3} 20\d\d/);
+  await expect(page.getByTestId('rm-today').first()).toBeAttached();
+  await expect(page.getByText('Today', { exact: true })).toBeVisible();
+});

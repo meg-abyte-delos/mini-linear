@@ -40,3 +40,23 @@ export function progress(issues: { status: string }[]): { done: number; total: n
 
 export const sortProjects = <T extends { name: string; target_date?: string | null }>(p: readonly T[]): T[] =>
   [...p].sort((a, b) => (a.target_date ?? '9999') < (b.target_date ?? '9999') ? -1 : (a.target_date ?? '9999') > (b.target_date ?? '9999') ? 1 : a.name.localeCompare(b.name));
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** One tick per month start inside the window (label "Oct 2026"), positioned as a percentage of it. */
+export function monthTicks(range: { from: string; to: string }): { label: string; leftPct: number }[] {
+  const total = Math.max(1, day(range.to) - day(range.from)), out: { label: string; leftPct: number }[] = [];
+  let y = Number(range.from.slice(0, 4)), m = Number(range.from.slice(5, 7)) - 1;
+  for (let guard = 0; guard < 240; guard++) {
+    const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    if (first > range.to) break;
+    if (first >= range.from) out.push({ label: `${MONTHS[m]} ${y}`, leftPct: ((day(first) - day(range.from)) / total) * 100 });
+    if (++m > 11) { m = 0; y++; }
+  }
+  return out;
+}
+
+/** Progress for a project: the API's progress_pct when present (computed server side over all issues), else from the loaded issues. */
+export function projectProgress(p: { progress_pct?: number; issue_count?: number; done_count?: number }, issues: { status: string }[]): { done: number; total: number; pct: number } {
+  if (typeof p.progress_pct === 'number') return { done: p.done_count ?? 0, total: p.issue_count ?? 0, pct: p.progress_pct };
+  return progress(issues);
+}
