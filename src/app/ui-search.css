@@ -1,0 +1,5 @@
+.shell:has(> .search-page) { grid-template-columns:1fr; }
+.search-page .search-bar { padding-inline:max(16px, calc((100% - 768px) / 2)); }
+.search-page .scroll { padding-inline:max(0px, calc((100% - 768px) / 2)); }
+.search-page .search-bar input { height:36px; }
+.search-page .search-link { min-height:36px; }
