@@ -27,6 +27,7 @@ CREATE TABLE issue_presence (
   seen_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (issue_id, user_id),
   FOREIGN KEY (issue_id, workspace_id) REFERENCES issues(id, workspace_id) ON DELETE CASCADE);
+CREATE INDEX issue_presence_ws_idx ON issue_presence (workspace_id, issue_id); -- S12: index leading with workspace_id
 
 CREATE FUNCTION sync_emit() RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
 DECLARE r record; n bigint; o text; iss uuid; actor uuid;
