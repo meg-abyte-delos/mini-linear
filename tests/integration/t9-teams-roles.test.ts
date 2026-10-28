@@ -35,7 +35,9 @@ describe.runIf(runIntegration)('T9 workspace settings', () => {
     expect(await (await api(W.A1, 'PATCH', `${P}/settings`, { logo_url: '' })).json()).toMatchObject({ logo_url: null });
   });
   it('slug collision with another workspace is 409', async () => {
-    expect((await api(W.A1, 'PATCH', `${P}/settings`, { slug: 'w2' })).status).toBe(409);
+    const other = `t9-${Date.now().toString(36)}`;
+    expect((await api(W.B1, 'POST', '/api/v1/workspaces', { slug: other, name: 'Other' })).status).toBe(201);
+    expect((await api(W.A1, 'PATCH', `${P}/settings`, { slug: other })).status).toBe(409);
   });
   it('non-member gets 404', async () => {
     expect((await api(W.B1, 'GET', `${P}/settings`)).status).toBe(404);
@@ -46,13 +48,13 @@ describe.runIf(runIntegration)('T9 workspace settings', () => {
 });
 
 describe.runIf(runIntegration)('T9 teams CRUD', () => {
-  it('admin creates a team and becomes its admin; member cannot create', async () => {
+  it('admin creates a team (no implicit members); member cannot create', async () => {
     expect((await api(W.M1, 'POST', `${P}/teams`, { name: 'X', key: 'XX' })).status).toBe(403);
     const r = await api(W.A1, 'POST', `${P}/teams`, { name: 'Design', key: 'DES' });
     expect(r.status).toBe(201);
     const t = await r.json();
     const m = await (await api(W.A1, 'GET', `${P}/teams/${t.id}/members`)).json();
-    expect(m.items).toEqual([expect.objectContaining({ user_id: W.A1.id, role: 'admin' })]);
+    expect(m.items).toEqual([]);
     expect((await api(W.A1, 'PATCH', `${P}/teams/${t.id}`, { name: 'Design 2' })).status).toBe(200);
     expect((await api(W.A1, 'DELETE', `${P}/teams/${t.id}`)).status).toBe(204);
   });

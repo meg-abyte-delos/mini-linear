@@ -71,20 +71,23 @@ GRANT EXECUTE ON FUNCTION is_workspace_admin(uuid), has_team_role(uuid, text),
 -- in USING and WITH CHECK of every policy, so these are FOR ALL with a tenant-only USING (reads unchanged) and the role
 -- check in WITH CHECK, which Postgres applies to INSERT and to the new row of UPDATE. DELETE is role-gated in the API
 -- (deleteTeam / removeTeamMember / cycles), not here: a DELETE-only policy cannot carry a WITH CHECK.
+-- Role checks apply to session requests (app.user_id set by withWorkspaceCtx). Without a session user (raw DB
+-- paths: jobs, low-level tests) only tenant isolation applies, exactly as before this migration. Workspace admins are
+-- listed explicitly so an unknown/foreign team id still fails on the composite FK (422), not on RLS.
 -- teams: create = workspace admin (the new row is not visible to has_team_role yet); update (issue_seq bump on issue
 -- creation, rename) = team member or workspace admin.
 CREATE POLICY teams_role_write ON teams AS RESTRICTIVE FOR ALL TO app_user
   USING (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
-  WITH CHECK (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND (is_workspace_admin(workspace_id) OR has_team_role(id, 'member')));
+  WITH CHECK (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND (nullif(current_setting('app.user_id', true), '') IS NULL OR is_workspace_admin(workspace_id) OR has_team_role(id, 'member')));
 -- team_memberships: add / change role = team admin (workspace admins hold every team role).
 CREATE POLICY tm_role_write ON team_memberships AS RESTRICTIVE FOR ALL TO app_user
   USING (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
-  WITH CHECK (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND has_team_role(team_id, 'admin'));
+  WITH CHECK (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND (nullif(current_setting('app.user_id', true), '') IS NULL OR is_workspace_admin(workspace_id) OR has_team_role(team_id, 'admin')));
 -- Team-scoped data: guests are read-only on their teams.
 CREATE POLICY issues_team_write ON issues AS RESTRICTIVE FOR ALL TO app_user
   USING (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
-  WITH CHECK (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND has_team_role(team_id, 'member'));
+  WITH CHECK (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND (nullif(current_setting('app.user_id', true), '') IS NULL OR is_workspace_admin(workspace_id) OR has_team_role(team_id, 'member')));
 CREATE POLICY cycles_team_write ON cycles AS RESTRICTIVE FOR ALL TO app_user
   USING (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid)
-  WITH CHECK (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND has_team_role(team_id, 'member'));
+  WITH CHECK (workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND (nullif(current_setting('app.user_id', true), '') IS NULL OR is_workspace_admin(workspace_id) OR has_team_role(team_id, 'member')));
 COMMIT;

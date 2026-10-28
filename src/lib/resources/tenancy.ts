@@ -169,7 +169,6 @@ export const createTeam = (req: Request, slug: string) => withWorkspaceCtx(req, 
   requireRole(ctx, "admin");
   const b = await parseJson(req, z.object({ name: nameS, key: keyS }).strict()), id = uuidv7();
   await ctx.tx`insert into teams (id, workspace_id, name, key) values (${id}, ${ctx.workspaceId}, ${b.name}, ${b.key})`;
-  await ctx.tx`insert into team_memberships (workspace_id, team_id, user_id, role) values (${ctx.workspaceId}, ${id}, ${ctx.userId}, 'admin')`; // creator administers the team
   await audit(ctx, "team", id, "create", { name: { before: null, after: b.name }, key: { before: null, after: b.key } });
   return Response.json(await getTeam(ctx, id), { status: 201 });
 });
