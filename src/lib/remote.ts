@@ -66,12 +66,16 @@ export async function loadRemote(cfg: ApiConfig): Promise<{ issues: Issue[]; met
 
 /** Session role in the workspace, from the same handler as GET /w/:slug. Fails closed: anything unknown is a guest (read-only). */
 export type WsRole = 'owner' | 'admin' | 'member' | 'guest';
-export async function loadRole(cfg: ApiConfig): Promise<WsRole> {
+export type Viewer = { userId: string | null; role: WsRole };
+/** Session user id + role from GET /w/:slug. Fails closed: unknown is a guest with no id (no author-only actions). */
+export async function loadViewer(cfg: ApiConfig): Promise<Viewer> {
   installDevAuth();
   try {
     const res = await getWorkspace(new Request(`http://localhost/api/v1/w/${cfg.slug}`), cfg.slug);
-    if (!res.ok) return 'guest';
-    const r = (await res.json()) as { role?: string };
-    return r.role === 'owner' || r.role === 'admin' || r.role === 'member' ? r.role : 'guest';
-  } catch { return 'guest'; }
+    if (!res.ok) return { userId: null, role: 'guest' };
+    const r = (await res.json()) as { role?: string; user_id?: string };
+    const role: WsRole = r.role === 'owner' || r.role === 'admin' || r.role === 'member' ? r.role : 'guest';
+    return { userId: typeof r.user_id === 'string' ? r.user_id : null, role };
+  } catch { return { userId: null, role: 'guest' }; }
 }
+export const loadRole = async (cfg: ApiConfig): Promise<WsRole> => (await loadViewer(cfg)).role;

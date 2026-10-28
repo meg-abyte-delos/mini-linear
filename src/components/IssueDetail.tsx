@@ -30,7 +30,7 @@ function wrapSel(el: HTMLTextAreaElement, before: string, after = before, placeh
   return value.slice(0, s) + before + sel + after + value.slice(e);
 }
 
-export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: string; initial: DetailIssue; all: DetailIssue[]; meta: Meta; api: boolean; today: string }) {
+export function IssueDetail({ slug, initial, all, meta, api, today, viewer = null }: { slug: string; initial: DetailIssue; all: DetailIssue[]; meta: Meta; api: boolean; today: string; viewer?: { userId: string | null; role: string } | null }) {
   const [issue, setIssue] = useState<DetailIssue>(initial);
   const [others, setOthers] = useState<DetailIssue[]>(all.filter((i) => i.id !== initial.id));
   const [title, setTitle] = useState(initial.title);
@@ -290,7 +290,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
           <ol className='feed' aria-label='Activity'>
             {timeline.map((t) => t.kind === 'event'
               ? <li key={t.at.id} className='ev'><span className='dot' aria-hidden='true' /><span className='who'>{who(t.at.actor_id)?.name ?? 'Someone'}</span> {t.at.summary ?? t.at.action} <time dateTime={t.at.created_at}>{fmtTime(t.at.created_at)}</time></li>
-              : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canManage={(x) => !!client || x.author_id === ME} readOnly={readOnly} /></li>)}
+              : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={(x) => (client ? !!viewer?.userId && x.author_id === viewer.userId : x.author_id === ME)} canDelete={(x) => (client ? !!viewer?.userId && (x.author_id === viewer.userId || viewer.role === 'owner' || viewer.role === 'admin') : x.author_id === ME)} readOnly={readOnly} /></li>)}
           </ol>
           {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} />}
         </section>
@@ -316,13 +316,13 @@ export function IssueDetail({ slug, initial, all, meta, api, today }: { slug: st
   );
 }
 
-function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canManage, readOnly }: { c: Comment; replies: Comment[]; onReact: (c: Comment, e: string) => void; onReply: (b: string) => Promise<boolean>; onEdit: (c: Comment, b: string) => Promise<boolean>; onDelete: (c: Comment) => void; canManage: (c: Comment) => boolean; readOnly: boolean }) {
+function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, canDelete, readOnly }: { c: Comment; replies: Comment[]; onReact: (c: Comment, e: string) => void; onReply: (b: string) => Promise<boolean>; onEdit: (c: Comment, b: string) => Promise<boolean>; onDelete: (c: Comment) => void; canEdit: (c: Comment) => boolean; canDelete: (c: Comment) => boolean; readOnly: boolean }) {
   const [replying, setReplying] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const one = (x: Comment) => (
     <article className='cmt' aria-label={`Comment by ${who(x.author_id)?.name ?? 'Someone'}`}>
       <header><span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time>{x.edited_at && <span className='dim'> (edited)</span>}
-        {!readOnly && canManage(x) && editing !== x.id && <span className='cmt-actions'><button aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</button><button aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</button></span>}</header>
+        {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <button aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</button>}{canDelete(x) && <button aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</button>}</span>}</header>
       {editing === x.id ? <Composer label='Edit comment' initial={x.body} autoFocus submitLabel='Save' onSubmit={async (b) => { const ok = await onEdit(x, b); if (ok) setEditing(null); return ok; }} onCancel={() => setEditing(null)} /> : <Markdown source={x.body} empty='' />}
       <div className='reacts' role='group' aria-label='Reactions'>
         {EMOJIS.map((e) => { const r = x.reactions?.find((y) => y.emoji === e); return (r || !readOnly) && <button key={e} className={reactedBy(r, ME) ? 'on' : ''} aria-pressed={reactedBy(r, ME)} aria-label={`React ${e}${r ? `, ${r.count}` : ''}`} disabled={readOnly} onClick={() => onReact(x, e)}>{e}{r && <span>{r.count}</span>}</button>; })}
