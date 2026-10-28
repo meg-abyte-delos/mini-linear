@@ -105,17 +105,12 @@ export function Inbox({ client, onUnread, onOpenIssue }: { client: InboxClient; 
           <ul role='listbox' aria-label='Notifications'>
             {list.map((n, i) => (
               <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
-                <input type='checkbox' aria-label={`Select ${n.issue?.identifier ?? 'notification'}`} checked={checked.has(n.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(n.id)} />
+                <span className={`rowsel${checked.has(n.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }}>{checked.has(n.id) ? '☑' : '☐'}</span>
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
                 <span className='nid'>{n.issue?.identifier ?? 'Deleted'}</span>
                 <span className='ntitle'>{n.issue?.title ?? ''}</span>
                 <span className='nwho'>{n.actor?.email.split('@')[0] ?? 'Someone'} {TYPE_LABEL[n.type]}</span>
                 <span className='ntime'>{relTime(n.created_at)}</span>
-                <span className='nact'>
-                  <button aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${n.issue?.identifier ?? ''}`} onClick={(e) => { e.stopPropagation(); void act(n, tab === 'archived' ? 'unarchive' : 'archive'); }}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
-                  <button aria-label={`Snooze ${n.issue?.identifier ?? ''}`} onClick={(e) => { e.stopPropagation(); setCur(i); setSnoozeOpen(true); }}>Snooze</button>
-                  <button aria-label={`Mark ${n.issue?.identifier ?? ''} ${n.read_at ? 'unread' : 'read'}`} onClick={(e) => { e.stopPropagation(); void act(n, n.read_at ? 'unread' : 'read'); }}>{n.read_at ? 'Unread' : 'Read'}</button>
-                </span>
               </li>
             ))}
           </ul>
@@ -130,7 +125,12 @@ export function Inbox({ client, onUnread, onOpenIssue }: { client: InboxClient; 
             <dt>When</dt><dd>{new Date(sel.created_at).toLocaleString()}</dd>
             {sel.snoozed_until && <><dt>Snoozed until</dt><dd>{new Date(sel.snoozed_until).toLocaleString()}</dd></>}
           </dl>
-          {sel.issue && <button onClick={() => open(sel)}>Open issue</button>}
+          <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
+            <button aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
+            <button aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>
+            <button aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</button>
+            {sel.issue && <button onClick={() => open(sel)}>Open issue</button>}
+          </div>
         </aside>
       )}
     </div>

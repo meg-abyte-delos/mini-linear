@@ -42,8 +42,8 @@ test('inbox: tabs, snooze menu, bulk archive, detail panel', async ({ page }) =>
   await page.getByRole('tab', { name: 'Snoozed' }).click();
   await expect(page.getByRole('option')).toHaveCount(1);
   await page.getByRole('tab', { name: 'All' }).click();
-  await page.getByRole('checkbox', { name: /Select DEL-2/ }).check();
-  await page.getByRole('checkbox', { name: /Select DEL-3/ }).check();
+  await page.getByTestId('select-DEL-2').click();
+  await page.getByTestId('select-DEL-3').click();
   await expect(page.getByText('2 selected')).toBeVisible();
   await page.getByRole('button', { name: 'Archive', exact: true }).click();
   await expect(page.getByText('Inbox zero')).toBeVisible();

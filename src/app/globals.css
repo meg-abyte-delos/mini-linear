@@ -157,8 +157,8 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .nid { color:var(--muted); font-size:12px; width:64px; flex:none; }
 .ntitle { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .nwho, .ntime { color:var(--muted); font-size:12px; white-space:nowrap; }
-.nact { display:none; gap:4px; }
-.nrow:hover .nact, .nrow.sel .nact, .nrow:focus-within .nact { display:flex; }
+.nrow .rowsel { cursor:pointer; }
+.inbox-detail-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
 .badge { margin-left:auto; min-width:18px; padding:0 5px; border-radius:9px; background:#28aba5; color:#fff; font-size:11px; line-height:18px; text-align:center; }
 .pdetail{padding:16px;display:flex;flex-direction:column;gap:16px}
 .pd-head{display:flex;align-items:center;gap:10px}
