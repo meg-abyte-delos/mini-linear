@@ -1,6 +1,7 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as S from '@/lib/settings-client';
+import { httpInboxClient, NOTIF_TYPES, TYPE_LABEL, type PrefMap, type NotifType } from '@/lib/inbox-client';
 
 const isAdmin = (r?: string) => r === 'owner' || r === 'admin';
 
@@ -39,6 +40,36 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged }: { slug: string;
           <button type='submit' disabled={!add}>Add</button>
         </form>
       )}
+    </section>
+  );
+}
+
+function NotificationPrefs({ slug, onMsg }: { slug: string; onMsg: (m: string) => void }) {
+  const client = useMemo(() => httpInboxClient(slug), [slug]);
+  const [prefs, setPrefs] = useState<PrefMap | null>(null);
+  useEffect(() => { void client.getPrefs().then((p) => { if (p) setPrefs(p); else onMsg('Could not load notification preferences'); }); }, [client, onMsg]);
+  if (!prefs) return null;
+  const set = async (t: NotifType, k: 'in_app' | 'email', v: boolean) => {
+    const prev = prefs;
+    setPrefs({ ...prefs, [t]: { ...prefs[t], [k]: v } });
+    const r = await client.putPrefs({ [t]: { [k]: v } });
+    if (r) setPrefs(r); else { setPrefs(prev); onMsg('Could not save notification preferences'); }
+  };
+  return (
+    <section aria-labelledby='np-h' className='settings-card'>
+      <h2 id='np-h'>Notifications</h2>
+      <table>
+        <thead><tr><th scope='col'>When someone…</th><th scope='col'>In app</th><th scope='col'>Email</th></tr></thead>
+        <tbody>
+          {NOTIF_TYPES.map((t) => (
+            <tr key={t}>
+              <td>{TYPE_LABEL[t]}</td>
+              <td><input type='checkbox' aria-label={`In-app: ${TYPE_LABEL[t]}`} checked={prefs[t].in_app} onChange={(e) => void set(t, 'in_app', e.target.checked)} /></td>
+              <td><input type='checkbox' aria-label={`Email: ${TYPE_LABEL[t]}`} checked={prefs[t].email} onChange={(e) => void set(t, 'email', e.target.checked)} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </section>
   );
 }
@@ -99,6 +130,7 @@ export function Settings({ slug }: { slug: string }) {
           </div>
         ))}
       </section>
+      <NotificationPrefs slug={slug} onMsg={setMsg} />
     </main>
   );
 }

@@ -157,8 +157,8 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .nid { color:var(--muted); font-size:12px; width:64px; flex:none; }
 .ntitle { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .nwho, .ntime { color:var(--muted); font-size:12px; white-space:nowrap; }
-.nact { display:none; gap:4px; }
-.nrow:hover .nact, .nrow.sel .nact, .nrow:focus-within .nact { display:flex; }
+.nrow .rowsel { cursor:pointer; }
+.inbox-detail-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
 .badge { margin-left:auto; min-width:18px; padding:0 5px; border-radius:9px; background:#28aba5; color:#fff; font-size:11px; line-height:18px; text-align:center; }
 .pdetail{padding:16px;display:flex;flex-direction:column;gap:16px}
 .pd-head{display:flex;align-items:center;gap:10px}
@@ -185,3 +185,17 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .save-form input[type=text], .save-form input:not([type]) { height:24px; border-radius:6px; border:1px solid var(--line); background:none; color:var(--fg); font:inherit; font-size:var(--fs-sm); padding:0 8px; }
 .save-form label { color:var(--muted-strong); font-size:var(--fs-sm); display:inline-flex; align-items:center; gap:4px; }
 .save-err { color:var(--fg); font-size:var(--fs-sm); }
+
+/* Inbox: tabs, bulk bar, snooze menu, detail panel */
+.inbox-wrap { display:flex; flex:1; min-height:0; }
+.inbox-wrap .inbox { flex:1; min-width:0; }
+.inbox-tabs { display:flex; gap:4px; padding:8px 16px 0; }
+.inbox-tabs button { background:none; border:0; color:var(--muted); padding:4px 10px; border-radius:6px; cursor:pointer; }
+.inbox-tabs button.on { background:var(--hover); color:var(--fg); }
+.bulk { display:flex; gap:6px; align-items:center; }
+.snooze-menu { display:flex; flex-direction:column; gap:2px; margin:0 16px 8px; padding:6px; border:1px solid var(--line); border-radius:8px; width:220px; }
+.snooze-menu button { text-align:left; }
+.inbox-detail { width:320px; flex:none; border-left:1px solid var(--line); padding:16px; overflow:auto; }
+.inbox-detail h2 { font-size:15px; margin:0 0 12px; }
+.inbox-detail dt { color:var(--muted); font-size:12px; margin-top:8px; }
+.inbox-detail dd { margin:0; }

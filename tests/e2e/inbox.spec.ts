@@ -30,3 +30,23 @@ test('inbox: mark all as read and empty state', async ({ page }) => {
   await page.keyboard.press('e');
   await expect(page.getByText('Inbox zero')).toBeVisible();
 });
+
+test('inbox: tabs, snooze menu, bulk archive, detail panel', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('complementary', { name: 'Notification detail' })).toContainText('DEL-1');
+  await page.keyboard.press('s');
+  await expect(page.getByRole('menu', { name: 'Snooze until' })).toBeVisible();
+  await page.keyboard.press('2');
+  await expect(page.getByRole('option')).toHaveCount(2);
+  await page.getByRole('tab', { name: 'Snoozed' }).click();
+  await expect(page.getByRole('option')).toHaveCount(1);
+  await page.getByRole('tab', { name: 'All' }).click();
+  await page.getByTestId('select-DEL-2').click();
+  await page.getByTestId('select-DEL-3').click();
+  await expect(page.getByText('2 selected')).toBeVisible();
+  await page.getByRole('button', { name: 'Archive', exact: true }).click();
+  await expect(page.getByText('Inbox zero')).toBeVisible();
+  await page.getByRole('tab', { name: 'Archived' }).click();
+  await expect(page.getByRole('option')).toHaveCount(2);
+});
