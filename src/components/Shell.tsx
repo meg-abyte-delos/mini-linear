@@ -12,6 +12,7 @@ import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, t
 import { createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
+import { ProjectDetail } from '@/components/ProjectDetail';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
@@ -120,6 +121,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const qs = sp.toString().replace(/%2C/gi, ',');
     window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
   }
+  const [detailId, setDetailId] = useState<string | null>(null); // project detail page (API mode)
   const [selId, setSelId] = useState<string | null>(initialIssueId ?? null);
   // Inbox: HTTP in API mode, in-memory seed otherwise. The unread badge polls every 30s (API mode only).
   const inboxClient = useMemo(() => (api ? httpInboxClient(api.slug) : mockInboxClient()), [api]);
@@ -478,6 +480,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         ) : view === 'inbox' ? (
           <Inbox client={inboxClient} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
+        ) : view === 'projects' && detailId && api ? (
+          <ProjectDetail slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }} />
         ) : view === 'projects' ? (
           <div className='scroll cycles'>
             <section className='group' aria-labelledby='pj-all'>
@@ -492,7 +496,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                     <span className='cy-dates'>{its.length} {its.length === 1 ? 'issue' : 'issues'}</span>
                     <span className='cy-prog' role='img' aria-label={`${pct}% complete, ${done} of ${its.length} issues`}><span style={{ width: `${pct}%` }} /></span>
                     <span className='cy-count'>{done}/{its.length}</span>
-                    <button onClick={() => goToProject(p.id)}>View issues</button>
+                    {api && <button onClick={() => setDetailId(p.id)}>Open</button>}<button onClick={() => goToProject(p.id)}>View issues</button>
                   </div>
                 );
               })}

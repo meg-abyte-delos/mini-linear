@@ -160,3 +160,9 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .nact { display:none; gap:4px; }
 .nrow:hover .nact, .nrow.sel .nact, .nrow:focus-within .nact { display:flex; }
 .badge { margin-left:auto; min-width:18px; padding:0 5px; border-radius:9px; background:#28aba5; color:#fff; font-size:11px; line-height:18px; text-align:center; }
+.pdetail{padding:16px;display:flex;flex-direction:column;gap:16px}
+.pd-head{display:flex;align-items:center;gap:10px}
+.pd-head h2{margin:0;flex:1}
+.pd-health{font-size:11px;padding:0 6px;border-radius:8px;border:1px solid var(--line)}
+.pd-health.on_track{color:#3fb950}.pd-health.at_risk{color:#d29922}.pd-health.off_track{color:#f85149}
+.pd-err{color:#f85149}
