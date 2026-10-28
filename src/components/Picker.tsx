@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { fuzzyFilter } from '@/lib/fuzzy';
 
-export interface PickOption { id: string; label: string; checked?: boolean; lead?: React.ReactNode }
+export interface PickOption { id: string; label: string; checked?: boolean; lead?: React.ReactNode; badge?: string }
 interface Props {
   title: string;
   options: PickOption[];
@@ -40,7 +40,7 @@ export function Picker({ title, options, multi, anchor, onPick, onClose }: Props
         <ul id='picker-list' role='listbox' aria-label={title} aria-multiselectable={multi || undefined}>
           {results.map((o, idx) => (
             <li key={o.id} id={`po-${o.id}`} role='option' aria-selected={!!o.checked} data-active={idx === active} onClick={() => onPick(o.id)}>
-              {o.lead}<span>{o.label}</span>{o.checked !== undefined && <span className='tick' aria-hidden='true'>{o.checked ? '✓' : ''}</span>}
+              {o.lead}<span>{o.label}</span>{o.badge && <span className='scope-badge' data-scope={o.badge.toLowerCase()}>{o.badge}</span>}{o.checked !== undefined && <span className='tick' aria-hidden='true'>{o.checked ? '✓' : ''}</span>}
             </li>
           ))}
           {results.length === 0 && <li role='option' aria-selected='false' aria-disabled='true'>No match</li>}

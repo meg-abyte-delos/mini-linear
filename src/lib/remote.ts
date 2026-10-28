@@ -46,7 +46,7 @@ const soft = async <T,>(p: Promise<All<T>>): Promise<All<T>> => p.catch((e) => {
 export async function loadRemote(cfg: ApiConfig): Promise<{ issues: Issue[]; meta: Meta; truncated: boolean }> {
   const [iss, lab, cyc, prj] = await Promise.all([
     all<ApiIssue>(listIssues, cfg.slug, 'issues'),
-    soft(all<{ id: string; name: string }>(listLabels, cfg.slug, 'labels')),
+    soft(all<{ id: string; name: string; team_id?: string | null }>(listLabels, cfg.slug, 'labels')),
     soft(all<Meta['cycles'][number]>(listCycles, cfg.slug, 'cycles')),
     soft(all<Meta['projects'][number]>(listProjects, cfg.slug, 'projects')),
   ]);
@@ -56,7 +56,8 @@ export async function loadRemote(cfg: ApiConfig): Promise<{ issues: Issue[]; met
     issues: issues.map(toIssue),
     meta: {
       // The API label has a hex color; chips use 3 theme hues for now (TODO: render the hex once the theme allows inline colors).
-      labels: labels.map((l, n) => ({ id: l.id, name: l.name, hue: `lb${(n % 3) + 1}` })),
+      // Pickers offer workspace labels and the labels of the current team only; scope is shown as a badge.
+      labels: labels.filter((l) => !l.team_id || l.team_id === cfg.teamId).map((l, n) => ({ id: l.id, name: l.name, hue: `lb${(n % 3) + 1}`, scope: (l.team_id ? 'team' : 'workspace') as 'team' | 'workspace' })),
       cycles: cycles.filter((c) => c.team_id === cfg.teamId),
       projects,
     },
