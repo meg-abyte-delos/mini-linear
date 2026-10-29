@@ -10,6 +10,8 @@ import { detailApi, reactedBy, type Attachment, type Comment, type Relation, typ
 import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
 import { activeMention, insertMention, suggest, type MentionUser } from '@/lib/detail/mentions';
 import { safeHref } from '@/lib/detail/markdown';
+import { IssueHeaderBar, type HeaderNav } from '@/components/IssueHeaderBar';
+import { PropIcon } from '@/components/PropIcons';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
 type PickKind = 'status' | 'priority' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent' | 'relation';
@@ -247,18 +249,23 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
   const project = meta.projects.find((p) => p.id === issue.project_id);
   const cycle = meta.cycles.find((c) => c.id === issue.cycle_id);
   const readOnly = !!issue.deleted_at;
+  // Prev/next: live issues of the workspace in identifier order (the list's default sort).
+  const nav = useMemo<HeaderNav | null>(() => {
+    const num = (i: DetailIssue) => Number(identifierOf(i).split('-').pop()) || 0;
+    const seq = [...all.filter((i) => !i.deleted_at && i.id !== issue.id), issue].sort((a, b) => num(a) - num(b));
+    const at = seq.findIndex((i) => i.id === issue.id);
+    if (at < 0 || seq.length < 2) return null;
+    const href = (i: DetailIssue | undefined) => (i ? `/w/${slug}/issue/${identifierOf(i)}` : null);
+    return { index: at, total: seq.length, prev: href(seq[at - 1]), next: href(seq[at + 1]) };
+  }, [all, issue, slug]);
+  const dueLabel = issue.due_date ? new Date(`${issue.due_date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : 'Set due date';
 
   return (
     <div className='idp'>
       <main className='idp-main' aria-label={`Issue ${ident}`}>
         <header className='idp-head'>
           <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>Issues</Link><span className='sep' aria-hidden='true'>/</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>/</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
-          <div className='idp-actions' role='toolbar' aria-label='Issue actions'>
-            <button onClick={() => void copyLink()} aria-keyshortcuts='Meta+. Control+.' title='Copy issue URL (⌘.)'>Copy link</button>
-            <button onClick={() => void copyBranch()} aria-keyshortcuts='Meta+Shift+. Control+Shift+.' title='Copy git branch name (⌘⇧.)'>Copy branch</button>
-            {!readOnly && (issue.archived_at ? <button onClick={() => void lifecycle('unarchive')}>Unarchive</button> : <button onClick={() => void lifecycle('archive')}>Archive</button>)}
-            {readOnly ? <button onClick={() => void lifecycle('restore')}>Restore</button> : <button className='danger' onClick={() => { if (window.confirm(`Delete ${ident}? You can restore it from the trash.`)) void lifecycle('delete'); }}>Delete</button>}
-          </div>
+          <IssueHeaderBar ident={ident} nav={nav} archived={!!issue.archived_at} readOnly={readOnly} onCopyLink={() => void copyLink()} onCopyBranch={() => void copyBranch()} onArchive={() => void lifecycle('archive')} onUnarchive={() => void lifecycle('unarchive')} onDelete={() => { if (window.confirm(`Delete ${ident}? You can restore it from the trash.`)) void lifecycle('delete'); }} onRestore={() => void lifecycle('restore')} />
         </header>
         {(issue.archived_at || issue.deleted_at) && <p className='idp-banner' role='status'>{issue.deleted_at ? 'This issue is in the trash. Restore it to edit.' : `Archived ${fmtDate(issue.archived_at as string)}.`}</p>}
         {parent && <Link className='parent-crumb' href={`/w/${slug}/issue/${identifierOf(parent)}`}><span className='id'>{identifierOf(parent)}</span> {parent.title}</Link>}
@@ -329,14 +336,14 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
         <dl>
           <dt>Status</dt><dd><button disabled={readOnly} onClick={open('status')} aria-haspopup='dialog'><StatusIcon status={issue.status} />{STATUS_LABEL[issue.status]}</button></dd>
           <dt>Priority</dt><dd><button disabled={readOnly} onClick={open('priority')} aria-haspopup='dialog'><PriorityIcon priority={issue.priority} />{PRIORITY_LABEL[issue.priority]}</button></dd>
-          <dt>Assignee</dt><dd><button disabled={readOnly} onClick={open('assignee')} aria-haspopup='dialog'>{assignee && <Avatar initials={assignee.initials} hue={assignee.hue} />}{assignee?.name ?? 'Unassigned'}</button></dd>
-          <dt>Labels</dt><dd><button disabled={readOnly} onClick={open('labels')} aria-haspopup='dialog'>{issue.label_ids.length ? issue.label_ids.map((l) => { const m = meta.labels.find((x) => x.id === l); return <span key={l} className={`chip ${m?.hue ?? ''}`}>{m?.name ?? l}</span>; }) : 'Add label'}</button></dd>
-          <dt><label htmlFor='prop-est'>Estimate</label></dt><dd><select id='prop-est' disabled={readOnly} value={issue.estimate ?? ''} onChange={(e) => void update({ estimate: e.target.value === '' ? null : Number(e.target.value) }, e.target.value === '' ? 'removed the estimate' : `set estimate to ${e.target.value}`)}><option value=''>No estimate</option>{ESTIMATES.map((n) => <option key={n} value={n}>{n} pt{n === 1 ? '' : 's'}</option>)}</select></dd>
-          <dt><label htmlFor='prop-due'>Due date</label></dt><dd><input id='prop-due' type='date' disabled={readOnly} className={`due-${due}`} value={issue.due_date ?? ''} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} />{due === 'overdue' && <span className='due-flag'>Overdue</span>}</dd>
-          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</button></dd>
-          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'>{project?.name ?? 'Add to project'}</button></dd>
-          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'>{cycle?.name ?? 'Add to cycle'}</button></dd>
-          <dt>Branch</dt><dd><code className='branch'>{branch}</code></dd>
+          <dt>Assignee</dt><dd><button disabled={readOnly} onClick={open('assignee')} aria-haspopup='dialog'>{assignee ? <Avatar initials={assignee.initials} hue={assignee.hue} /> : <PropIcon name='user' />}<span className={assignee ? undefined : 'prop-empty'}>{assignee?.name ?? 'Unassigned'}</span></button></dd>
+          <dt>Labels</dt><dd><button disabled={readOnly} onClick={open('labels')} aria-haspopup='dialog'>{issue.label_ids.length ? issue.label_ids.map((l) => { const m = meta.labels.find((x) => x.id === l); return <span key={l} className={`chip ${m?.hue ?? ''}`}>{m?.name ?? l}</span>; }) : <><PropIcon name='label' /><span className='prop-empty'>Add label</span></>}</button></dd>
+          <dt><label htmlFor='prop-est'>Estimate</label></dt><dd className='prop-native'><span className='prop-pill' aria-hidden='true'><PropIcon name='estimate' /><span className={issue.estimate == null ? 'prop-empty' : undefined}>{issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}</span></span><select id='prop-est' disabled={readOnly} value={issue.estimate ?? ''} onChange={(e) => void update({ estimate: e.target.value === '' ? null : Number(e.target.value) }, e.target.value === '' ? 'removed the estimate' : `set estimate to ${e.target.value}`)}><option value=''>No estimate</option>{ESTIMATES.map((n) => <option key={n} value={n}>{n} pt{n === 1 ? '' : 's'}</option>)}</select></dd>
+          <dt><label htmlFor='prop-due'>Due date</label></dt><dd className='prop-native'><span className={`prop-pill due-${due}`} aria-hidden='true'><PropIcon name='due' /><span className={issue.due_date ? undefined : 'prop-empty'}>{dueLabel}</span>{due === 'overdue' && <span className='due-flag'>Overdue</span>}</span><input id='prop-due' type='date' disabled={readOnly} value={issue.due_date ?? ''} onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* not supported */ } }} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} /></dd>
+          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'><PropIcon name='parent' /><span className={parent ? 'prop-trunc' : 'prop-empty'}>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</span></button></dd>
+          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'><PropIcon name='project' /><span className={project ? 'prop-trunc' : 'prop-empty'}>{project?.name ?? 'Add to project'}</span></button></dd>
+          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
+          <dt>Branch</dt><dd><button className='branch-btn' onClick={() => void copyBranch()} title={`${branch} (click to copy)`} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code></button></dd>
         </dl>
       </aside>
       {pick && <Picker title={pickTitle[pick.kind]} multi={pick.kind === 'labels'} anchor={pick.rect} options={options(pick.kind)} onPick={(id) => void onPick(id)} onClose={() => setPick(null)} />}
