@@ -7,7 +7,7 @@ export function proxy(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith('/api/') && !originAllowed(req)) {
     return NextResponse.json({ error: { code: 'forbidden', message: 'cross-origin request refused', request_id: crypto.randomUUID() } }, { status: 403 });
   }
-  const to = loginRedirect(req.nextUrl.pathname, req.nextUrl.search, !!req.cookies.get('ml_session')?.value, process.env.ML_API === '1' && process.env.ML_DEV_AUTH !== '1');
+  const to = loginRedirect(req.nextUrl.pathname, req.nextUrl.search, !!req.cookies.get('ml_session')?.value, process.env.ML_DEV_AUTH !== '1');
   if (to) return NextResponse.redirect(new URL(to, req.url));
   const nonce = btoa(crypto.randomUUID());
   const csp = buildCsp(nonce);
