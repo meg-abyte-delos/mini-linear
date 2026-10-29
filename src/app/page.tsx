@@ -2,7 +2,8 @@ import { listIssues, parseSimState } from '@/lib/mock-api';
 import { Shell } from '@/components/Shell';
 import { parseFilters, TODAY_RE } from '@/lib/filters';
 import { seedIssues, MOCK_META, type Issue, type Meta } from '@/lib/issues';
-import { apiConfig, loadRemote, loadRole } from '@/lib/remote';
+import { redirect } from 'next/navigation';
+import { apiConfig, loadRemote, loadRole, HttpError } from '@/lib/remote';
 
 const parseView = (v: string | string[] | undefined) => { const x = Array.isArray(v) ? v[0] : v; return x === 'board' || x === 'cycles' || x === 'projects' || x === 'inbox' ? x : 'list'; };
 
@@ -16,6 +17,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const todayParam = !seedAllowed ? undefined : Array.isArray(sp.today) ? sp.today[0] : sp.today;
   const today = todayParam && TODAY_RE.test(todayParam) ? todayParam : new Date().toISOString().slice(0, 10);
   let issues: Issue[] = [];
+  let unauthenticated = false;
   let error: string | null = null;
   let meta: Meta = MOCK_META;
   let truncated = false;
@@ -26,9 +28,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     if (api && !sim) readOnly = (await loadRole(api)) === 'guest';
     if (api && !sim) ({ issues, meta, truncated } = await loadRemote(api)); else issues = await listIssues(sim);
     if (seed > 0 && !sim) issues = [...issues, ...seedIssues(seed)]; } catch (e) {
+    if (e instanceof HttpError && e.status === 401) unauthenticated = true;
     // Log the real cause server-side only; the UI gets a fixed, user-safe message.
     console.error('listIssues failed:', e instanceof Error ? e.message : e);
     error = 'Could not load issues';
   }
+  if (unauthenticated) redirect('/login'); // expired/invalid session cookie (middleware only checks presence)
   return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} truncated={truncated} initialFilters={parseFilters(sp, meta, !!api)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} readOnly={readOnly} initialIssueId={Array.isArray(sp.issue) ? sp.issue[0] : sp.issue} />;
 }
