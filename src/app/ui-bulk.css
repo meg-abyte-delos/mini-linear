@@ -1,10 +1,16 @@
 /* Bulk bar (SelectionBar) in Delos Night: floating frosted pill, centered at the bottom,
    teal counter dot, ghost action buttons. Dark only (data-theme=dark AND system dark); light untouched.
    Contrast: text stays --fg / --muted / --accent on --glass over --n-bg (AA tokens).
-   Layering: .selbar and .toast are both z 40 (ui-night.css) at bottom:20px. The toast is lifted above the bar
-   while a selection is active, so they never overlap. Pickers are NOT children of .selbar (SelectionBar renders
-   no Picker; Shell mounts it beside the bar), so the bar's backdrop-filter containing block cannot trap them.
-   Same-specificity glow conflicts on .card are resolved at the end of this file (last import in layout.tsx). */
+   Layering: .selbar and .toast are both z 40 (ui-night.css) at bottom:20px. The toast ("N selected, Esc to clear")
+   is lifted above the bar while a selection is active, so it never covers the actions. Pickers are NOT children of
+   .selbar (SelectionBar renders no Picker; Shell mounts it beside the bar), so the backdrop-filter containing block
+   cannot trap them. Same-specificity glow conflicts on .card are resolved at the end of this file (last import). */
+
+/* ---------- selection hint / toast: above the bar, any theme ----------
+   No theme prefix: data-theme may sit on <html> or <body>, and `[data-theme] body` would miss the latter.
+   Bar = 20px offset + 40px height (28px buttons + 2x6px padding) -> hint sits 8px above it. */
+body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
+.selbar [role='tooltip'], .selbar .selbar-hint { position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); pointer-events:none; white-space:nowrap; }
 
 /* ---------- explicit dark ---------- */
 [data-theme='dark'] .selbar {
@@ -40,7 +46,6 @@
 [data-theme='dark'] .selbar .selbar-undo { color:var(--accent); margin-left:4px; border-left:1px solid var(--line); border-radius:0 7px 7px 0; }
 [data-theme='dark'] .selbar .selbar-clear { color:var(--muted); }
 [data-theme='dark'] .selbar .selbar-clear:hover { color:var(--fg); }
-[data-theme='dark'] body:has(.selbar) .toast { bottom:72px; }
 
 /* ---------- system dark (no data-theme): same rules ---------- */
 @media (prefers-color-scheme: dark) {
@@ -77,7 +82,6 @@
   html:not([data-theme]) .selbar .selbar-undo { color:var(--accent); margin-left:4px; border-left:1px solid var(--line); border-radius:0 7px 7px 0; }
   html:not([data-theme]) .selbar .selbar-clear { color:var(--muted); }
   html:not([data-theme]) .selbar .selbar-clear:hover { color:var(--fg); }
-  html:not([data-theme]) body:has(.selbar) .toast { bottom:72px; }
   /* card depth + selected glow, mirrored from ui-night.css */
   html:not([data-theme]) .card { box-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 4px 12px rgba(0,0,0,.25); }
   html:not([data-theme]) .card:hover { border-color:rgba(255,255,255,.12); }
