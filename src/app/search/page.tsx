@@ -1,4 +1,4 @@
-import { listIssues } from '@/lib/mock-api';
+import { listIssues } from '@/lib/sim-store';
 import { apiConfig } from '@/lib/remote';
 import { SearchView } from '@/components/SearchView';
 import type { HitKind } from '@/lib/search-client';
