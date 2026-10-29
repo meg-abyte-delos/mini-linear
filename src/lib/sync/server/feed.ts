@@ -82,7 +82,7 @@ async function assertIssueVisible(ctx: Ctx, id: string) {
 }
 const viewers = async (ctx: Ctx, id: string) => {
   const rows = await ctx.tx<{ user_id: string; seen_at: string }[]>`select user_id, seen_at from issue_presence
-    where issue_id = ${id} and seen_at > now() - make_interval(secs => ${PRESENCE_TTL_S}) order by seen_at desc`;
+    where issue_id = ${id} and seen_at > now() - make_interval(secs => ${PRESENCE_TTL_S}) order by user_id`; // same order as the SSE snapshot: the list never flips between a heartbeat answer and an event
   // Guests get a count only: other users' ids (internal members) are not theirs to see. They still see themselves.
   return ctx.role === 'guest' ? { viewers: rows.filter((r) => r.user_id === ctx.userId), count: rows.length } : { viewers: rows, count: rows.length };
 };

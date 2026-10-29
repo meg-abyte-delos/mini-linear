@@ -94,10 +94,11 @@ describe('connectRealtime', () => {
 });
 
 describe('presence', () => {
-  it('connectRealtime forwards `presence` events and ignores malformed frames', () => {
+  it('connectRealtime forwards `presence` events and ignores malformed frames', async () => {
     const { es, fire } = fakeES(); const got: unknown[] = [];
     connectRealtime({ slug: 'w1', store: new SyncStore(), onResync: vi.fn(), onPresence: (p) => got.push(p), eventSource: () => es });
     fire('presence', { issue_id: 'a', viewers: ['u1'], count: 1 });
+    await flush();
     expect(got).toEqual([{ issue_id: 'a', viewers: ['u1'], count: 1 }]);
   });
   it('publishPresence replaces the list, notifies once per change, and empties on count 0', async () => {
@@ -109,6 +110,40 @@ describe('presence', () => {
     expect(presenceOf('a').viewers).toEqual(['u2']);
     publishPresence({ issue_id: 'a', viewers: [], count: 0 });
     expect(presenceOf('a')).toEqual({ viewers: [], count: 0 });
+  });
+  it('resync race: a presence snapshot sent right after `resync` is applied after the reset, never wiped by it (no flush between the frames)', async () => {
+    const { publishPresence, presenceOf, resetPresence } = await import('@/lib/presence');
+    resetPresence(); publishPresence({ issue_id: 'old', viewers: ['ghost'], count: 1 });
+    const { es, fire } = fakeES();
+    connectRealtime({ slug: 'w1', store: new SyncStore(), onResync: async () => { await new Promise((r) => setTimeout(r, 5)); resetPresence(); }, onPresence: publishPresence, eventSource: () => es });
+    fire('resync', { cursor: '1' });
+    fire('presence', { issue_id: 'new', viewers: ['u1'], count: 1 });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(presenceOf('old').count).toBe(0);
+    expect(presenceOf('new')).toEqual({ viewers: ['u1'], count: 1 });
+  });
+  it('startHeartbeat sorts viewers by user_id like the SSE snapshot', async () => {
+    const { startHeartbeat, presenceOf, resetPresence } = await import('@/lib/presence');
+    resetPresence();
+    const f = vi.fn(async () => new Response(JSON.stringify({ viewers: [{ user_id: 'u9' }, { user_id: 'u1' }], count: 2 }), { status: 200 }));
+    const stop = startHeartbeat('w1', 'srt', { fetch: f as never, intervalMs: 1_000_000 });
+    await flush(); await flush(); stop();
+    expect(presenceOf('srt').viewers).toEqual(['u1', 'u9']);
+  });
+  it('subscribePresenceFeed: instant events for pages without the Shell, shared stream, reset on reconnect, closes at last unsubscribe', async () => {
+    const { subscribePresenceFeed, presenceOf, resetPresence } = await import('@/lib/presence');
+    resetPresence();
+    const { es, fire } = fakeES(); const mk = vi.fn(() => es as never);
+    const off1 = subscribePresenceFeed('w1', mk), off2 = subscribePresenceFeed('w1', mk);
+    expect(mk).toHaveBeenCalledTimes(1);
+    fire('presence', { issue_id: 'd', viewers: ['u1'], count: 1 });
+    expect(presenceOf('d').viewers).toEqual(['u1']);
+    es.onopen?.(undefined); // first open
+    fire('presence', { issue_id: 'd', viewers: ['u1', 'u2'], count: 2 });
+    es.onopen?.(undefined); // reconnect: ghosts cleared
+    expect(presenceOf('d').count).toBe(0);
+    off1(); expect(es.close).not.toHaveBeenCalled();
+    off2(); expect(es.close).toHaveBeenCalledTimes(1);
   });
   it('startHeartbeat POSTs {issue_id}, publishes the answer, DELETEs on stop', async () => {
     const { startHeartbeat, presenceOf, resetPresence } = await import('@/lib/presence');

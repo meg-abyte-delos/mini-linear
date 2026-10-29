@@ -48,9 +48,9 @@ describe('presence after reconnect', () => {
     const f = fakeES();
     const stop = startIssueRealtime({ slug: 'w', known: () => undefined, upsert: vi.fn(), remove: vi.fn(), resync: vi.fn(), onPresence: publishPresence, eventSource: () => f.es });
     f.es.onopen?.({});
-    f.emit('presence', { issue_id: 'i1', viewers: ['u1'], count: 1 });
+    f.emit('presence', { issue_id: 'i1', viewers: ['u1'], count: 1 }); await flush();
     expect(presenceOf('i1').count).toBe(1);
-    f.es.onopen?.({});
+    f.es.onopen?.({}); await flush();
     expect(presenceOf('i1').count).toBe(0);
     f.emit('presence', { issue_id: 'i2', viewers: ['u2'], count: 1 });
     f.emit('resync', {}); await flush();

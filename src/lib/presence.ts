@@ -32,7 +32,7 @@ export function startHeartbeat(slug: string, issueId: string, opts: Opts = {}): 
   const beat = async () => {
     try {
       const r = await call('POST');
-      if (r.ok && !stopped) { const b = (await r.json()) as { viewers: { user_id: string }[]; count: number }; publishPresence({ issue_id: issueId, viewers: b.viewers.map((v) => v.user_id), count: b.count }); }
+      if (r.ok && !stopped) { const b = (await r.json()) as { viewers: { user_id: string }[]; count: number }; publishPresence({ issue_id: issueId, viewers: b.viewers.map((v) => v.user_id).sort(), count: b.count }); }
     } catch { /* offline: next beat retries */ }
   };
   void beat();
@@ -40,9 +40,31 @@ export function startHeartbeat(slug: string, issueId: string, opts: Opts = {}): 
   return () => { stopped = true; clearInterval(t); void call('DELETE').catch(() => undefined); };
 }
 
+type FeedES = { onopen: ((e: unknown) => void) | null; addEventListener(t: string, f: (e: { data: string }) => void): void; close(): void };
+let feed: { slug: string; refs: number; es: FeedES } | null = null;
+/**
+ * Shared, ref-counted listener on the SSE `presence` events, for pages that do not mount the Shell (issue detail page):
+ * the viewer list then updates instantly instead of at the next heartbeat. Same store as the Shell feed (identical events dedupe).
+ * The server sends a snapshot when a stream opens, so a reconnect clears the store first (no ghost viewers).
+ */
+export function subscribePresenceFeed(slug: string, mk: (url: string) => FeedES = (u) => new EventSource(u, { withCredentials: true }) as unknown as FeedES): () => void {
+  if (feed && feed.slug !== slug) { feed.es.close(); feed = null; resetPresence(); }
+  if (!feed) {
+    const es = mk(`/api/v1/w/${slug}/events`);
+    let wasLive = false;
+    es.addEventListener('presence', (m) => { try { publishPresence(JSON.parse(m.data)); } catch { /* malformed frame */ } });
+    es.addEventListener('resync', () => resetPresence());
+    es.onopen = () => { if (wasLive) resetPresence(); wasLive = true; };
+    feed = { slug, refs: 0, es };
+  }
+  const mine = feed; mine.refs++;
+  return () => { mine.refs--; if (mine.refs <= 0) { mine.es.close(); if (feed === mine) feed = null; } };
+}
+
 /** Users (ids) currently viewing `issueId`, me included. Pass `slug = null` (mock mode) or no issue to stay idle. */
 export function usePresence(slug: string | null | undefined, issueId: string | null | undefined): PresenceState {
   useEffect(() => (slug && issueId ? startHeartbeat(slug, issueId) : undefined), [slug, issueId]);
+  useEffect(() => (slug && issueId && typeof EventSource !== 'undefined' ? subscribePresenceFeed(slug) : undefined), [slug, issueId]);
   return useSyncExternalStore(
     (f) => { subs.add(f); return () => { subs.delete(f); }; },
     () => (issueId ? presenceOf(issueId) : EMPTY),

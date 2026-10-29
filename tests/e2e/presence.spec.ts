@@ -152,3 +152,21 @@ test('UI: PresenceStack shows B on the board card and in the issue header, never
   await pb.request.delete(url, { data: { issue_id: issue.id } });
   await ctxB.close();
 });
+
+test('UI: the issue page gets B instantly over SSE (well under the 10 s heartbeat), and drops B when B leaves', async ({ page, browser }) => {
+  await page.goto('/'); await page.waitForSelector('html[data-ready]');
+  const issue = await apiCreateIssue(page, `presence-detail-sse-${Date.now()}`);
+  await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
+  const header = page.locator('.idp-head');
+  await expect(header).toBeVisible();
+  await expect(header.locator('.presence-av')).toHaveCount(0);
+  const ctxB = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const pb = await ctxB.newPage();
+  expect((await pb.request.post('/api/v1/auth/login', { data: { email: B_EMAIL, password: pass } })).ok()).toBeTruthy();
+  const url = `/api/v1/w/${DEMO.slug}/presence`;
+  expect((await pb.request.post(url, { data: { issue_id: issue.id } })).status()).toBe(200); // one heartbeat only
+  await expect(header.getByRole('group', { name: /Viewing now: Presence B/ })).toBeVisible({ timeout: 5_000 });
+  expect((await pb.request.delete(url, { data: { issue_id: issue.id } })).status()).toBe(200);
+  await expect(header.locator('.presence-av')).toHaveCount(0, { timeout: 5_000 });
+  await ctxB.close();
+});

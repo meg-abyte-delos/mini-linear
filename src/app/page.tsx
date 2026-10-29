@@ -3,7 +3,7 @@ import { Shell } from '@/components/Shell';
 import { parseFilters, TODAY_RE } from '@/lib/filters';
 import { seedIssues, MOCK_META, type Issue, type Meta } from '@/lib/issues';
 import { redirect } from 'next/navigation';
-import { loadRemote, loadRole, HttpError } from '@/lib/remote';
+import { loadRemote, loadViewer, HttpError } from '@/lib/remote';
 import { getWorkspaceContext, problemFor } from '@/lib/auth/workspace-context';
 import { WorkspaceState } from '@/components/WorkspaceState';
 
@@ -33,8 +33,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   }
   // Read-only is derived from the session role (guest).
   let readOnly = false;
+  let meId: string | null = null;
   try {
-    if (!sim) readOnly = (await loadRole(api)) === 'guest';
+    if (!sim) { const v = await loadViewer(api); readOnly = v.role === 'guest'; meId = v.userId; }
     if (!sim) ({ issues, meta, truncated } = await loadRemote(api)); else issues = await listIssues(sim);
     if (seed > 0 && !sim) issues = [...issues, ...seedIssues(seed)]; } catch (e) {
     if (e instanceof HttpError && e.status === 401) unauthenticated = true;
@@ -43,5 +44,5 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
     error = 'Could not load issues';
   }
   if (unauthenticated) redirect('/login'); // expired/invalid session cookie (middleware only checks presence)
-  return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} truncated={truncated} initialFilters={parseFilters(sp, meta, true)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} readOnly={readOnly} initialIssueId={Array.isArray(sp.issue) ? sp.issue[0] : sp.issue} />;
+  return <Shell key={error ? "error" : sim ?? "ok"} initialIssues={issues} loadError={error} truncated={truncated} initialFilters={parseFilters(sp, meta, true)} meta={meta} api={api} today={today} initialView={parseView(sp.view)} readOnly={readOnly} meId={meId} initialIssueId={Array.isArray(sp.issue) ? sp.issue[0] : sp.issue} />;
 }

@@ -64,7 +64,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
-export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
+export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, meId = null, initialIssueId }: { meId?: string | null;  initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
   const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
@@ -602,7 +602,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   );
   const card = (i: Issue, pos?: number, size?: number) => (
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
-      <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{api && <PresenceStack presence={toPresenceUsers(presenceMap.get(i.id)?.viewers ?? [], nlPeople.users, nlPeople.me)} max={2} />}{assignee(i)}</div>
+      <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{api && <PresenceStack presence={toPresenceUsers(presenceMap.get(i.id)?.viewers ?? [], nlPeople.users, meId ?? nlPeople.me)} max={2} />}{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
       <div className='card-meta'><PriorityIcon priority={i.priority} />{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
