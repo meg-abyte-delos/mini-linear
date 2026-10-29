@@ -106,6 +106,7 @@ test('a11y: detail panel and filter picker have no wcag2a/aa violations', async 
   let r = await wcag(page);
   expect(r.violations.map((x) => `panel: ${x.id} x${x.nodes.length}`)).toEqual([]);
   await page.getByRole('button', { name: 'Close detail panel' }).click();
+  await page.locator('#fb-add').click();
   await page.locator('#fb-status').click();
   r = await wcag(page);
   expect(r.violations.map((x) => `filter: ${x.id} x${x.nodes.length}`)).toEqual([]);
