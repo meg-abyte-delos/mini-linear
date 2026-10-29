@@ -14,7 +14,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { CycleBurndown } from '@/components/CycleBurndown';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
-import { GROUPING_LABEL, ORDERING_LABEL, hueOfId, initialsOf, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
+import { GROUPING_LABEL, ORDERING_LABEL, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
