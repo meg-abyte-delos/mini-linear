@@ -2,11 +2,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PROJECT_STATUSES, statusLabel, byTarget, HEALTH_LABEL, newestFirst, projectClient, type Health, type Milestone, type ProjectDetail as Detail, type ProjectUpdate } from '@/lib/project-client';
 import { ProgressRing } from '@/components/ProgressRing';
+import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 
 export interface PdIssue { id: string; identifier: string; title: string; done: boolean }
 interface Props { issues?: PdIssue[]; leadName?: string | null; onOpenIssue?: (id: string) => void; slug: string; projectId: string; canWrite: boolean; onBack: () => void; onViewIssues: (id: string) => void }
 
 // Project detail: progress, milestones and status updates, on the project endpoints (API mode only).
+// Lead: proj.lead_id is a workspace member UUID, resolved via GET /me + /members (same source as Cmd+K and ProjectsList).
+// The leadName prop (mock who()) is only a fallback when the member is not found.
 export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues, issues = [], leadName = null, onOpenIssue }: Props) {
   const client = useMemo(() => projectClient(slug, projectId), [slug, projectId]);
   const [proj, setProj] = useState<Detail | null>(null);
@@ -18,6 +21,14 @@ export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues,
   const [msName, setMsName] = useState('');
   const [msDate, setMsDate] = useState('');
   const [busy, setBusy] = useState(false);
+  const [people, setPeople] = useState<NlPeople>(EMPTY_PEOPLE);
+  const [peopleLoaded, setPeopleLoaded] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setPeopleLoaded(false);
+    void fetchNlPeople(slug).then((p) => { if (live) setPeople(p); }).finally(() => { if (live) setPeopleLoaded(true); });
+    return () => { live = false; };
+  }, [slug]);
 
   async function load() {
     try { const [p, m, u] = await Promise.all([client.get(), client.milestones(), client.updates()]); setProj(p); setMs(m); setUps(u); setErr(null); }
@@ -33,6 +44,9 @@ export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues,
   if (err && !proj) return <div className='state error' role='alert'><p>Could not load the project ({err}).</p><button onClick={onBack}>Back to projects</button></div>;
   if (!proj) return <div className='state' role='status'>Loading project…</div>;
   const pct = proj.progress_pct;
+  // No 'Unknown' flash while members load: blank until resolved.
+  const member = proj.lead_id ? people.users.find((u) => u.id === proj.lead_id) : undefined;
+  const lead = !proj.lead_id ? (leadName ?? 'No lead') : member?.name ?? (leadName && leadName !== 'Unknown' ? leadName : peopleLoaded ? 'Unknown' : '\u00a0');
   return (
     <div className='scroll cycles pdetail' data-project={proj.id}>
       <div className='pd-head'>
@@ -53,7 +67,7 @@ export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues,
         <ProgressRing pct={pct} size={28} showPct={false} label={`${pct}% complete, ${proj.done_count} of ${proj.issue_count} issues`} />
         <span className='cy-count'>{proj.done_count}/{proj.issue_count} ({pct}%)</span>
         <span className='cy-dates'>{proj.start_date ?? 'No start'} to {proj.target_date ?? 'no target'}</span>
-        <p className='pd-meta'>Lead: <strong data-testid='pd-lead'>{leadName ?? 'No lead'}</strong>
+        <p className='pd-meta'>Lead: <strong data-testid='pd-lead'>{lead}</strong>
           {canWrite && <label> Target date <input type='date' aria-label='Target date' value={proj.target_date ?? ''} disabled={busy} onChange={(e) => void run(() => client.patch(proj.version, { target_date: e.target.value || null }))} /></label>}
         </p>
       </section>
