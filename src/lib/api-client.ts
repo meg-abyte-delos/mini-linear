@@ -22,12 +22,30 @@ export async function getIssue(slug: string, id: string, f: Fetch = fetch, prev?
   } catch { return null; }
 }
 
+// PATCHes of one issue are serialized. Two edits in quick succession (estimate, then due date) would otherwise both go out with the
+// same If-Match: the second gets a 412, and the caller replaces its optimistic state with the server row, which lacks the new value.
+const patchChain = new Map<string, Promise<unknown>>();
+const knownVersion = new Map<string, number>();
+
 /** PATCH with If-Match: "<version>". On 412 the issue is refetched once; there is no automatic retry. */
 export async function patchIssue(slug: string, prev: Issue, version: number, patch: Record<string, unknown>, f: Fetch = fetch): Promise<SyncResult> {
+  const run = (patchChain.get(prev.id) ?? Promise.resolve()).then(() => send(slug, prev, version, patch, f));
+  patchChain.set(prev.id, run.catch(() => undefined));
+  return run;
+}
+
+async function send(slug: string, prev: Issue, version: number, patch: Record<string, unknown>, f: Fetch): Promise<SyncResult> {
+  // Versions only grow: when an earlier PATCH of this issue succeeded while this one was queued, use its resulting version.
+  const v = Math.max(version, knownVersion.get(prev.id) ?? 0);
   try {
-    const res = await f(`${base(slug)}/issues/${prev.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json', 'if-match': `"${version}"` }, body: JSON.stringify(patch) });
-    if (res.ok) return { kind: 'ok', issue: fromApi((await res.json()) as Record<string, unknown>, prev) };
+    const res = await f(`${base(slug)}/issues/${prev.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json', 'if-match': `"${v}"` }, body: JSON.stringify(patch) });
+    if (res.ok) {
+      const issue = fromApi((await res.json()) as Record<string, unknown>, prev);
+      knownVersion.set(prev.id, issue.version);
+      return { kind: 'ok', issue };
+    }
     const fresh = await getIssue(slug, prev.id, f, prev);
+    if (fresh) knownVersion.set(prev.id, fresh.version);
     return { kind: res.status === 412 ? 'conflict' : 'error', issue: fresh };
   } catch { return { kind: 'error', issue: null }; }
 }

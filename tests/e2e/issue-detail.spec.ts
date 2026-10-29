@@ -44,9 +44,11 @@ test('inline title, properties and activity', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
   // The ?today= override is ignored when the server runs a production build (CI), so the page compares against the real clock.
   // Use a date that is in the past on any clock, not one relative to the pinned 2026-10-28.
+  const patched = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'), { timeout: 10_000 }).catch(() => null);
   await page.getByLabel('Due date').fill('2020-01-01');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2020-01-01');
-  await expect(page.getByText('Overdue')).toBeVisible();
+  await patched;
+  await expect(page.getByRole('complementary', { name: 'Properties' }).locator('.due-flag')).toHaveText('Overdue');
 });
 
 test('markdown editor is safe: no script/raw html, unsafe links dropped', async ({ page }) => {
