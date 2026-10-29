@@ -123,6 +123,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // Filters live in the URL: replaceState keeps other params (seed, state) and does not refetch.
   function setFilters(f: Filters) {
     setFiltersState(f);
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- event handler, runs after render
     setActiveViewId(null); // an edited filter set is no longer the saved view
     const sp = new URLSearchParams(window.location.search); sp.delete('v');
     const qs = writeFilters(sp.toString(), f);
@@ -136,6 +137,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [copied, setCopied] = useState<string | null>(null);
   function applyView(v: SavedView) {
     const f = groupToFilters(v.filters);
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- event handler, runs after render
     setFiltersState(f); setViewState(v.layout);
     setActiveViewId(v.id);
     const sp = new URLSearchParams(); sp.set('v', v.id);
@@ -159,6 +161,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (!saving) return;
     const name = saving.name.trim();
     if (!name) { setSaving({ ...saving, err: true }); return; }
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- event handler, runs after render
     const row = await viewsClient.create({ name, shared: saving.shared, layout: view === 'board' ? 'board' : 'list', filters });
     if (!row) { setSaving({ ...saving, err: true }); return; }
     setViews((l) => [...l, row]); setSaving(null); setActiveViewId(row.id);
@@ -240,6 +243,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const current = ordered.find((i) => i.id === selId) ?? ordered[0];
   const orderedRef = useRef(ordered);
   const currentIdRef = useRef<string | undefined>(current?.id);
+  const multiRef = useRef<string[]>([]);
 
   // Bulk: with a multi-selection, an action applies to every selected issue; otherwise to the current one.
   const targetIds = () => (multiRef.current.length ? multiRef.current : currentIdRef.current ? [currentIdRef.current] : []);
@@ -469,7 +473,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const nl = q.trim().length >= 4 && !readOnly ? parseNlCommand(q, USERS, LABELS, null) : null;
   // A status-only phrase is already covered by the built-in 'Move to …' commands: no duplicate NL row.
   const nlStatusOnly = !!nl && Object.keys(nl.patch).every((k) => k === 'status');
-  const nlIds = nl && !nlStatusOnly ? targetIds() : [];
+  // Render-time: use state, not targetIds() (multiRef is declared further down: calling it here is a TDZ crash).
+  const nlIds = nl && !nlStatusOnly ? (multi.length ? multi : current?.id ? [current.id] : []) : [];
   const nlCmd: Cmd[] = nl && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), hint: '↵', run: () => {
     const { add_label_ids, assignee_id, ...rest } = nl.patch;
     for (const id of nlIds) {
@@ -489,7 +494,6 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
-  const multiRef = useRef<string[]>([]);
   const readOnlyRef = useRef(readOnly);
   useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
