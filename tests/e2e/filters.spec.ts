@@ -1,7 +1,16 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+// Other specs move the seeded Todo issues around (dnd, palette, bulk) on this shared DB: tests that need Todo rows create their own.
+async function ownTodoIssues(page: Page) {
+  for (const title of ['Filter spec todo A', 'Filter spec todo B']) {
+    const res = await page.request.post('/api/v1/w/demo/issues', { data: { team_id: '00000000-0000-4000-8000-000000000003', title, status: 'todo' } });
+    expect(res.status()).toBe(201);
+  }
+}
+
 test('filter by status is applied and written to the URL', async ({ page }) => {
+  await ownTodoIssues(page);
   await page.goto('/');
   await page.waitForSelector('html[data-ready]');
   const before = await page.locator('.row').count();
@@ -32,6 +41,7 @@ test('no match shows an empty state with a way out', async ({ page }) => {
 });
 
 test('filters survive a view switch and apply to the board', async ({ page }) => {
+  await ownTodoIssues(page);
   await page.goto('/?status=todo');
   await page.getByRole('button', { name: /board/i }).click();
   await expect(page.locator('#c-todo .count')).not.toHaveText('0');
