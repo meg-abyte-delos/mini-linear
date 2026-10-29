@@ -58,7 +58,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - name: API-mode e2e (Playwright starts `pnpm start` with the env above)
         env: { SEED_DEMO_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}', E2E_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}' }
-        run: pnpm exec playwright test tests/e2e/core-flow.spec.ts tests/e2e/auth.spec.ts tests/e2e/search-inbox-api.spec.ts tests/e2e/bulk-actions-api.spec.ts tests/e2e/cycle-burndown.spec.ts
+        run: pnpm exec playwright test tests/e2e/core-flow.spec.ts tests/e2e/auth.spec.ts tests/e2e/search-inbox-api.spec.ts tests/e2e/bulk-actions-api.spec.ts tests/e2e/cycle-burndown.spec.ts tests/e2e/views-api.spec.ts
   build-test:
     runs-on: ubuntu-latest
     services:
