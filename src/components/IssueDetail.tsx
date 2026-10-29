@@ -173,8 +173,10 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
   }
 
   async function lifecycle(action: 'archive' | 'unarchive' | 'delete' | 'restore') {
-    const r = client ? await (action === 'delete' ? client.remove(issue.id) : action === 'restore' ? client.restore(issue.id) : client.archive(issue.id, action === 'archive')) : null;
+    const r = client ? await (action === 'delete' ? client.remove(issue.id, version.current) : action === 'restore' ? client.restore(issue.id) : client.archive(issue.id, action === 'archive')) : null;
     if (r && !r.ok && !r.unsupported) { setToast(`Could not ${action} the issue`); return; }
+    // The server bumps the version on every lifecycle change: keep the If-Match token in step (restore returns the row).
+    if (r && r.ok) { const v = (r.data as { version?: number } | null)?.version; version.current = typeof v === 'number' ? v : version.current + 1; }
     const patch = action === 'archive' ? { archived_at: now() } : action === 'unarchive' ? { archived_at: null } : action === 'delete' ? { deleted_at: now() } : { deleted_at: null };
     setIssue((i) => ({ ...i, ...patch }));
     log(action === 'delete' ? 'deleted the issue' : `${action}d the issue`);

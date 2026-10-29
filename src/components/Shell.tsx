@@ -2,7 +2,7 @@
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
@@ -11,6 +11,7 @@ import { createStore } from '@/lib/mock-api';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { ProgressRing } from '@/components/ProgressRing';
+import { CycleBurndown } from '@/components/CycleBurndown';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
@@ -22,6 +23,7 @@ import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
+import { WorkspaceSwitcher, TeamSection } from '@/components/SidebarParts';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'Priority', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
@@ -65,6 +67,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
 export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
+  const [burnOpen, setBurnOpen] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
   // API mode: server versions by issue id, and one write chain per issue so If-Match never races our own PATCHes.
   const versions = useRef(new Map<string, number>(initialIssues.map((i) => [i.id, i.version])));
@@ -603,7 +606,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   return (
     <div className='shell'>
       <aside className='side' aria-label='Sidebar'>
-        <div className='ws'><span className='ws-logo' aria-hidden='true'>D</span><span className='ws-name'>Delos</span></div>
+        <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
         {!readOnly && <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
         <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
         <nav aria-label='Primary'>
@@ -622,10 +625,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </nav>
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
-          <a className='side-link' href='#team' onClick={(e) => e.preventDefault()}><Icon name='team' /><span>Delos</span></a>
+          <TeamSection name='Delos'>
           <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><span>Issues</span></a>
           <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><span>Cycles</span></a>
           <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><span>Projects</span></a>
+          </TeamSection>
         </nav>
       </aside>
       <main className='main' ref={mainRef} data-view={view}>
@@ -674,7 +678,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             leadName={who(PROJECTS.find((p) => p.id === detailId)?.lead_id ?? null)?.name ?? null}
             onOpenIssue={(id) => { setDetailId(null); setView('list'); setSelId(id); }} />
         ) : view === 'projects' ? (
-          <ProjectsList projects={PROJECTS} issues={allIssues} today={today} canOpen={!!api} onOpen={setDetailId} onViewIssues={goToProject} />
+          <ProjectsList projects={PROJECTS} issues={allIssues} today={today} canOpen={!!api} onOpen={setDetailId} onViewIssues={goToProject} slug={api?.slug ?? null} />
         ) : view === 'cycles' ? (
           <div className='scroll cycles'>
             {BUCKETS.map((b) => {
@@ -687,14 +691,21 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                     const its = allIssues.filter((i) => i.cycle_id === c.id);
                     const done = its.filter((i) => i.status === 'done' || i.status === 'canceled').length;
                     const pct = its.length ? Math.round((done / its.length) * 100) : 0;
+                    const bdOpen = burnOpen.has(c.id);
                     return (
-                      <div key={c.id} className='cycle' data-cycle={c.id} data-bucket={b.id}>
+                      <Fragment key={c.id}>
+                      <div className='cycle' data-cycle={c.id} data-bucket={b.id}>
                         <span className='cy-name'>{c.name}</span>
                         <span className='cy-dates'>{fmtDate(c.start_date)} to {fmtDate(c.end_date)}</span>
                         <ProgressRing pct={pct} size={18} showPct={false} tone={b.id === 'past' ? 'muted' : undefined} label={`${pct}% complete, ${done} of ${its.length} issues`} />
                         <span className='cy-count'>{done}/{its.length}</span>
-                        <button onClick={() => { setFilters({ ...emptyFilters(), cycle: [c.id] }); setView('list'); }}>View issues</button>
+                        <span className='cy-actions'>
+                          {api && isUuid(c.id) && <button aria-expanded={bdOpen} aria-controls={`bd-${c.id}`} onClick={() => setBurnOpen((o) => { const n = new Set(o); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })}>Burndown</button>}
+                          <button onClick={() => { setFilters({ ...emptyFilters(), cycle: [c.id] }); setView('list'); }}>View issues</button>
+                        </span>
                       </div>
+                      {bdOpen && api && <div id={`bd-${c.id}`}><CycleBurndown slug={api.slug} cycleId={c.id} name={c.name} today={today} /></div>}
+                      </Fragment>
                     );
                   })}
                 </section>
