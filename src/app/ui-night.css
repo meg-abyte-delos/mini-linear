@@ -109,3 +109,6 @@
 [data-theme='dark'] .panel { z-index:30; }
 [data-theme='dark'] .selbar, [data-theme='dark'] .toast { z-index:40; }
 [data-theme='dark'] .overlay { z-index:50; }
+
+/* Scope badge on a highlighted picker row: --muted on the teal-tinted active bg was 4.45:1 (axe, #135). */
+.picker li[data-active='true'] .scope-badge, .picker li[aria-selected='true'] .scope-badge { color:var(--fg); }
