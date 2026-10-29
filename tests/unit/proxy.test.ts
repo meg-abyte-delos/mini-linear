@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server';
 import { proxy } from '../../src/proxy';
 import { SECURITY_HEADERS } from '../../src/lib/csp';
 
-const run = () => proxy(new NextRequest('http://localhost/'));
+// A session cookie is present: anonymous page requests are redirected to /login before CSP (covered in auth-guard.test).
+const run = () => proxy(new NextRequest('http://localhost/', { headers: { cookie: 'ml_session=t' } }));
 const nonceOf = (csp: string) => /'nonce-([^']+)'/.exec(csp)?.[1];
 
 describe('proxy (S10)', () => {
