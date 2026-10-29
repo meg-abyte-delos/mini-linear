@@ -750,7 +750,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </dl>
         </aside>
       )}
-      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} />}
+      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} openKind={pick && pick.ids.length > 1 ? (pick.kind as BulkKind) : null} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} />}
       {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
       {help && (
         <div className='overlay' onClick={() => setHelp(false)}>
