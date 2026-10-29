@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { USERS, STATUSES, STATUS_LABEL, PRIORITY_LABEL, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
 import { Picker, type PickOption } from '@/components/Picker';
 import { Markdown } from '@/components/Markdown';
@@ -10,6 +10,10 @@ import { detailApi, reactedBy, type Attachment, type Comment, type Relation, typ
 import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
 import { activeMention, insertMention, suggest, type MentionUser } from '@/lib/detail/mentions';
 import { safeHref } from '@/lib/detail/markdown';
+import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
+import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
+import { IssueHeaderBar, type HeaderNav } from '@/components/IssueHeaderBar';
+import { PropIcon } from '@/components/PropIcons';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
 type PickKind = 'status' | 'priority' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent' | 'relation';
@@ -17,12 +21,14 @@ const REL_ORDER: Relation['type'][] = ['blocks', 'blocked_by', 'related', 'dupli
 const REL_LABEL: Record<Relation['type'], string> = { blocks: 'Blocks', blocked_by: 'Blocked by', related: 'Related', duplicate: 'Duplicate of' };
 const ESTIMATES = [0, 1, 2, 3, 5, 8, 13];
 const EMOJIS = ['👍', '🎉', '❤️', '👀'];
-const MENTION_USERS: MentionUser[] = USERS.map((u) => ({ id: u.id, name: u.name, handle: u.name.split(' ')[0]?.toLowerCase() ?? u.id }));
-const ME = USERS[0].id;
+const mentionUsers = (people: readonly Person[]): MentionUser[] => people.map((u) => ({ id: u.id, name: u.name, handle: u.name.split(' ')[0]?.toLowerCase() ?? u.id }));
+// Workspace directory for names, avatars and mentions: members in API mode, the USERS fixtures in mock mode.
+const PeopleCtx = createContext<readonly Person[]>(MOCK_PEOPLE);
+const MOCK_ME = USERS[0].id;
+const MeCtx = createContext<string>(MOCK_ME);
 let seq = 0;
 const lid = (p: string) => `${p}-${Date.now().toString(36)}-${++seq}`;
 const now = () => new Date().toISOString();
-const who = (id: string | null | undefined) => USERS.find((u) => u.id === id);
 const fmtTime = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
 
 function wrapSel(el: HTMLTextAreaElement, before: string, after = before, placeholder = 'text'): string {
@@ -32,6 +38,20 @@ function wrapSel(el: HTMLTextAreaElement, before: string, after = before, placeh
 }
 
 export function IssueDetail({ slug, initial, all, meta, api, today, viewer = null, teamId }: { teamId?: string; slug: string; initial: DetailIssue; all: DetailIssue[]; meta: Meta; api: boolean; today: string; viewer?: { userId: string | null; role: string } | null }) {
+  const [nlPeople, setNlPeople] = useState<NlPeople>(EMPTY_PEOPLE);
+  useEffect(() => {
+    if (!api) return;
+    let live = true;
+    void fetchNlPeople(slug).then((p) => { if (live) setNlPeople(p); });
+    return () => { live = false; };
+  }, [api, slug]);
+  const people = useMemo<readonly Person[]>(() => (api ? peopleFromNl(nlPeople) : MOCK_PEOPLE), [api, nlPeople]);
+  const ME = api ? (viewer?.userId ?? nlPeople.me ?? '') : MOCK_ME;
+  return <PeopleCtx.Provider value={people}><MeCtx.Provider value={ME}><IssueDetailBody slug={slug} initial={initial} all={all} meta={meta} api={api} today={today} viewer={viewer} teamId={teamId} people={people} ME={ME} /></MeCtx.Provider></PeopleCtx.Provider>;
+}
+
+function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, teamId , people, ME}: { people: readonly Person[]; ME: string; teamId?: string; slug: string; initial: DetailIssue; all: DetailIssue[]; meta: Meta; api: boolean; today: string; viewer?: { userId: string | null; role: string } | null }) {
+  const who = (id: string | null | undefined) => findPerson(people, id);
   const [issue, setIssue] = useState<DetailIssue>(initial);
   const [others, setOthers] = useState<DetailIssue[]>(all.filter((i) => i.id !== initial.id));
   const [title, setTitle] = useState(initial.title);
@@ -115,7 +135,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
     switch (kind) {
       case 'status': return STATUSES.map((s) => ({ id: s, label: STATUS_LABEL[s], checked: issue.status === s, lead: <StatusIcon status={s} /> }));
       case 'priority': return PRIORITY_LABEL.map((l, p) => ({ id: String(p), label: l, checked: issue.priority === p, lead: <PriorityIcon priority={p as Issue['priority']} /> }));
-      case 'assignee': return [{ id: '', label: 'Unassigned', checked: !issue.assignee_id }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: issue.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+      case 'assignee': return [{ id: '', label: 'Unassigned', checked: !issue.assignee_id }, ...people.map((u) => ({ id: u.id, label: u.name, checked: issue.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
       case 'labels': return meta.labels.map((l) => ({ id: l.id, label: l.name, checked: issue.label_ids.includes(l.id) }));
       case 'project': return [{ id: '', label: 'No project', checked: !issue.project_id }, ...meta.projects.map((p) => ({ id: p.id, label: p.name, checked: issue.project_id === p.id }))];
       case 'cycle': return [{ id: '', label: 'No cycle', checked: !issue.cycle_id }, ...meta.cycles.map((c) => ({ id: c.id, label: c.name, checked: issue.cycle_id === c.id }))];
@@ -247,18 +267,23 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
   const project = meta.projects.find((p) => p.id === issue.project_id);
   const cycle = meta.cycles.find((c) => c.id === issue.cycle_id);
   const readOnly = !!issue.deleted_at;
+  // Prev/next: live issues of the workspace in identifier order (the list's default sort).
+  const nav = useMemo<HeaderNav | null>(() => {
+    const num = (i: DetailIssue) => Number(identifierOf(i).split('-').pop()) || 0;
+    const seq = [...all.filter((i) => !i.deleted_at && i.id !== issue.id), issue].sort((a, b) => num(a) - num(b));
+    const at = seq.findIndex((i) => i.id === issue.id);
+    if (at < 0 || seq.length < 2) return null;
+    const href = (i: DetailIssue | undefined) => (i ? `/w/${slug}/issue/${identifierOf(i)}` : null);
+    return { index: at, total: seq.length, prev: href(seq[at - 1]), next: href(seq[at + 1]) };
+  }, [all, issue, slug]);
+  const dueLabel = issue.due_date ? new Date(`${issue.due_date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : 'Set due date';
 
   return (
     <div className='idp'>
       <main className='idp-main' aria-label={`Issue ${ident}`}>
         <header className='idp-head'>
           <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>Issues</Link><span className='sep' aria-hidden='true'>/</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>/</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
-          <div className='idp-actions' role='toolbar' aria-label='Issue actions'>
-            <button onClick={() => void copyLink()} aria-keyshortcuts='Meta+. Control+.' title='Copy issue URL (⌘.)'>Copy link</button>
-            <button onClick={() => void copyBranch()} aria-keyshortcuts='Meta+Shift+. Control+Shift+.' title='Copy git branch name (⌘⇧.)'>Copy branch</button>
-            {!readOnly && (issue.archived_at ? <button onClick={() => void lifecycle('unarchive')}>Unarchive</button> : <button onClick={() => void lifecycle('archive')}>Archive</button>)}
-            {readOnly ? <button onClick={() => void lifecycle('restore')}>Restore</button> : <button className='danger' onClick={() => { if (window.confirm(`Delete ${ident}? You can restore it from the trash.`)) void lifecycle('delete'); }}>Delete</button>}
-          </div>
+          <IssueHeaderBar ident={ident} nav={nav} archived={!!issue.archived_at} readOnly={readOnly} onCopyLink={() => void copyLink()} onCopyBranch={() => void copyBranch()} onArchive={() => void lifecycle('archive')} onUnarchive={() => void lifecycle('unarchive')} onDelete={() => { if (window.confirm(`Delete ${ident}? You can restore it from the trash.`)) void lifecycle('delete'); }} onRestore={() => void lifecycle('restore')} />
         </header>
         {(issue.archived_at || issue.deleted_at) && <p className='idp-banner' role='status'>{issue.deleted_at ? 'This issue is in the trash. Restore it to edit.' : `Archived ${fmtDate(issue.archived_at as string)}.`}</p>}
         {parent && <Link className='parent-crumb' href={`/w/${slug}/issue/${identifierOf(parent)}`}><span className='id'>{identifierOf(parent)}</span> {parent.title}</Link>}
@@ -329,14 +354,14 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
         <dl>
           <dt>Status</dt><dd><button disabled={readOnly} onClick={open('status')} aria-haspopup='dialog'><StatusIcon status={issue.status} />{STATUS_LABEL[issue.status]}</button></dd>
           <dt>Priority</dt><dd><button disabled={readOnly} onClick={open('priority')} aria-haspopup='dialog'><PriorityIcon priority={issue.priority} />{PRIORITY_LABEL[issue.priority]}</button></dd>
-          <dt>Assignee</dt><dd><button disabled={readOnly} onClick={open('assignee')} aria-haspopup='dialog'>{assignee && <Avatar initials={assignee.initials} hue={assignee.hue} />}{assignee?.name ?? 'Unassigned'}</button></dd>
-          <dt>Labels</dt><dd><button disabled={readOnly} onClick={open('labels')} aria-haspopup='dialog'>{issue.label_ids.length ? issue.label_ids.map((l) => { const m = meta.labels.find((x) => x.id === l); return <span key={l} className={`chip ${m?.hue ?? ''}`}>{m?.name ?? l}</span>; }) : 'Add label'}</button></dd>
-          <dt><label htmlFor='prop-est'>Estimate</label></dt><dd><select id='prop-est' disabled={readOnly} value={issue.estimate ?? ''} onChange={(e) => void update({ estimate: e.target.value === '' ? null : Number(e.target.value) }, e.target.value === '' ? 'removed the estimate' : `set estimate to ${e.target.value}`)}><option value=''>No estimate</option>{ESTIMATES.map((n) => <option key={n} value={n}>{n} pt{n === 1 ? '' : 's'}</option>)}</select></dd>
-          <dt><label htmlFor='prop-due'>Due date</label></dt><dd><input id='prop-due' type='date' disabled={readOnly} className={`due-${due}`} value={issue.due_date ?? ''} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} />{due === 'overdue' && <span className='due-flag'>Overdue</span>}</dd>
-          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</button></dd>
-          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'>{project?.name ?? 'Add to project'}</button></dd>
-          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'>{cycle?.name ?? 'Add to cycle'}</button></dd>
-          <dt>Branch</dt><dd><code className='branch'>{branch}</code></dd>
+          <dt>Assignee</dt><dd><button disabled={readOnly} onClick={open('assignee')} aria-haspopup='dialog'>{assignee ? <Avatar initials={assignee.initials} hue={assignee.hue} /> : <PropIcon name='user' />}<span className={assignee ? undefined : 'prop-empty'}>{assignee?.name ?? 'Unassigned'}</span></button></dd>
+          <dt>Labels</dt><dd><button disabled={readOnly} onClick={open('labels')} aria-haspopup='dialog'>{issue.label_ids.length ? issue.label_ids.map((l) => { const m = meta.labels.find((x) => x.id === l); return <span key={l} className={`chip ${m?.hue ?? ''}`}>{m?.name ?? l}</span>; }) : <><PropIcon name='label' /><span className='prop-empty'>Add label</span></>}</button></dd>
+          <dt><label htmlFor='prop-est'>Estimate</label></dt><dd className='prop-native'><span className='prop-pill' aria-hidden='true'><PropIcon name='estimate' /><span className={issue.estimate == null ? 'prop-empty' : undefined}>{issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}</span></span><select id='prop-est' disabled={readOnly} value={issue.estimate ?? ''} onChange={(e) => void update({ estimate: e.target.value === '' ? null : Number(e.target.value) }, e.target.value === '' ? 'removed the estimate' : `set estimate to ${e.target.value}`)}><option value=''>No estimate</option>{ESTIMATES.map((n) => <option key={n} value={n}>{n} pt{n === 1 ? '' : 's'}</option>)}</select></dd>
+          <dt><label htmlFor='prop-due'>Due date</label></dt><dd className='prop-native'><span className={`prop-pill due-${due}`} aria-hidden='true'><PropIcon name='due' /><span className={issue.due_date ? undefined : 'prop-empty'}>{dueLabel}</span>{due === 'overdue' && <span className='due-flag'>Overdue</span>}</span><input id='prop-due' type='date' disabled={readOnly} value={issue.due_date ?? ''} onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* not supported */ } }} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} /></dd>
+          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'><PropIcon name='parent' /><span className={parent ? 'prop-trunc' : 'prop-empty'}>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</span></button></dd>
+          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'><PropIcon name='project' /><span className={project ? 'prop-trunc' : 'prop-empty'}>{project?.name ?? 'Add to project'}</span></button></dd>
+          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
+          <dt>Branch</dt><dd><button className='branch-btn' onClick={() => void copyBranch()} title={`${branch} (click to copy)`} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code></button></dd>
         </dl>
       </aside>
       {pick && <Picker title={pickTitle[pick.kind]} multi={pick.kind === 'labels'} anchor={pick.rect} options={options(pick.kind)} onPick={(id) => void onPick(id)} onClose={() => setPick(null)} />}
@@ -346,6 +371,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
 }
 
 function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, canDelete, readOnly }: { c: Comment; replies: Comment[]; onReact: (c: Comment, e: string) => void; onReply: (b: string) => Promise<boolean>; onEdit: (c: Comment, b: string) => Promise<boolean>; onDelete: (c: Comment) => void; canEdit: (c: Comment) => boolean; canDelete: (c: Comment) => boolean; readOnly: boolean }) {
+  const people = useContext(PeopleCtx); const ME = useContext(MeCtx); const who = (id: string | null | undefined) => findPerson(people, id);
   const [replying, setReplying] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const one = (x: Comment) => (
@@ -368,12 +394,13 @@ function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, 
 }
 
 function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLabel }: { label: string; onSubmit: (b: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean; initial?: string; submitLabel?: string }) {
+  const people = useContext(PeopleCtx);
   const [text, setText] = useState(initial);
   const [caret, setCaret] = useState(initial.length);
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
   const at = activeMention(text, caret);
-  const list = at ? suggest(MENTION_USERS, at.query) : [];
+  const list = at ? suggest(mentionUsers(people), at.query) : [];
   const idx = Math.min(sel, Math.max(list.length - 1, 0));
   const listId = useMemo(() => lid('ml'), []);
   function choose(u: MentionUser) {
