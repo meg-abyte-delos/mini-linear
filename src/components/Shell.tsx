@@ -10,6 +10,7 @@ import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/l
 import { createStore } from '@/lib/mock-api';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
+import { ProgressRing } from '@/components/ProgressRing';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
@@ -685,7 +686,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                       <div key={c.id} className='cycle' data-cycle={c.id} data-bucket={b.id}>
                         <span className='cy-name'>{c.name}</span>
                         <span className='cy-dates'>{fmtDate(c.start_date)} to {fmtDate(c.end_date)}</span>
-                        <svg className='cy-prog' role='img' aria-label={`${pct}% complete, ${done} of ${its.length} issues`}><rect className='cy-prog-fill' x='0' y='0' height='100%' width={`${pct}%`} /></svg>
+                        <ProgressRing pct={pct} size={18} showPct={false} tone={b.id === 'past' ? 'muted' : undefined} label={`${pct}% complete, ${done} of ${its.length} issues`} />
                         <span className='cy-count'>{done}/{its.length}</span>
                         <button onClick={() => { setFilters({ ...emptyFilters(), cycle: [c.id] }); setView('list'); }}>View issues</button>
                       </div>
