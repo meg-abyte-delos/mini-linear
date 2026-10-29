@@ -10,11 +10,13 @@
 .presence[data-size='md'] .presence-av .av { width:22px; height:22px; font-size:10px; }
 .presence-more { margin-left:4px; font-size:11px; line-height:18px; padding:0 5px; border-radius:9px; color:var(--fg); background:var(--raised, var(--panel)); box-shadow:0 0 0 1px var(--line); font-variant-numeric:tabular-nums; }
 [data-theme='dark'] .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-/* Board: cards sit on --raised (globals.css .card), selected cards on --sel; column headers on --panel. */
+/* Board: cards sit on --raised (globals.css .card), selected cards on --sel over --raised; column headers on --panel. */
 .board .presence-av { box-shadow:0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent); }
 .board .presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--panel); }
 .card .presence-av { box-shadow:0 0 0 2px var(--raised), 0 0 0 3.5px var(--accent); }
 .card .presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--raised); }
-.card[aria-selected=true] .presence-av { box-shadow:0 0 0 2px var(--sel), 0 0 0 3.5px var(--accent); }
-.card[aria-selected=true] .presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--sel); }
+/* --sel is translucent (teal 12%): a cutout in --sel would show the avatar behind it. Flatten it onto --raised. */
+.card[aria-selected=true] { --sel-solid:color-mix(in srgb, var(--sel) 12%, var(--raised)); }
+.card[aria-selected=true] .presence-av { box-shadow:0 0 0 2px var(--sel-solid), 0 0 0 3.5px var(--accent); }
+.card[aria-selected=true] .presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--sel-solid); }
 @media (prefers-reduced-motion: reduce) { .presence-av { transition:none; } .presence-av:hover { transform:none; } }
