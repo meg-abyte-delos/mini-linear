@@ -90,7 +90,7 @@ test('group header "+": creates an issue in that status, keyboard reachable, lab
   await home(page);
   const n = () => group(page, 'Todo').locator('.row').count();
   const before = await n();
-  const add = group(page, 'Todo').getByRole('button', { name: 'New issue in Todo' });
+  const add = group(page, 'Todo').getByRole('button', { name: 'Add issue to Todo' });
   const created = page.waitForResponse((r) => r.request().method() === 'POST' && /\/issues$/.test(r.url()));
   await add.focus(); await expect(add).toBeVisible();
   await page.keyboard.press('Enter');
@@ -154,7 +154,7 @@ test('Display: popover dialog; Grouping "No grouping" -> single "All issues" gro
   await dlg.getByLabel('Grouping').selectOption('none');
   await expect(page.getByRole('heading', { name: /All issues/ })).toBeVisible();
   await expect(page.locator('section.group')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: /^New issue in / })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Add issue to / })).toHaveCount(0);
   await expect(rowOf(page, T.plain)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dlg).toBeHidden(); await expect(btn).toBeFocused();
