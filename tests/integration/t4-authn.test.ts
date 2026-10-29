@@ -86,9 +86,12 @@ describe.runIf(runIntegration)('T4 login', () => {
   });
   it('IP rate limit is independent of the account lockout', async () => {
     const ip = { 'x-forwarded-for': '10.7.7.7' };
-    let last = 0;
-    for (let i = 0; i < 40; i++) last = (await login(uniq(), 'wrong-password-123', ip)).status;
-    expect(last).toBe(429);
+    // Fixed-window limiter: a burst can straddle a window boundary and split its count in two.
+    // Start from a clean table and stop at the first 429 (bounded) instead of asserting on attempt #40.
+    await resetRl();
+    let saw429 = false;
+    for (let i = 0; i < 80 && !saw429; i++) saw429 = (await login(uniq(), 'wrong-password-123', ip)).status === 429;
+    expect(saw429, 'IP limiter must return 429 within 80 attempts').toBe(true);
     await resetRl(); // lockout phase is separate from the IP-limit phase
     const { email } = await signup();
     expect((await login(email, PW, { 'x-forwarded-for': '10.7.7.8' })).status).toBe(200);
