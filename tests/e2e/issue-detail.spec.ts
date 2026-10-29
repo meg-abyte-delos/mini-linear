@@ -42,9 +42,10 @@ test('inline title, properties and activity', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set status to Done');
   await page.getByLabel('Estimate').selectOption('5');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
-  await page.getByLabel('Due date').fill('2026-10-20');
-  // Wait for the update to land (activity entry) before asserting the derived Overdue state.
-  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2026-10-20');
+  // The ?today= override is ignored when the server runs a production build (CI), so the page compares against the real clock.
+  // Use a date that is in the past on any clock, not one relative to the pinned 2026-10-28.
+  await page.getByLabel('Due date').fill('2020-01-01');
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2020-01-01');
   await expect(page.getByText('Overdue')).toBeVisible();
 });
 
