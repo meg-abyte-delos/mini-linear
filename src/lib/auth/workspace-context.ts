@@ -9,6 +9,10 @@ import { HttpError, type ApiConfig } from '@/lib/remote';
 
 export const DEFAULT_WORKSPACE_SLUG = 'demo';
 
+/** What the home screen shows when the user has no usable workspace: 404 = not a member of any (or no team), the rest = our failure. */
+export type WorkspaceProblem = 'no-workspace' | 'unavailable';
+export const problemFor = (status: number): WorkspaceProblem => (status === 404 ? 'no-workspace' : 'unavailable');
+
 type Item = { slug: string; id: string };
 /** Pure choice: preferred slug when the user is a member, else the first workspace. */
 export const pickWorkspace = (items: Item[], preferred = DEFAULT_WORKSPACE_SLUG): Item | null => items.find((w) => w.slug === preferred) ?? items[0] ?? null;
