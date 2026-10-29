@@ -4,7 +4,8 @@ import { parseFilters, TODAY_RE } from '@/lib/filters';
 import { seedIssues, MOCK_META, type Issue, type Meta } from '@/lib/issues';
 import { redirect } from 'next/navigation';
 import { loadRemote, loadRole, HttpError } from '@/lib/remote';
-import { getWorkspaceContext } from '@/lib/auth/workspace-context';
+import { getWorkspaceContext, problemFor } from '@/lib/auth/workspace-context';
+import { WorkspaceState } from '@/components/WorkspaceState';
 
 const parseView = (v: string | string[] | undefined) => { const x = Array.isArray(v) ? v[0] : v; return x === 'board' || x === 'cycles' || x === 'projects' || x === 'inbox' ? x : 'list'; };
 
@@ -23,7 +24,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   let error: string | null = null;
   let meta: Meta = MOCK_META;
   let truncated = false;
-  const api = await getWorkspaceContext(); // API is the only mode; redirects to /login without a session
+  // API is the only mode. No session -> getWorkspaceContext redirects to /login. Any other failure gets a dedicated page, not the generic Next error.
+  let api: Awaited<ReturnType<typeof getWorkspaceContext>>;
+  try { api = await getWorkspaceContext(); } catch (e) {
+    if (!(e instanceof HttpError)) throw e; // includes Next's redirect signal
+    console.error('getWorkspaceContext failed:', e.message);
+    return <WorkspaceState problem={problemFor(e.status)} />;
+  }
   // Read-only is derived from the session role (guest).
   let readOnly = false;
   try {
