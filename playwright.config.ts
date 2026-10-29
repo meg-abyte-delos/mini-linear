@@ -27,6 +27,9 @@ const PENDING_MIGRATION = [
 ];
 export default defineConfig({
   testDir: 'tests/e2e',
+  // One worker: all specs share one persistent Postgres and the live change feed (SSE) pushes every mutation to every open tab,
+  // so parallel files interfere with each other (rows move, counts change mid-test).
+  workers: 1,
   // PR 1b (front mock->API): these specs assert mock fixture data or mock-only hooks (?state=, ?role=guest, cycle c2, project p1,
   // notifications) that the demo seed does not have. They are skipped, not deleted: migrate them together with the seed, then drop this line.
   grepInvert: new RegExp(PENDING_MIGRATION.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')),
