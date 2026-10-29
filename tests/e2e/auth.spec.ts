@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 
+// Auth specs run signed out (the other specs reuse the demo session from global-setup).
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test('login form posts credentials and honours a safe next', async ({ page }) => {
   let body = '';
   await page.route('**/api/v1/auth/login', async (r) => { body = r.request().postData() ?? ''; await r.fulfill({ status: 200, json: { status: 'ok' } }); });
@@ -28,4 +31,9 @@ test('signup shows the check-your-email state on 202', async ({ page }) => {
   await page.getByLabel('Password').fill('longenough1');
   await page.getByRole('button', { name: 'Sign up' }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
+});
+
+test('anonymous visitors are sent to /login (no silent fallback)', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/login$/);
 });
