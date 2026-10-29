@@ -38,7 +38,9 @@ describe.skipIf(!runIntegration)('bulk cross-workspace', () => {
   // Contract: partial batch, 200 + per-id result. A foreign id is reported not_found (no existence leak) and left untouched.
   it('ids d un autre workspace: not_found par id, valeur inchangée en base', async () => {
     const dbPriority = async (id: string) => {
-      const p = new pg.Pool({ connectionString: process.env.PGSUPER_URL ?? process.env.DATABASE_OWNER_URL, max: 1 });
+      const url = process.env.PGSUPER_URL ?? process.env.DATABASE_OWNER_URL;
+      if (!url) throw new Error('PGSUPER_URL or DATABASE_OWNER_URL is required'); // never fall back to PG* defaults
+      const p = new pg.Pool({ connectionString: url, max: 1 });
       try { return (await p.query('select priority from issues where id = $1', [id])).rows[0]?.priority as number; } finally { await p.end(); }
     };
     const before = await dbPriority(W.i2);
