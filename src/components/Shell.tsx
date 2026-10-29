@@ -456,7 +456,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       if (Object.keys(remote).length) push(id, remote);
     }
     sync(); } }] : [];
-  const results: Cmd[] = [...nlCmd, ...baseResults];
+  // Only an explicit leading verb puts the action first; otherwise ('fix for Ada') search hits keep Enter.
+  const nlFirst = /^\s*(assign|unassign|move|mark|set|label|prioriti[sz]e)\b/i.test(q);
+  const results: Cmd[] = nlFirst ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
