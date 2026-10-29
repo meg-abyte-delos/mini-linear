@@ -13,6 +13,8 @@ describe('loginRedirect', () => {
 describe('safeNext', () => {
   it('accepts relative paths only', () => {
     expect(safeNext('/w/a')).toBe('/w/a');
-    for (const bad of ['//evil.com', 'https://evil.com', '/\\evil.com', '', null, undefined]) expect(safeNext(bad as string)).toBe('/');
+    for (const bad of ['//evil.com', 'https://evil.com', '/\\evil.com', '', null, undefined, '/\t/evil.com', '/\n/evil.com', '/\r/evil.com', '/ /evil.com']) expect(safeNext(bad as string)).toBe('/');
   });
+  it('allows a percent-encoded tab (same origin, no decoding)', () => expect(safeNext('/%09/evil.com')).toBe('/%09/evil.com'));
+  it('keeps query and hash', () => expect(safeNext('/w/a?x=1#h')).toBe('/w/a?x=1#h'));
 });
