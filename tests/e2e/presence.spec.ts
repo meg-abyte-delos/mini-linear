@@ -84,3 +84,49 @@ test('anonymous heartbeat is 401', async ({ playwright, baseURL }) => {
   expect(r.status()).toBe(401);
   await anon.dispose();
 });
+
+test('guest sees only themselves plus the count, and not a deleted issue', async ({ page, browser }) => {
+  const pool = new pg.Pool({ connectionString: owner, max: 1 });
+  const GUEST = 'presence-guest@example.test'; let guestId = '';
+  const w = '00000000-0000-4000-8000-000000000001';
+  await page.goto('/'); await page.waitForSelector('html[data-ready]');
+  const issue = await apiCreateIssue(page, `presence-guest-${Date.now()}`);
+  const gone = await apiCreateIssue(page, `presence-guest-gone-${Date.now()}`);
+  try {
+    const hash = await hashPassword(pass!);
+    await pool.query(`insert into users (id, email, password_hash, email_verified_at) values (gen_random_uuid(), $1, $2, now())
+      on conflict (lower(email)) do update set password_hash = excluded.password_hash`, [GUEST, hash]);
+    guestId = (await pool.query('select id from users where lower(email) = $1', [GUEST])).rows[0].id;
+    const me = (await (await page.request.get('/api/v1/me')).json()).id as string;
+    const c = await pool.connect();
+    try {
+      await c.query('begin');
+      await c.query("select set_config('app.workspace_id', $1, true)", [w]);
+      await c.query("insert into memberships (id, workspace_id, user_id, role) values (gen_random_uuid(), $1, $2, 'guest') on conflict (workspace_id, user_id) do update set role = 'guest'", [w, guestId]);
+      for (const id of [issue.id, gone.id]) await c.query('insert into issue_shares (workspace_id, issue_id, guest_user_id, shared_by) values ($1,$2,$3,$4) on conflict do nothing', [w, id, guestId, me]);
+      await c.query('commit');
+    } catch (e) { await c.query('rollback'); throw e; } finally { c.release(); }
+  } finally { await pool.end(); }
+
+  const url = `/api/v1/w/${DEMO.slug}/presence`;
+  expect((await page.request.post(url, { data: { issue_id: issue.id } })).status()).toBe(200);
+  const ctxG = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const pgst = await ctxG.newPage();
+  expect((await pgst.request.post('/api/v1/auth/login', { data: { email: GUEST, password: pass } })).ok()).toBeTruthy();
+  const r = await pgst.request.post(url, { data: { issue_id: issue.id } });
+  expect(r.status()).toBe(200);
+  const body = await r.json();
+  expect(body.viewers.map((v: { user_id: string }) => v.user_id)).toEqual([guestId]);
+  expect(body.count).toBe(2);
+
+  await pgst.goto('/');
+  await listen(pgst);
+  await expect.poll(() => last(pgst, issue.id), { timeout: 15_000 }).toMatchObject({ viewers: [guestId], count: 2 });
+
+  expect((await page.request.delete(`/api/v1/w/${DEMO.slug}/issues/${gone.id}`, { headers: { 'if-match': `"${gone.version}"` } })).status()).toBeLessThan(300);
+  expect((await pgst.request.post(url, { data: { issue_id: gone.id } })).status()).toBe(404);
+
+  await page.request.delete(url, { data: { issue_id: issue.id } });
+  await pgst.request.delete(url, { data: { issue_id: issue.id } });
+  await ctxG.close();
+});

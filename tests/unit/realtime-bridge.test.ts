@@ -40,3 +40,21 @@ describe('realtime bridge', () => {
     expect(out.map((i) => i.id)).toEqual(['a', 'b']); expect(urls[1]).toContain('cursor=c1');
   });
 });
+
+describe('presence after reconnect', () => {
+  it('drops ghost viewers on reconnect and on resync, keeps those of the new snapshot', async () => {
+    const { publishPresence, presenceOf, resetPresence } = await import('@/lib/presence');
+    resetPresence();
+    const f = fakeES();
+    const stop = startIssueRealtime({ slug: 'w', known: () => undefined, upsert: vi.fn(), remove: vi.fn(), resync: vi.fn(), onPresence: publishPresence, eventSource: () => f.es });
+    f.es.onopen?.({});
+    f.emit('presence', { issue_id: 'i1', viewers: ['u1'], count: 1 });
+    expect(presenceOf('i1').count).toBe(1);
+    f.es.onopen?.({});
+    expect(presenceOf('i1').count).toBe(0);
+    f.emit('presence', { issue_id: 'i2', viewers: ['u2'], count: 1 });
+    f.emit('resync', {}); await flush();
+    expect(presenceOf('i2').count).toBe(0);
+    stop(); resetPresence();
+  });
+});

@@ -106,10 +106,10 @@ export type PresenceSnapshot = { issue_id: string; viewers: string[]; count: num
 /** Fresh viewers of every issue the caller can see, one entry per issue. Guests get themselves and a count only. */
 export async function readPresence(ctx: Ctx): Promise<PresenceSnapshot[]> {
   const vis = ctx.role === 'guest'
-    ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = p.issue_id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)`
+    ? ctx.tx`exists (select 1 from issue_shares s join issues i on i.id = s.issue_id where s.issue_id = p.issue_id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null and i.deleted_at is null)`
     : ctx.tx`exists (select 1 from issues i where i.id = p.issue_id and i.deleted_at is null and ${teamVisible(ctx, 'i.team_id')})`;
   const rows = await ctx.tx<{ issue_id: string; user_id: string }[]>`select p.issue_id, p.user_id from issue_presence p
-    where p.seen_at > now() - make_interval(secs => ${PRESENCE_TTL_S}) and ${vis} order by p.issue_id, p.seen_at desc`;
+    where p.seen_at > now() - make_interval(secs => ${PRESENCE_TTL_S}) and ${vis} order by p.issue_id, p.user_id`; // stable order: no event every poll when nothing changed
   const m = new Map<string, string[]>();
   for (const r of rows) m.set(r.issue_id, [...(m.get(r.issue_id) ?? []), r.user_id]);
   return [...m].map(([issue_id, ids]) => ({ issue_id, viewers: ctx.role === 'guest' ? ids.filter((u) => u === ctx.userId) : ids, count: ids.length }));

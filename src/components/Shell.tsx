@@ -9,7 +9,7 @@ import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/mock-api';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
-import { publishPresence } from '@/lib/presence';
+import { publishPresence, resetPresence } from '@/lib/presence';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { ProgressRing } from '@/components/ProgressRing';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
@@ -79,6 +79,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [rtTick, setRtTick] = useState(0);
   useEffect(() => {
     if (!api) return;
+    resetPresence(); // another workspace or a remount: never carry over viewers of the previous stream
     return startIssueRealtime({
       slug: api.slug,
       known: (id) => versions.current.get(id),

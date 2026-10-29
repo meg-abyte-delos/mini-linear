@@ -64,7 +64,7 @@ export async function eventsRoute(req: Request, slug: string): Promise<Response>
     start(c) {
       const send = (s: string) => { if (closed) return; try { c.enqueue(enc.encode(s)); lastWrite = Date.now(); } catch { release(); } };
       const emit = (p: FeedPage) => {
-        if (p.resync) send(frame({ id: p.cursor, event: 'resync', data: { cursor: p.cursor } }));
+        if (p.resync) { seen.clear(); /* client drops its presence on resync: resend the snapshot */ send(frame({ id: p.cursor, event: 'resync', data: { cursor: p.cursor } })); }
         for (const e of p.events) send(frame({ id: e.id, event: `${e.entity}.${e.op}`, data: e }));
         if (p.events.length === 0 && !p.resync && cursor !== p.cursor) send(`id: ${p.cursor}\n\n`); // advance Last-Event-ID past filtered events
         cursor = p.cursor;
