@@ -115,8 +115,7 @@ test('copy branch shortcut, archive and unarchive', async ({ page, context }) =>
   await expect(page.locator('.idp-banner')).toHaveCount(0);
 });
 
-// FIXME: on the API, Delete from the issue page does not put the page in the trash state (no banner after confirming). Cause not investigated yet.
-test.fixme('delete and restore', async ({ page }) => {
+test('delete and restore', async ({ page }) => {
   await ready(page);
   page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'Delete' }).click();
@@ -155,4 +154,13 @@ test('comments: edit, delete, and one chronological timeline with change events'
   await c.getByRole('button', { name: 'Delete comment' }).click();
   await expect(page.getByRole('article', { name: /Comment by/ })).toHaveCount(0);
   await expect(feed).toContainText('deleted a comment');
+});
+
+// FIXME(PR 4, members directory): the assignee step of the timeline test was removed because the assignee picker needs the members directory.
+// Restore it here once PR 4 lands: assign a member, expect 'changed the assignee' interleaved with the comment in time order.
+test.fixme('timeline: assignee change interleaves with comments', async ({ page }) => {
+  await ready(page);
+  await page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: /assignee|unassigned/i }).first().click();
+  await page.getByRole('option').first().click();
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('assignee');
 });
