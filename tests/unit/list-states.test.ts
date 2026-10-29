@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listIssues, parseSimState } from '@/lib/mock-api';
+import { listIssues, parseSimState } from '@/lib/sim-store';
 
 describe('listIssues simulation states', () => {
   it('parses only known states', () => {

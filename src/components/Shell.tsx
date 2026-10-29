@@ -7,7 +7,7 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scop
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
-import { createStore } from '@/lib/mock-api';
+import { createStore } from '@/lib/sim-store';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { ProgressRing } from '@/components/ProgressRing';
