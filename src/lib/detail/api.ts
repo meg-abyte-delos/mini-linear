@@ -39,7 +39,7 @@ export function detailApi(slug: string, f: Fetch = (...a) => fetch(...a)) {
     deleteComment: (cid: string, version: number) => call<null>(f, `${b}/comments/${cid}`, { method: 'DELETE', headers: { 'if-match': `"${version}"` } }),
     react: (cid: string, emoji: string, on: boolean) => call<null>(f, `${b}/comments/${cid}/reactions`, j(on ? 'POST' : 'DELETE', { emoji })),
     archive: (id: string, on: boolean) => call<unknown>(f, `${b}/issues/${id}/${on ? 'archive' : 'unarchive'}`, j('POST')),
-    remove: (id: string) => call<null>(f, `${b}/issues/${id}`, j('DELETE')),
+    remove: (id: string, version: number) => call<null>(f, `${b}/issues/${id}`, { ...j('DELETE'), headers: { 'if-match': `"${version}"` } }),
     restore: (id: string) => call<unknown>(f, `${b}/issues/${id}/restore`, j('POST')),
   };
 }
