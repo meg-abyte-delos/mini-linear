@@ -15,4 +15,9 @@
 @media (prefers-color-scheme: dark) { html:not([data-theme]) .ring[data-tone='accent'] .ring-svg { filter:drop-shadow(0 0 3px rgba(40,171,165,.45)); } }
 .rm-name .ring { margin-left:auto; }
 .cycle[data-bucket='past'] .ring-s0, .cycle[data-bucket='past'] .ring-s1 { stop-color:var(--muted); }
+/* Cycles / Projects rows: the ring took the old bar's 1fr grid cell and sat at its start, ~300-530px away from
+   the count in the next cell. Pin it to the end of its cell so ring + count read as one unit (8px apart).
+   margin-left:auto covers the flex fallback. */
+.cycle > .ring { justify-self:end; margin-left:auto; margin-right:calc(8px - var(--sp-4, 16px)); }
+.cycle > .ring + .cy-count { justify-self:start; }
 @media (prefers-reduced-motion: reduce) { .ring-arc { transition:none; } }

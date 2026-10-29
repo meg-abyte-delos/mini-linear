@@ -1,11 +1,18 @@
 /* Bulk bar (SelectionBar) in Delos Night: floating frosted pill, centered at the bottom,
-   teal counter, ghost action buttons. Dark only (data-theme=dark or system dark); light untouched.
-   Contrast: text stays --fg / --muted on --glass over --n-bg (>= 7:1 / >= 4.5:1),
-   counter #fff on accent #28aba5 is 3:1 at bold 12px -> counter text uses --n-bg (#0b0c0e) on accent: 7.3:1.
-   z-index stays 40 (ui-night.css): above .head (20) and .panel (30), under .overlay (50) and pickers (60). */
+   teal counter dot, ghost action buttons. Dark only (data-theme=dark AND system dark); light untouched.
+   Contrast: text stays --fg / --muted / --accent on --glass over --n-bg (AA tokens).
+   Layering: .selbar and .toast are both z 40 (ui-night.css) at bottom:20px. The toast ("N selected, Esc to clear")
+   is lifted above the bar while a selection is active, so it never covers the actions. Pickers are NOT children of
+   .selbar (SelectionBar renders no Picker; Shell mounts it beside the bar), so the backdrop-filter containing block
+   cannot trap them. Same-specificity glow conflicts on .card are resolved at the end of this file (last import). */
 
-:is([data-theme='dark'], html:not([data-theme])) .selbar { --bk:1; }
+/* ---------- selection hint / toast: above the bar, any theme ----------
+   No theme prefix: data-theme may sit on <html> or <body>, and `[data-theme] body` would miss the latter.
+   Bar = 20px offset + 40px height (28px buttons + 2x6px padding) -> hint sits 8px above it. */
+body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
+.selbar [role='tooltip'], .selbar .selbar-hint { position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); pointer-events:none; white-space:nowrap; }
 
+/* ---------- explicit dark ---------- */
 [data-theme='dark'] .selbar {
   position:fixed; left:50%; bottom:20px; transform:translateX(-50%);
   display:flex; align-items:center; gap:2px;
@@ -40,6 +47,7 @@
 [data-theme='dark'] .selbar .selbar-clear { color:var(--muted); }
 [data-theme='dark'] .selbar .selbar-clear:hover { color:var(--fg); }
 
+/* ---------- system dark (no data-theme): same rules ---------- */
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) .selbar {
     position:fixed; left:50%; bottom:20px; transform:translateX(-50%);
@@ -50,12 +58,53 @@
     border:1px solid rgba(255,255,255,.10);
     box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 12px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4);
     color:var(--fg); font-size:13px; white-space:nowrap;
+    animation:bulk-in .16s ease-out;
   }
-  html:not([data-theme]) .selbar > button { height:28px; padding:0 10px; border-radius:7px; background:transparent; border:1px solid transparent; color:var(--fg); }
+  html:not([data-theme]) .selbar-count {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:0 10px 0 4px; margin-right:4px; height:28px;
+    border-right:1px solid var(--line); color:var(--fg); font-weight:500;
+    font-variant-numeric:tabular-nums;
+  }
+  html:not([data-theme]) .selbar-count::before {
+    content:''; width:8px; height:8px; border-radius:50%;
+    background:var(--accent); box-shadow:var(--accent-bar-glow);
+  }
+  html:not([data-theme]) .selbar > button {
+    height:28px; padding:0 10px; border-radius:7px;
+    background:transparent; border:1px solid transparent;
+    color:var(--fg); font:inherit; cursor:pointer;
+    transition:background-color .12s ease, border-color .12s ease;
+  }
   html:not([data-theme]) .selbar > button:hover { background:var(--hover); border-color:var(--line); }
-  html:not([data-theme]) .selbar-count { padding:0 10px 0 4px; margin-right:4px; border-right:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  html:not([data-theme]) .selbar > button[aria-expanded=true] { background:var(--sel); box-shadow:var(--accent-halo); }
+  html:not([data-theme]) .selbar > button:focus-visible { outline:1px solid var(--accent); box-shadow:var(--accent-ring); }
+  html:not([data-theme]) .selbar .selbar-undo { color:var(--accent); margin-left:4px; border-left:1px solid var(--line); border-radius:0 7px 7px 0; }
+  html:not([data-theme]) .selbar .selbar-clear { color:var(--muted); }
+  html:not([data-theme]) .selbar .selbar-clear:hover { color:var(--fg); }
+  /* card depth + selected glow, mirrored from ui-night.css */
+  html:not([data-theme]) .card { box-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 4px 12px rgba(0,0,0,.25); }
+  html:not([data-theme]) .card:hover { border-color:rgba(255,255,255,.12); }
 }
 
 @keyframes bulk-in { from { opacity:0; transform:translate(-50%, 8px); } to { opacity:1; transform:translate(-50%, 0); } }
-@media (prefers-reduced-motion: reduce) { [data-theme='dark'] .selbar { animation:none; } [data-theme='dark'] .selbar > button { transition:none; } }
-@media (max-width: 640px) { [data-theme='dark'] .selbar { left:8px; right:8px; transform:none; overflow-x:auto; animation:none; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='dark'] .selbar, html:not([data-theme]) .selbar { animation:none; }
+  [data-theme='dark'] .selbar > button, html:not([data-theme]) .selbar > button { transition:none; }
+}
+@media (max-width: 640px) {
+  [data-theme='dark'] .selbar, html:not([data-theme]) .selbar { left:8px; right:8px; transform:none; overflow-x:auto; animation:none; }
+}
+
+/* ---------- selected card wins, whatever the order ----------
+   ui-night.css has .card:hover and .card[aria-selected=true] at the same specificity (0,3,0) and a global
+   :focus-visible ring: hover/focus could replace the selected border + glow depending on import order.
+   Locked here with explicit combined states (0,4,0), focus ring added on top of the glow. */
+[data-theme='dark'] .card[aria-selected=true],
+[data-theme='dark'] .card[aria-selected=true]:hover { border-color:var(--accent); box-shadow:var(--accent-glow); }
+[data-theme='dark'] .card[aria-selected=true]:focus-visible { border-color:var(--accent); box-shadow:var(--accent-glow), var(--accent-ring); }
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .card[aria-selected=true],
+  html:not([data-theme]) .card[aria-selected=true]:hover { border-color:var(--accent); box-shadow:var(--accent-glow); }
+  html:not([data-theme]) .card[aria-selected=true]:focus-visible { border-color:var(--accent); box-shadow:var(--accent-glow), var(--accent-ring); }
+}
