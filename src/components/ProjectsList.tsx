@@ -3,14 +3,37 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/icons';
 import { ProgressRing } from '@/components/ProgressRing';
 import { USERS, fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
+import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, timelineWidth, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
 
-interface Props { projects: readonly ProjectMeta[]; issues: readonly Issue[]; today: string; canOpen: boolean; onOpen: (id: string) => void; onViewIssues: (id: string) => void }
+// slug set = API mode: leads are workspace member UUIDs, resolved via GET members (same source as the Cmd+K palette).
+// Without slug (mock mode) the USERS mock still applies.
+interface Props { projects: readonly ProjectMeta[]; issues: readonly Issue[]; today: string; canOpen: boolean; onOpen: (id: string) => void; onViewIssues: (id: string) => void; slug?: string | null }
 
-export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewIssues }: Props) {
+type Hue = (typeof USERS)[number]['hue'];
+const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+
+export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewIssues, slug = null }: Props) {
   const [mode, setMode] = useState<'list' | 'roadmap'>('list');
+  const [people, setPeople] = useState<NlPeople>(EMPTY_PEOPLE);
+  const [peopleLoaded, setPeopleLoaded] = useState(!slug);
+  useEffect(() => {
+    if (!slug) return;
+    let live = true;
+    setPeopleLoaded(false);
+    void fetchNlPeople(slug).then((p) => { if (live) setPeople(p); }).finally(() => { if (live) setPeopleLoaded(true); });
+    return () => { live = false; };
+  }, [slug]);
   const sorted = sortProjects(projects);
-  const lead = (id?: string | null) => USERS.find((u) => u.id === id)?.name ?? (id ? 'Unknown' : 'No lead');
+  const person = (id?: string | null): { name: string; initials: string; hue: Hue } | null => {
+    if (!id) return null;
+    const m = people.users.find((u) => u.id === id);
+    if (m) return { name: m.name, initials: initialsOf(m.name), hue: 'h2' as Hue };
+    const u = USERS.find((x) => x.id === id);
+    return u ? { name: u.name, initials: u.initials, hue: u.hue } : null;
+  };
+  // While members load, show nothing rather than a flash of 'Unknown'.
+  const lead = (id?: string | null) => (!id ? 'No lead' : person(id)?.name ?? (peopleLoaded ? 'Unknown' : '\u00a0'));
   const dated = sorted.some((p) => p.start_date || p.target_date);
   const range = dated ? roadmapRange([...sorted.map((p) => ({ start: p.start_date, end: p.target_date })), { start: today, end: today }]) : null;
   const tp = range ? todayPct(today, range) : null;
@@ -45,12 +68,13 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
             <div key={p.id} className='cycle project pj-row' data-project={p.id}>
               <span className='cy-name'>{p.name}</span>
               <span className='pj-status' data-status={p.status ?? 'backlog'}>{statusLabel(p.status)}</span>
-              <span className='cy-dates'>{lead(p.lead_id)}</span>
+              <span className='cy-dates pj-lead'>{lead(p.lead_id)}</span>
               <span className={`cy-dates${late ? ' pj-late' : ''}`} data-testid={`target-${p.id}`}>{p.target_date ? `Target ${fmtDate(p.target_date)}${late ? ' (overdue)' : ''}` : 'No target date'}</span>
               {/* Ring geometry is SVG attributes only (pathLength + dasharray): survives the strict CSP. */}
               <ProgressRing pct={pr.pct} size={18} showPct={false} label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`} />
               <span className='cy-count'>{pr.pct}%</span>
-              {canOpen && <button onClick={() => onOpen(p.id)}>Open</button>}<button onClick={() => onViewIssues(p.id)}>View issues</button>
+              {/* One grid cell for both actions: 8 children in a 7-column grid wrapped 'View issues' onto a second line. */}
+              <span className='pj-actions'>{canOpen && <button onClick={() => onOpen(p.id)}>Open</button>}<button onClick={() => onViewIssues(p.id)}>View issues</button></span>
             </div>
           );
         }) : (
@@ -73,7 +97,7 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
                   {sorted.map((p) => {
                     const bar = p.start_date && p.target_date ? barFor({ start: p.start_date, end: p.target_date }, range) : null;
                     const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
-                    const u = USERS.find((x) => x.id === p.lead_id);
+                    const u = person(p.lead_id);
                     return (
                       <div key={p.id} className='rm-row' data-project={p.id}>
                         <span className='rm-name'>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />}<span className='rm-name-t'>{p.name}</span><ProgressRing pct={pr.pct} size={14} label={`${p.name} progress ${pr.pct}%`} /></span>
