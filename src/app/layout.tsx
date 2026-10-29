@@ -6,6 +6,7 @@ import './ui-search.css';
 import './ui-projects.css';
 import './ui-inbox.css';
 import './ui-board.css';
+import './ui-presence.css';
 import './ui-list.css';
 import './ui-palette.css';
 import './ui-auth.css';
