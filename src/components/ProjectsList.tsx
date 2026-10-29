@@ -2,15 +2,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/icons';
 import { ProgressRing } from '@/components/ProgressRing';
-import { USERS, fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
+import { MOCK_PEOPLE, findPerson, type Person } from '@/lib/people';
+import { fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
 import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, timelineWidth, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
 
-interface Props { projects: readonly ProjectMeta[]; issues: readonly Issue[]; today: string; canOpen: boolean; onOpen: (id: string) => void; onViewIssues: (id: string) => void }
+interface Props { people?: readonly Person[]; projects: readonly ProjectMeta[]; issues: readonly Issue[]; today: string; canOpen: boolean; onOpen: (id: string) => void; onViewIssues: (id: string) => void }
 
-export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewIssues }: Props) {
+export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, canOpen, onOpen, onViewIssues }: Props) {
   const [mode, setMode] = useState<'list' | 'roadmap'>('list');
   const sorted = sortProjects(projects);
-  const lead = (id?: string | null) => USERS.find((u) => u.id === id)?.name ?? (id ? 'Unknown' : 'No lead');
+  const lead = (id?: string | null) => findPerson(people, id)?.name ?? (id ? 'Unknown' : 'No lead');
   const dated = sorted.some((p) => p.start_date || p.target_date);
   const range = dated ? roadmapRange([...sorted.map((p) => ({ start: p.start_date, end: p.target_date })), { start: today, end: today }]) : null;
   const tp = range ? todayPct(today, range) : null;
@@ -73,7 +74,7 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
                   {sorted.map((p) => {
                     const bar = p.start_date && p.target_date ? barFor({ start: p.start_date, end: p.target_date }, range) : null;
                     const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
-                    const u = USERS.find((x) => x.id === p.lead_id);
+                    const u = findPerson(people, p.lead_id);
                     return (
                       <div key={p.id} className='rm-row' data-project={p.id}>
                         <span className='rm-name'>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />}<span className='rm-name-t'>{p.name}</span><ProgressRing pct={pr.pct} size={14} label={`${p.name} progress ${pr.pct}%`} /></span>
