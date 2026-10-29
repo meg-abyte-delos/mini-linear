@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { PROJECT_STATUSES, statusLabel, byTarget, HEALTH_LABEL, newestFirst, projectClient, type Health, type Milestone, type ProjectDetail as Detail, type ProjectUpdate } from '@/lib/project-client';
+import { ProgressRing } from '@/components/ProgressRing';
 
 export interface PdIssue { id: string; identifier: string; title: string; done: boolean }
 interface Props { issues?: PdIssue[]; leadName?: string | null; onOpenIssue?: (id: string) => void; slug: string; projectId: string; canWrite: boolean; onBack: () => void; onViewIssues: (id: string) => void }
@@ -49,7 +50,7 @@ export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues,
       {proj.description && <p className='pd-desc'>{proj.description}</p>}
       <section aria-labelledby='pd-progress'>
         <h3 id='pd-progress'>Progress</h3>
-        <svg className='cy-prog' role='img' aria-label={`${pct}% complete, ${proj.done_count} of ${proj.issue_count} issues`}><rect className='cy-prog-fill' x='0' y='0' height='100%' width={`${pct}%`} /></svg>
+        <ProgressRing pct={pct} size={28} showPct={false} label={`${pct}% complete, ${proj.done_count} of ${proj.issue_count} issues`} />
         <span className='cy-count'>{proj.done_count}/{proj.issue_count} ({pct}%)</span>
         <span className='cy-dates'>{proj.start_date ?? 'No start'} to {proj.target_date ?? 'no target'}</span>
         <p className='pd-meta'>Lead: <strong data-testid='pd-lead'>{leadName ?? 'No lead'}</strong>
