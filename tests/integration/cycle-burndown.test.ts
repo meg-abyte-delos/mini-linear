@@ -49,6 +49,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect((await get(seed.a.member, long, "2041-01-03")).status).toBe(422);
     expect((await get(seed.a.member, cy, "2040-01-03", seed.b.slug)).status).toBe(404);
   });
+
   it("uses snapshots where present (replay only before them), reports scopeChange, writes today's snapshot lazily and idempotently", async () => {
     const cy = randomUUID(), a = randomUUID(), b = randomUUID();
     await asOwner(seed.a.id, async (tx) => {
@@ -82,6 +83,14 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect(r1.points[1]).toMatchObject({ day: day(0), scope: 1, done: 1, remaining: 0 });
     await get(seed.a.member, live, day(0));
     expect(await count()).toHaveLength(1);
+    // read -> change an issue -> read: today's point follows the change (no freeze at the first read of the day).
+    await asOwner(seed.a.id, (tx) => tx`insert into issues (id, workspace_id, team_id, number, title, status, sort_key, created_by, cycle_id) values (${randomUUID()}, ${seed.a.id}, ${teamA}, 73, 'd', 'todo', 'a3', ${seed.a.member}, ${live})`);
+    const r2 = await (await get(seed.a.member, live, day(0))).json();
+    expect(r2.points[1]).toMatchObject({ day: day(0), scope: 2, done: 1, remaining: 1 });
+    expect(await count()).toHaveLength(1);
+    expect([(await count())[0]!.scope, (await count())[0]!.completed]).toEqual([2, 1]);
+    // Guests are refused before any write (requireRole member); the tenant-only RLS policy would allow the insert anyway.
+    expect((await get(seed.a.guest, live, day(0))).status).toBe(403);
 
     // Fully snapshotted cycles skip the replay, so the 120-day cap does not apply to them.
     const longc = randomUUID();
