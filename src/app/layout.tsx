@@ -9,6 +9,7 @@ import './ui-board.css';
 import './ui-list.css';
 import './ui-palette.css';
 import './ui-auth.css';
+import './ui-night.css';
 import { cookies } from 'next/headers';
 
 export const metadata = { title: 'Mini-Linear' };
