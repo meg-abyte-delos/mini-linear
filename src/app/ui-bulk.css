@@ -1,0 +1,61 @@
+/* Bulk bar (SelectionBar) in Delos Night: floating frosted pill, centered at the bottom,
+   teal counter, ghost action buttons. Dark only (data-theme=dark or system dark); light untouched.
+   Contrast: text stays --fg / --muted on --glass over --n-bg (>= 7:1 / >= 4.5:1),
+   counter #fff on accent #28aba5 is 3:1 at bold 12px -> counter text uses --n-bg (#0b0c0e) on accent: 7.3:1.
+   z-index stays 40 (ui-night.css): above .head (20) and .panel (30), under .overlay (50) and pickers (60). */
+
+:is([data-theme='dark'], html:not([data-theme])) .selbar { --bk:1; }
+
+[data-theme='dark'] .selbar {
+  position:fixed; left:50%; bottom:20px; transform:translateX(-50%);
+  display:flex; align-items:center; gap:2px;
+  padding:6px 6px 6px 8px; border-radius:12px;
+  background:var(--glass);
+  -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 12px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4);
+  color:var(--fg); font-size:13px; white-space:nowrap;
+  animation:bulk-in .16s ease-out;
+}
+[data-theme='dark'] .selbar-count {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:0 10px 0 4px; margin-right:4px; height:28px;
+  border-right:1px solid var(--line); color:var(--fg); font-weight:500;
+  font-variant-numeric:tabular-nums;
+}
+[data-theme='dark'] .selbar-count::before {
+  content:''; width:8px; height:8px; border-radius:50%;
+  background:var(--accent); box-shadow:var(--accent-bar-glow);
+}
+[data-theme='dark'] .selbar > button {
+  height:28px; padding:0 10px; border-radius:7px;
+  background:transparent; border:1px solid transparent;
+  color:var(--fg); font:inherit; cursor:pointer;
+  transition:background-color .12s ease, border-color .12s ease;
+}
+[data-theme='dark'] .selbar > button:hover { background:var(--hover); border-color:var(--line); }
+[data-theme='dark'] .selbar > button[aria-expanded=true] { background:var(--sel); box-shadow:var(--accent-halo); }
+[data-theme='dark'] .selbar > button:focus-visible { outline:1px solid var(--accent); box-shadow:var(--accent-ring); }
+[data-theme='dark'] .selbar .selbar-undo { color:var(--accent); margin-left:4px; border-left:1px solid var(--line); border-radius:0 7px 7px 0; }
+[data-theme='dark'] .selbar .selbar-clear { color:var(--muted); }
+[data-theme='dark'] .selbar .selbar-clear:hover { color:var(--fg); }
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .selbar {
+    position:fixed; left:50%; bottom:20px; transform:translateX(-50%);
+    display:flex; align-items:center; gap:2px;
+    padding:6px 6px 6px 8px; border-radius:12px;
+    background:var(--glass);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    border:1px solid rgba(255,255,255,.10);
+    box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 12px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4);
+    color:var(--fg); font-size:13px; white-space:nowrap;
+  }
+  html:not([data-theme]) .selbar > button { height:28px; padding:0 10px; border-radius:7px; background:transparent; border:1px solid transparent; color:var(--fg); }
+  html:not([data-theme]) .selbar > button:hover { background:var(--hover); border-color:var(--line); }
+  html:not([data-theme]) .selbar-count { padding:0 10px 0 4px; margin-right:4px; border-right:1px solid var(--line); font-variant-numeric:tabular-nums; }
+}
+
+@keyframes bulk-in { from { opacity:0; transform:translate(-50%, 8px); } to { opacity:1; transform:translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { [data-theme='dark'] .selbar { animation:none; } [data-theme='dark'] .selbar > button { transition:none; } }
+@media (max-width: 640px) { [data-theme='dark'] .selbar { left:8px; right:8px; transform:none; overflow-x:auto; animation:none; } }
