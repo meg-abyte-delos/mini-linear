@@ -182,7 +182,12 @@ const getTeam = async (ctx: Parameters<typeof TEAM>[0], id: string) => {
 };
 export const listTeams = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const q = parseQuery(req, listQuery), c = afterId(ctx, "teams", q);
-  const rows = await ctx.tx<Row[]>`${TEAM(ctx)} where ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} order by id limit ${q.limit + 1}`;
+  // A guest has no team access (teamVisible = false): it only learns the teams holding an issue actively shared with it
+  // (the app shell needs one team id to boot), never the other teams of the workspace.
+  const scope = ctx.role === "guest"
+    ? ctx.tx`id in (select i.team_id from issues i join issue_shares s on s.issue_id = i.id where s.guest_user_id = ${ctx.userId} and s.revoked_at is null and i.deleted_at is null)`
+    : ctx.tx`true`;
+  const rows = await ctx.tx<Row[]>`${TEAM(ctx)} where ${scope} and ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} order by id limit ${q.limit + 1}`;
   return listPage(ctx, "teams", q, rows);
 });
 export const createTeam = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -207,6 +212,7 @@ export const deleteTeam = (req: Request, slug: string, rawId: string) => withWor
   return new Response(null, { status: 204 });
 });
 export const listTeamMembers = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  if (ctx.role === "guest") throw new ApiError("not_found"); // member emails are not for guests (same 404 as the other team subroutes)
   const id = parseId(rawId); await getTeam(ctx, id);
   const items = await ctx.tx<Row[]>`select t.user_id, u.email, t.role from team_memberships t join users u on u.id = t.user_id where t.team_id = ${id} order by t.user_id`;
   return Response.json({ items, next_cursor: null });
