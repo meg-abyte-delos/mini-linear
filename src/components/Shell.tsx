@@ -469,7 +469,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const nl = q.trim().length >= 4 && !readOnly ? parseNlCommand(q, USERS, LABELS, null) : null;
   // A status-only phrase is already covered by the built-in 'Move to …' commands: no duplicate NL row.
   const nlStatusOnly = !!nl && Object.keys(nl.patch).every((k) => k === 'status');
-  const nlIds = nl && !nlStatusOnly ? targetIds() : [];
+  // Render-time: use state, not targetIds() (multiRef is declared further down: calling it here is a TDZ crash).
+  const nlIds = nl && !nlStatusOnly ? (multi.length ? multi : current?.id ? [current.id] : []) : [];
   const nlCmd: Cmd[] = nl && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), hint: '↵', run: () => {
     const { add_label_ids, assignee_id, ...rest } = nl.patch;
     for (const id of nlIds) {
