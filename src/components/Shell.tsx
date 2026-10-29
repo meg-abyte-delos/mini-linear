@@ -65,6 +65,27 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   );
 }
 
+// Cmd+K sections and icons, derived from the command id (Linear groups results under small labels).
+const NAV_IDS = new Set(['list', 'board', 'cycles', 'projects', 'go-project']);
+function paletteGroup(id: string): string {
+  if (id === 'nl') return 'Suggested';
+  if (id.startsWith('hit-')) return 'Issues';
+  if (id === 'search-all') return 'Search';
+  if (NAV_IDS.has(id)) return 'Navigation';
+  if (id.startsWith('filter-') || id === 'clear-filters') return 'Filters';
+  return 'Issue actions';
+}
+function paletteIcon(id: string) {
+  if (id === 'list' || id === 'go-project') return <Icon name='list' />;
+  if (id === 'board') return <Icon name='board' />;
+  if (id === 'cycles') return <Icon name='views' />;
+  if (id === 'projects') return <Icon name='team' />;
+  if (id === 'create') return <Icon name='plus' />;
+  if (id === 'search-all' || id.startsWith('filter-')) return <Icon name='search' />;
+  if (id.startsWith('hit-')) return <Icon name='issues' />;
+  return <Icon name='inbox' />;
+}
+
 export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
@@ -515,6 +536,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // Only an explicit leading verb puts the action first; otherwise ('fix for Ada') search hits keep Enter.
   const nlFirst = /^\s*(assign|unassign|move|mark|set|label|prioriti[sz]e)\b/i.test(q);
   const results: Cmd[] = nlFirst && !nl?.blocked ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
+  // Keep the active row visible while arrowing through a long, sectioned list.
+  const activeId = results[pi]?.id;
+  useEffect(() => { if (palette && activeId) document.getElementById(`pc-${activeId}`)?.scrollIntoView({ block: 'nearest' }); }, [palette, activeId]);
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
@@ -792,14 +816,15 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             />
             <ul id='palette-list' role='listbox' aria-label='Commands'>
               {results.map((c, idx) => (
-                <li key={c.id} id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
+                <Fragment key={c.id}>{(idx === 0 || paletteGroup(results[idx - 1]!.id) !== paletteGroup(c.id)) && <li role='presentation' className='pal-group'>{paletteGroup(c.id)}</li>}
+                <li id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span className='pal-ic' aria-hidden='true'>{paletteIcon(c.id)}</span><span className='pal-label'>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <span className='pal-keys'>{c.hint.split(' ').map((k, j) => <kbd key={j}>{k}</kbd>)}</span>}</li></Fragment>
               ))}
               {api && q.trim().length >= MIN_QUERY && searchState === 'loading' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-searching'>Searching…</li>}
               {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-search-error'>Search failed. Try again.</li>}
-              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-no-results'>No results for “{q.trim()}”</li>}
-              {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
+              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-no-results' className='pal-empty'>No results for “{q.trim()}”</li>}
+              {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true' className='pal-empty'>No matching command</li>}
             </ul>
-            <div className='palette-foot'><kbd>↑↓</kbd> navigate <kbd>↵</kbd> run <kbd>esc</kbd> close</div>
+            <div className='palette-foot'><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>
           </div>
         </div>
       )}
