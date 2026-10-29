@@ -66,3 +66,47 @@ export function computeBurndown(cycle: { id: string; start_date: string; end_dat
   }
   return out;
 }
+
+export type SnapRow = { day: string; scope: number; completed: number };
+export type ScopeChange = { day: string; delta: number | null };
+
+const idealOf = (scope0: number, n: number, k: number) => (n === 1 ? 0 : Math.round(scope0 * (1 - k / (n - 1)) * 100) / 100);
+
+/** Days up to `on` that have no snapshot (the only ones the audit replay is still needed for). */
+export function daysWithoutSnapshot(cycle: { start_date: string; end_date: string }, snaps: SnapRow[], on: string): string[] {
+  const have = new Set(snaps.map((s) => s.day)), out: string[] = [];
+  const n = daysBetween(cycle.start_date, cycle.end_date) + 1;
+  for (let k = 0; k < n; k++) { const d = addDays(cycle.start_date, k); if (d <= on && !have.has(d)) out.push(d); }
+  return out;
+}
+
+/**
+ * Snapshots win over the replay on the days they exist (scope/done as captured); replayed points fill the days before snapshots began.
+ * `replayed` is null when every day up to `on` has a snapshot (no replay run). The ideal line restarts from the first known scope.
+ */
+export function mergeSnapshots(cycle: { start_date: string; end_date: string }, replayed: BurnPoint[] | null, snaps: SnapRow[], on: string): BurnPoint[] {
+  const by = new Map(snaps.map((s) => [s.day, s]));
+  const rep = new Map((replayed ?? []).map((p) => [p.day, p]));
+  const n = daysBetween(cycle.start_date, cycle.end_date) + 1;
+  if (n < 1) return [];
+  const base: { day: string; scope: number | null; done: number | null }[] = [];
+  for (let k = 0; k < n; k++) {
+    const day = addDays(cycle.start_date, k), s = by.get(day), r = rep.get(day);
+    if (day > on) base.push({ day, scope: null, done: null });
+    else if (s) base.push({ day, scope: s.scope, done: s.completed });
+    else base.push({ day, scope: r?.scope ?? null, done: r?.done ?? null });
+  }
+  const scope0 = base.find((b) => b.scope !== null)?.scope ?? 0;
+  return base.map((b, k) => ({ day: b.day, scope: b.scope, done: b.done, remaining: b.scope === null ? null : b.scope - (b.done as number), ideal: idealOf(scope0, n, k) }));
+}
+
+/** Scope added (+) or removed (-) since the previous day; 0 on the first day, null on days without data. */
+export function scopeChange(points: BurnPoint[]): ScopeChange[] {
+  let prev: number | null = null;
+  return points.map((p) => {
+    if (p.scope === null) return { day: p.day, delta: null };
+    const delta = prev === null ? 0 : p.scope - prev;
+    prev = p.scope;
+    return { day: p.day, delta };
+  });
+}
