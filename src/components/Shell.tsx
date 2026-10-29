@@ -674,7 +674,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             leadName={who(PROJECTS.find((p) => p.id === detailId)?.lead_id ?? null)?.name ?? null}
             onOpenIssue={(id) => { setDetailId(null); setView('list'); setSelId(id); }} />
         ) : view === 'projects' ? (
-          <ProjectsList projects={PROJECTS} issues={allIssues} today={today} canOpen={!!api} onOpen={setDetailId} onViewIssues={goToProject} />
+          <ProjectsList projects={PROJECTS} issues={allIssues} today={today} canOpen={!!api} onOpen={setDetailId} onViewIssues={goToProject} slug={api?.slug ?? null} />
         ) : view === 'cycles' ? (
           <div className='scroll cycles'>
             {BUCKETS.map((b) => {
