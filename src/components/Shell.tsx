@@ -2,7 +2,7 @@
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
@@ -10,8 +10,7 @@ import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/l
 import { createStore } from '@/lib/mock-api';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
-import { ProgressRing } from '@/components/ProgressRing';
-import { CycleBurndown } from '@/components/CycleBurndown';
+import { CyclesList } from '@/components/CyclesList';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
@@ -22,12 +21,11 @@ import { Picker, type PickOption } from '@/components/Picker';
 import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
-import { FILTER_KEYS, NONE, activeCount, applyFilters, cycleBucket, emptyFilters, writeFilters, type FilterKey, type Filters, type CycleBucket } from '@/lib/filters';
+import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilters, type FilterKey, type Filters } from '@/lib/filters';
 import { WorkspaceSwitcher, TeamSection } from '@/components/SidebarParts';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'Priority', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
-const BUCKETS: { id: CycleBucket; title: string }[] = [{ id: 'active', title: 'Active' }, { id: 'upcoming', title: 'Upcoming' }, { id: 'past', title: 'Past' }];
 type PickKind = 'priority' | 'assignee' | 'label' | BulkKind;
 interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit; disabled?: boolean }
 
@@ -67,7 +65,6 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
 export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
-  const [burnOpen, setBurnOpen] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
   // API mode: server versions by issue id, and one write chain per issue so If-Match never races our own PATCHes.
   const versions = useRef(new Map<string, number>(initialIssues.map((i) => [i.id, i.version])));
@@ -680,38 +677,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : view === 'projects' ? (
           <ProjectsList projects={PROJECTS} issues={allIssues} today={today} canOpen={!!api} onOpen={setDetailId} onViewIssues={goToProject} slug={api?.slug ?? null} />
         ) : view === 'cycles' ? (
-          <div className='scroll cycles'>
-            {BUCKETS.map((b) => {
-              const cs = CYCLES.filter((c) => cycleBucket(c, today) === b.id);
-              return (
-                <section key={b.id} className='group' aria-labelledby={`cy-${b.id}`}>
-                  <h2 id={`cy-${b.id}`}><span>{b.title}</span><span className='count'>{cs.length}</span></h2>
-                  {cs.length === 0 ? <p className='col-empty'>No {b.id} cycles</p> : cs.map((c) => {
-                    // Progress ignores list filters on purpose; cycle_id already scopes issues to the cycle's team.
-                    const its = allIssues.filter((i) => i.cycle_id === c.id);
-                    const done = its.filter((i) => i.status === 'done' || i.status === 'canceled').length;
-                    const pct = its.length ? Math.round((done / its.length) * 100) : 0;
-                    const bdOpen = burnOpen.has(c.id);
-                    return (
-                      <Fragment key={c.id}>
-                      <div className='cycle' data-cycle={c.id} data-bucket={b.id}>
-                        <span className='cy-name'>{c.name}</span>
-                        <span className='cy-dates'>{fmtDate(c.start_date)} to {fmtDate(c.end_date)}</span>
-                        <ProgressRing pct={pct} size={18} showPct={false} tone={b.id === 'past' ? 'muted' : undefined} label={`${pct}% complete, ${done} of ${its.length} issues`} />
-                        <span className='cy-count'>{done}/{its.length}</span>
-                        <span className='cy-actions'>
-                          {api && isUuid(c.id) && <button aria-expanded={bdOpen} aria-controls={`bd-${c.id}`} onClick={() => setBurnOpen((o) => { const n = new Set(o); if (n.has(c.id)) n.delete(c.id); else n.add(c.id); return n; })}>Burndown</button>}
-                          <button onClick={() => { setFilters({ ...emptyFilters(), cycle: [c.id] }); setView('list'); }}>View issues</button>
-                        </span>
-                      </div>
-                      {bdOpen && api && <div id={`bd-${c.id}`}><CycleBurndown slug={api.slug} cycleId={c.id} name={c.name} today={today} /></div>}
-                      </Fragment>
-                    );
-                  })}
-                </section>
-              );
-            })}
-          </div>
+          <CyclesList cycles={CYCLES} issues={allIssues} today={today} slug={api?.slug ?? null} onViewIssues={(id) => { setFilters({ ...emptyFilters(), cycle: [id] }); setView('list'); }} />
         ) : issues.length === 0 ? (
           <div className='state empty' role='status'>
             <p>No issues match these filters.</p>
