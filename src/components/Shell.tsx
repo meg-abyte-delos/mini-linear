@@ -442,7 +442,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const baseResults: Cmd[] = looksLikeIdentifier(q) ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...hitCmds, ...allCmd];
   // Natural-language action: an extra row next to the search results, never a replacement.
   const nl = q.trim().length >= 4 && !readOnly ? parseNlCommand(q, USERS, LABELS, null) : null;
-  const nlIds = nl ? targetIds() : [];
+  // A status-only phrase is already covered by the built-in 'Move to …' commands: no duplicate NL row.
+  const nlStatusOnly = !!nl && Object.keys(nl.patch).every((k) => k === 'status');
+  const nlIds = nl && !nlStatusOnly ? targetIds() : [];
   const nlCmd: Cmd[] = nl && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), hint: '↵', run: () => {
     const { add_label_ids, assignee_id, ...rest } = nl.patch;
     for (const id of nlIds) {
@@ -455,7 +457,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       store.current.update(id, local);
       if (Object.keys(remote).length) push(id, remote);
     }
-    sync(); } }] : [];
+    sync(); if (nlIds.length === 1) setSelId(nlIds[0]!); } }] : [];
   // Only an explicit leading verb puts the action first; otherwise ('fix for Ada') search hits keep Enter.
   const nlFirst = /^\s*(assign|unassign|move|mark|set|label|prioriti[sz]e)\b/i.test(q);
   const results: Cmd[] = nlFirst ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
