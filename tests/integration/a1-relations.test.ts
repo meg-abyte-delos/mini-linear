@@ -4,6 +4,8 @@ import { ownerSql, seedTwoWorkspaces, type Seed } from "../helpers/seed";
 import { setSessionResolver, db } from "../../src/lib/http/ctx";
 import * as H from "../../src/lib/issues/handlers";
 import * as R from "../../src/lib/issues/relations";
+import * as A from "../../src/lib/issues/activity-attachments";
+import * as S from "../../src/lib/resources/shares-audit";
 
 const haveDb = !!(process.env.DATABASE_URL && process.env.DATABASE_OWNER_URL);
 if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integration tests must not skip");
@@ -52,6 +54,21 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect((await rel(seed.a.member, a.id, { type: "blocks", related_issue_id: hidden.id })).status).toBe(422);
     expect((await rel(seed.a.guest, a.id, { type: "blocks", related_issue_id: b.id })).status).toBe(403);
     expect((await rel(seed.a.member, a.id, { type: "nope", related_issue_id: b.id })).status).toBe(422);
+  });
+
+  it("activity hides relation events whose other end the viewer cannot see (guest shared on one end only)", async () => {
+    const a = await mk(seed.a.member, { team_id: teamA, title: "shared-end" }), hidden = await mk(seed.a.owner, { team_id: teamA2, title: "secret-end" });
+    const ok = await mk(seed.a.member, { team_id: teamA, title: "visible-end" });
+    expect((await rel(seed.a.owner, a.id, { type: "related", related_issue_id: hidden.id })).status).toBe(201);
+    expect((await rel(seed.a.owner, a.id, { type: "related", related_issue_id: ok.id })).status).toBe(201);
+    const sh = (id: string) => call(S.shareIssue as never, seed.a.member, { method: "POST", body: JSON.stringify({ guest_user_id: seed.a.guest }) }, seed.a.slug, id);
+    expect((await sh(a.id)).status).toBe(201);
+    expect((await sh(ok.id)).status).toBe(201);
+    const feed = async (user: string) => JSON.stringify(await (await call(A.listActivity as never, user, {}, seed.a.slug, a.id)).json());
+    const g = await feed(seed.a.guest);
+    expect(g).not.toContain(hidden.id); // nothing of the unshared issue reaches the guest
+    expect(g).toContain(ok.id);
+    expect(await feed(seed.a.owner)).toContain(hidden.id); // admins still see it
   });
 
   it("DB enforces no self-relation and same workspace even for the owner role", async () => {
