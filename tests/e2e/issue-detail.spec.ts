@@ -42,9 +42,10 @@ test('inline title, properties and activity', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set status to Done');
   await page.getByLabel('Estimate').selectOption('5');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
-  await page.getByLabel('Due date').fill('2026-10-20');
-  // Wait for the update to land (activity entry) before asserting the derived Overdue state.
-  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2026-10-20');
+  // The ?today= override is ignored when the server runs a production build (CI), so the page compares against the real clock.
+  // Use a date that is in the past on any clock, not one relative to the pinned 2026-10-28.
+  await page.getByLabel('Due date').fill('2020-01-01');
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2020-01-01');
   await expect(page.getByText('Overdue')).toBeVisible();
 });
 
@@ -117,8 +118,7 @@ test('copy branch shortcut, archive and unarchive', async ({ page, context }) =>
   await expect(page.locator('.idp-banner')).toHaveCount(0);
 });
 
-// FIXME: on the API, Delete from the issue page does not put the page in the trash state (no banner after confirming). Cause not investigated yet.
-test.fixme('delete and restore', async ({ page }) => {
+test('delete and restore', async ({ page }) => {
   await ready(page);
   page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'Delete' }).click();
@@ -157,4 +157,13 @@ test('comments: edit, delete, and one chronological timeline with change events'
   await c.getByRole('button', { name: 'Delete comment' }).click();
   await expect(page.getByRole('article', { name: /Comment by/ })).toHaveCount(0);
   await expect(feed).toContainText('deleted a comment');
+});
+
+// FIXME(PR 4, members directory): the assignee step of the timeline test was removed because the assignee picker needs the members directory.
+// Restore it here once PR 4 lands: assign a member, expect 'changed the assignee' interleaved with the comment in time order.
+test.fixme('timeline: assignee change interleaves with comments', async ({ page }) => {
+  await ready(page);
+  await page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: /assignee|unassigned/i }).first().click();
+  await page.getByRole('option').first().click();
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('assignee');
 });
