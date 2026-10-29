@@ -44,9 +44,11 @@ test('inline title, properties and activity', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
   // The ?today= override is ignored when the server runs a production build (CI), so the page compares against the real clock.
   // Use a date that is in the past on any clock, not one relative to the pinned 2026-10-28.
+  const patched = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'), { timeout: 10_000 }).catch(() => null);
   await page.getByLabel('Due date').fill('2020-01-01');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2020-01-01');
-  await expect(page.getByText('Overdue')).toBeVisible();
+  await patched;
+  await expect(page.getByRole('complementary', { name: 'Properties' }).locator('.due-flag')).toHaveText('Overdue');
 });
 
 test('markdown editor is safe: no script/raw html, unsafe links dropped', async ({ page }) => {
@@ -65,13 +67,13 @@ test('markdown editor is safe: no script/raw html, unsafe links dropped', async 
 test('comments: mention autocomplete, reply thread, reactions', async ({ page }) => {
   await ready(page);
   const box = page.getByRole('combobox', { name: 'Leave a comment' });
-  await box.click(); await box.pressSequentially('hey @li');
-  await expect(page.getByRole('listbox', { name: 'Mention a teammate' })).toContainText('Linus Patch');
+  await box.click(); await box.pressSequentially('hey @ma');
+  await expect(page.getByRole('listbox', { name: 'Mention a teammate' })).toContainText('Mate');
   await page.keyboard.press('Enter');
-  await expect(box).toHaveValue('hey @linus ');
+  await expect(box).toHaveValue('hey @mate ');
   await page.getByRole('button', { name: 'Comment', exact: true }).click();
   const c = page.getByRole('article', { name: /Comment by/ }).first();
-  await expect(c.locator('.mention')).toHaveText('@linus');
+  await expect(c.locator('.mention')).toHaveText('@mate');
   await c.getByRole('button', { name: /React 👍/ }).click();
   await expect(c.getByRole('button', { name: 'React 👍, 1' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Reply', exact: true }).click();
@@ -168,5 +170,5 @@ test.fixme('timeline: assignee change interleaves with comments', async ({ page 
   await ready(page);
   await page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: /assignee|unassigned/i }).first().click();
   await page.getByRole('option').first().click();
-  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('assignee');
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set assignee');
 });

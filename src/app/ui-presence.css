@@ -1,35 +1,30 @@
-/* Presence stack: overlapping avatars, each with a 2px ring in the surface color (cutout) + teal ring (live).
-   Idle viewers lose the teal ring and go grayscale. No opacity: it would also dim the white initials
-   (#fff on a 55% avatar fell under 4.5:1). Grayscale keeps every hue bg at >= 5:1 against #fff. */
-.presence { display:inline-flex; align-items:center; flex-direction:row; padding-left:4px; }
-.presence-av { position:relative; display:inline-flex; margin-left:-6px; border-radius:50%; box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); transition:transform .12s ease-out, filter .12s ease-out; }
+/* Presence stack, Linear style: overlapping avatars, each cut out of the surface by a 2px ring in the
+   surface colour (no coloured live ring). First avatar on top. Idle viewers go grayscale: no opacity, it would
+   dim the white initials under 4.5:1; grayscale keeps every hue bg >= 5:1 against #fff.
+   The cutout colour is --presence-cut, set per surface below. */
+.presence { --presence-cut:var(--bg); display:inline-flex; align-items:center; padding-left:2px; }
+.presence-av { position:relative; display:inline-flex; margin-left:-4px; border-radius:50%; box-shadow:0 0 0 2px var(--presence-cut); transition:transform .12s ease-out, filter .12s ease-out; }
 .presence-av:first-child { margin-left:0; }
-.presence-av:hover { transform:translateY(-1px); z-index:1; }
-.presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--bg); filter:grayscale(1); }
+.presence-av[data-active='false'] { filter:grayscale(1); }
 .presence-av .av { width:18px; height:18px; font-size:9px; }
 .presence[data-size='md'] .presence-av .av { width:22px; height:22px; font-size:10px; }
-.presence-more { margin-left:4px; font-size:11px; line-height:18px; padding:0 5px; border-radius:9px; color:var(--fg); background:var(--raised, var(--panel)); box-shadow:0 0 0 1px var(--line); font-variant-numeric:tabular-nums; }
+.presence[data-size='md'] .presence-av { margin-left:-6px; }
+.presence-more { position:relative; margin-left:-5px; min-width:18px; height:18px; padding:0 4px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;
+  font-size:10px; font-weight:500; border-radius:9px; color:var(--fg); background:var(--raised, var(--panel)); box-shadow:0 0 0 2px var(--presence-cut); font-variant-numeric:tabular-nums; }
+.presence[data-size='md'] .presence-more { height:22px; min-width:22px; border-radius:11px; font-size:11px; }
 
-/* Surface cutouts (light + base). Board: cards on --raised, selected cards on --sel over --raised, columns on --panel.
-   --sel is already a 12% alpha teal: mixing it again gave ~1.5%. Opaque equivalent = 12% accent over --raised. */
+/* Tooltip (name, or hidden names on +N), Linear-like dark chip. */
+.presence [data-tip]:hover { z-index:20 !important; }
+.presence [data-tip]:hover::after { content:attr(data-tip); position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%); white-space:nowrap; width:max-content;
+  padding:3px 7px; border-radius:5px; font-size:11px; font-weight:500; line-height:16px; color:#f7f8f8; background:#1c1d21; box-shadow:0 0 0 1px rgba(255,255,255,.08), 0 4px 12px rgba(0,0,0,.35); pointer-events:none; filter:none; }
+.presence-av:hover { transform:translateY(-1px); }
+
+/* Surface cutouts. Board columns on --panel, cards on --raised, selected cards on 12% accent over --raised
+   (--sel is already alpha: mixing it again gave ~1.5%, so use the opaque equivalent). */
 .card[aria-selected=true] { --sel-solid:color-mix(in srgb, var(--accent) 12%, var(--raised)); }
-.board .presence-av { box-shadow:0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent); }
-.board .presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--panel); }
-.card .presence-av { box-shadow:0 0 0 2px var(--raised), 0 0 0 3.5px var(--accent); }
-.card .presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--raised); }
-.card[aria-selected=true] .presence-av { box-shadow:0 0 0 2px var(--sel-solid), 0 0 0 3.5px var(--accent); }
-.card[aria-selected=true] .presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--sel-solid); }
+.board .presence { --presence-cut:var(--panel); }
+.card .presence { --presence-cut:var(--raised); }
+.card[aria-selected=true] .presence { --presence-cut:var(--sel-solid); }
+.idp-head .presence { margin-left:auto; margin-right:4px; }
 
-/* Dark glow, per surface. Every live rule is scoped by theme + :not([data-active=false]) so it outranks the
-   base surface rules (no tie at 0,3,0 decided by source order), and idle avatars never get the glow. */
-[data-theme='dark'] .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-[data-theme='dark'] .board .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-[data-theme='dark'] .card .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--raised), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-[data-theme='dark'] .card[aria-selected=true] .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--sel-solid), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme]) .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-  html:not([data-theme]) .board .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-  html:not([data-theme]) .card .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--raised), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-  html:not([data-theme]) .card[aria-selected=true] .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--sel-solid), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
-}
 @media (prefers-reduced-motion: reduce) { .presence-av { transition:none; } .presence-av:hover { transform:none; } }

@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { settled } from './helpers/settled';
 
 test('axe: no wcag2a/aa violations on list, palette, board', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('option').first()).toBeVisible();
   const scan = async (label: string) => {
+    await settled(page);
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     expect(r.violations.map((v) => `${label}: ${v.id} x${v.nodes.length}`), label).toEqual([]);
   };
