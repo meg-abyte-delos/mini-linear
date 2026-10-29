@@ -1,0 +1,14 @@
+/* Presence stack: overlapping avatars, each with a 2px ring in the page bg (cutout) + teal ring (live).
+   Idle viewers lose the teal ring and dim to 55%. No text colors changed except +N in --fg. */
+.presence { display:inline-flex; align-items:center; flex-direction:row; padding-left:4px; }
+.presence-av { display:inline-flex; margin-left:-6px; border-radius:50%; box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent); transition:transform .12s ease-out, opacity .12s ease-out; }
+.presence-av:first-child { margin-left:0; }
+.presence-av:hover { transform:translateY(-1px); z-index:1; }
+.presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--bg); opacity:.55; }
+.presence-av .av { width:18px; height:18px; font-size:9px; }
+.presence[data-size='md'] .presence-av .av { width:22px; height:22px; font-size:10px; }
+.presence-more { margin-left:4px; font-size:11px; line-height:18px; padding:0 5px; border-radius:9px; color:var(--fg); background:var(--raised, var(--panel)); box-shadow:0 0 0 1px var(--line); font-variant-numeric:tabular-nums; }
+[data-theme='dark'] .presence-av:not([data-active='false']) { box-shadow:0 0 0 2px var(--bg), 0 0 0 3.5px var(--accent), 0 0 8px rgba(40,171,165,.35); }
+.card .presence-av, .board .presence-av { box-shadow:0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent); }
+.card .presence-av[data-active='false'], .board .presence-av[data-active='false'] { box-shadow:0 0 0 2px var(--panel); }
+@media (prefers-reduced-motion: reduce) { .presence-av { transition:none; } .presence-av:hover { transform:none; } }
