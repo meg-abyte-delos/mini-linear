@@ -112,16 +112,19 @@ test('copy branch shortcut, archive and unarchive', async ({ page, context }) =>
   await page.keyboard.press('Control+Shift+.');
   await expect(page.getByRole('status')).toContainText('Copied branch name');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`demo/${identifier.toLowerCase()}-board-drag-and-drop`);
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
   await expect(page.locator('.idp-banner')).toContainText('Archived');
-  await page.getByRole('button', { name: 'Unarchive' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Unarchive' }).click();
   await expect(page.locator('.idp-banner')).toHaveCount(0);
 });
 
 test('delete and restore', async ({ page }) => {
   await ready(page);
   page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
   await expect(page.locator('.idp-banner')).toContainText('trash');
   await expect(page.getByLabel('Title', { exact: true })).toHaveAttribute('readonly', '');
   await page.getByRole('button', { name: 'Restore' }).click();
