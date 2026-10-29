@@ -5,7 +5,9 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, type Issue, type Status } from 
 export interface NlUser { id: string; name: string }
 export interface NlLabel { id: string; name: string }
 export type NlPatch = Partial<Pick<Issue, 'status' | 'priority' | 'assignee_id'>> & { add_label_ids?: string[] };
-export interface NlAction { patch: NlPatch; parts: string[] }
+/** `blocked` set => the palette shows the row disabled with that text and must not apply `patch` (never a partial action). */
+export interface NlAction { patch: NlPatch; parts: string[]; blocked?: string }
+export interface NlOptions { /** People (/me, members) still loading: unresolved "me" reads "Loading members…". */ peopleLoading?: boolean }
 
 const PRIO: [RegExp, Issue['priority']][] = [
   [/\b(urgent|p0|asap)\b/, 1],
@@ -17,20 +19,32 @@ const PRIO: [RegExp, Issue['priority']][] = [
 const STATUS_ALIAS: Record<string, Status> = { 'in progress': 'in_progress', started: 'in_progress', doing: 'in_progress', review: 'in_review', 'in review': 'in_review', done: 'done', closed: 'done', complete: 'done', todo: 'todo', 'to do': 'todo', backlog: 'backlog', cancel: 'canceled', canceled: 'canceled', cancelled: 'canceled' };
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const cue = (name: string) => new RegExp(`(\\bassign (to )?|\\bfor |@)${esc(name.toLowerCase())}\\b`);
+
+/** Full-name match wins; otherwise first name. Several distinct people => tie (no assignee). */
+function matchUser(t: string, users: readonly NlUser[]): { user?: NlUser; tie?: NlUser[] } {
+  const full = users.filter((u) => cue(u.name).test(t));
+  if (full.length === 1) return { user: full[0] };
+  const pool = full.length > 1 ? full : users.filter((u) => cue(u.name.split(' ')[0]!).test(t));
+  const uniq = pool.filter((u, i) => pool.findIndex((v) => v.id === u.id) === i);
+  if (uniq.length === 1) return { user: uniq[0] };
+  return uniq.length > 1 ? { tie: uniq } : {};
+}
 
 /** Returns null when the text holds no recognised action, so the palette keeps plain search. */
-export function parseNlCommand(input: string, users: readonly NlUser[], labels: readonly NlLabel[] = [], me: string | null = null): NlAction | null {
+export function parseNlCommand(input: string, users: readonly NlUser[], labels: readonly NlLabel[] = [], me: string | null = null, opts: NlOptions = {}): NlAction | null {
   const t = ` ${input.toLowerCase().replace(/[,;]+/g, ' ').replace(/\s+/g, ' ').trim()} `;
-  const patch: NlPatch = {}; const parts: string[] = [];
+  const patch: NlPatch = {}; const parts: string[] = []; let blocked: string | undefined;
 
   // Assignee: "assign to X", "assign X", "for X", "@X", "unassign", "assign to me".
   if (/\bunassign\b/.test(t)) { patch.assignee_id = null; parts.push('Unassign'); }
-  else if (me && /\bassign (to )?me\b/.test(t)) { patch.assignee_id = me; parts.push('Assign to me'); }
-  else {
-    for (const u of users) {
-      const first = esc(u.name.split(' ')[0]!.toLowerCase()); const full = esc(u.name.toLowerCase());
-      if (new RegExp(`(\\bassign (to )?|\\bfor |@)(${full}|${first})\\b`).test(t)) { patch.assignee_id = u.id; parts.push(`Assign to ${u.name}`); break; }
-    }
+  else if (/\bassign (to )?me\b/.test(t)) {
+    if (me) { patch.assignee_id = me; parts.push('Assign to me'); }
+    else { blocked = opts.peopleLoading ? 'Loading members…' : "Can't resolve me"; parts.push('Assign to me'); }
+  } else {
+    const m = matchUser(t, users);
+    if (m.user) { patch.assignee_id = m.user.id; parts.push(`Assign to ${m.user.name}`); }
+    else if (m.tie) { blocked = `Ambiguous: ${m.tie.map((u) => u.name).join(' / ')}`; parts.push('Assign'); }
   }
   // Priority: only with an explicit cue ("priority", "prio", "urgent", "pN") to avoid false hits on titles.
   if (/\b(priority|prio|urgent|p[0-3])\b/.test(t)) {
@@ -49,8 +63,9 @@ export function parseNlCommand(input: string, users: readonly NlUser[], labels: 
   const add = labels.filter((l) => new RegExp(`\\b(label|tag)(ed)? (as )?${esc(l.name.toLowerCase())}\\b`).test(t)).map((l) => l.id);
   if (add.length) { patch.add_label_ids = add; parts.push(`Label ${labels.filter((l) => add.includes(l.id)).map((l) => l.name).join(', ')}`); }
 
+  if (blocked) return { patch: {}, parts, blocked };
   return parts.length ? { patch, parts } : null;
 }
 
-/** Palette row label: "Assign to Ada Byte · Priority High". */
-export const nlLabel = (a: NlAction, count = 1) => `${a.parts.join(' · ')}${count > 1 ? ` (${count} issues)` : ''}`;
+/** Palette row label: "Assign to Ada Byte · Priority High"; a blocked row shows its reason instead. */
+export const nlLabel = (a: NlAction, count = 1) => a.blocked ?? `${a.parts.join(' · ')}${count > 1 ? ` (${count} issues)` : ''}`;

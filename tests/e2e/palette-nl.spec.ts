@@ -24,3 +24,20 @@ test('palette NL: a plain search phrase keeps search first', async ({ page }) =>
   await expect(page.locator('li.nl-action')).toBeVisible();
   await expect(page.locator('li[aria-selected="true"]')).not.toHaveClass(/nl-action/);
 });
+
+test('palette NL: an unresolved "me" shows a disabled row, Enter does nothing', async ({ page }) => {
+  // Hold /me so people stay loading (API mode); in mock mode me is always resolved, so skip there.
+  test.skip(!process.env.ML_API, 'API mode only');
+  await page.route('**/api/v1/me', () => new Promise(() => {}));
+  await page.goto('/');
+  await page.waitForSelector('html[data-ready]');
+  await page.keyboard.press('j');
+  await page.keyboard.press('Control+k');
+  await page.getByRole('combobox').fill('assign to me, urgent');
+  const row = page.locator('li.nl-action');
+  await expect(row).toBeVisible();
+  await expect(row).toHaveAttribute('aria-disabled', 'true');
+  await expect(row).toContainText('Loading members');
+  await row.click();
+  await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible();
+});

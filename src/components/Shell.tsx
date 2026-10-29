@@ -26,7 +26,7 @@ type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'Priority', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
 const BUCKETS: { id: CycleBucket; title: string }[] = [{ id: 'active', title: 'Active' }, { id: 'upcoming', title: 'Upcoming' }, { id: 'past', title: 'Past' }];
 type PickKind = 'priority' | 'assignee' | 'label' | BulkKind;
-interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit }
+interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit; disabled?: boolean }
 
 function Column({ status, items, renderCard, selectedId, overZone, zone }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -99,10 +99,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }, [api?.slug]);
   // NL palette: real people (me + workspace members) in API mode.
   const [nlPeople, setNlPeople] = useState<NlPeople>(EMPTY_PEOPLE);
+  const [nlPeopleLoaded, setNlPeopleLoaded] = useState(false);
   useEffect(() => {
     if (!api) return;
     let live = true;
-    void fetchNlPeople(api.slug).then((p) => { if (live) setNlPeople(p); });
+    setNlPeople(EMPTY_PEOPLE); setNlPeopleLoaded(false);
+    void fetchNlPeople(api.slug).then((p) => { if (live) setNlPeople(p); }).finally(() => { if (live) setNlPeopleLoaded(true); });
     return () => { live = false; };
   }, [api?.slug]);
   // Push a change to the API (no-op in mock mode). Local state is already updated (optimistic); the server row then wins.
@@ -479,12 +481,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // An identifier-looking query (DEL-12) puts the hits first; otherwise commands keep priority.
   const baseResults: Cmd[] = looksLikeIdentifier(q) ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...hitCmds, ...allCmd];
   // Natural-language action: an extra row next to the search results, never a replacement.
-  const nl = q.trim().length >= 4 && !readOnly ? (api ? parseNlCommand(q, nlPeople.users, LABELS, nlPeople.me) : parseNlCommand(q, USERS, LABELS, USERS[0]!.id)) : null;
+  const nl = q.trim().length >= 4 && !readOnly ? (api ? parseNlCommand(q, nlPeople.users, LABELS, nlPeople.me, { peopleLoading: !nlPeopleLoaded }) : parseNlCommand(q, USERS, LABELS, USERS[0]!.id)) : null;
   // A status-only phrase is already covered by the built-in 'Move to …' commands: no duplicate NL row.
-  const nlStatusOnly = !!nl && Object.keys(nl.patch).every((k) => k === 'status');
+  const nlStatusOnly = !!nl && !nl.blocked && Object.keys(nl.patch).every((k) => k === 'status');
   // Render-time: use state, not targetIds() (multiRef is declared further down: calling it here is a TDZ crash).
   const nlIds = nl && !nlStatusOnly ? (multi.length ? multi : current?.id ? [current.id] : []) : [];
-  const nlCmd: Cmd[] = nl && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), hint: '↵', run: () => {
+  const nlCmd: Cmd[] = nl?.blocked && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), disabled: true, run: () => {} }] : nl && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), hint: '↵', run: () => {
     const { add_label_ids, assignee_id, ...rest } = nl.patch;
     for (const id of nlIds) {
       const cur = store.current.list().find((x) => x.id === id); if (!cur) continue;
@@ -499,7 +501,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     sync(); if (nlIds.length === 1) setSelId(nlIds[0]!); } }] : [];
   // Only an explicit leading verb puts the action first; otherwise ('fix for Ada') search hits keep Enter.
   const nlFirst = /^\s*(assign|unassign|move|mark|set|label|prioriti[sz]e)\b/i.test(q);
-  const results: Cmd[] = nlFirst ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
+  const results: Cmd[] = nlFirst && !nl?.blocked ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
@@ -764,12 +766,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') { e.preventDefault(); setPi((p) => Math.min(p + 1, results.length - 1)); }
                 else if (e.key === 'ArrowUp') { e.preventDefault(); setPi((p) => Math.max(p - 1, 0)); }
-                else if (e.key === 'Enter') { const c = results[pi]; closePalette(); c?.run(); }
+                else if (e.key === 'Enter') { const c = results[pi]; if (c?.disabled) return; closePalette(); c?.run(); }
               }}
             />
             <ul id='palette-list' role='listbox' aria-label='Commands'>
               {results.map((c, idx) => (
-                <li key={c.id} id={`pc-${c.id}`} className={c.id === 'nl' ? 'nl-action' : undefined} role='option' aria-selected={idx === pi} onClick={() => { closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
+                <li key={c.id} id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
               ))}
               {results.length === 0 && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
             </ul>
