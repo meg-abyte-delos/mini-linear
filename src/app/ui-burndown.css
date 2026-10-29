@@ -1,0 +1,16 @@
+/* Cycle burndown (Delos Night tokens). SVG geometry lives in attributes; only paint is here (strict CSP). */
+.cy-actions { display:inline-flex; gap:6px; }
+.bd { grid-column:1 / -1; padding:8px 16px 14px; border-bottom:1px solid var(--line-soft); }
+.bd-svg { width:100%; max-width:640px; height:auto; display:block; }
+.bd-grid { stroke:var(--line); stroke-width:1; }
+.bd-tick { fill:var(--muted-strong); font-size:10px; }
+.bd-line { stroke:var(--accent); stroke-width:2; filter:drop-shadow(0 0 4px rgba(40,171,165,.45)); }
+.bd-dot { fill:var(--accent); }
+.bd-ideal { stroke:var(--muted-strong); stroke-width:1.25; }
+.bd-scope { stroke:var(--st-info); stroke-width:1; opacity:.55; }
+.bd-legend { display:flex; gap:14px; margin-top:6px; color:var(--muted-strong); font-size:var(--fs-xs); }
+.bd-k::before { content:''; display:inline-block; width:14px; height:0; border-top:2px solid; margin-right:6px; vertical-align:middle; }
+.bd-k-line::before { border-color:var(--accent); }
+.bd-k-ideal::before { border-top-style:dashed; border-color:var(--muted-strong); }
+.bd-k-scope::before { border-color:var(--st-info); opacity:.7; }
+.bd-empty { color:var(--muted-strong); font-size:var(--fs-sm); padding:8px 16px; margin:0; }
