@@ -5,6 +5,7 @@ import { hashPassword } from '../src/lib/auth/password';
 
 const url = process.env.DATABASE_OWNER_URL;
 if (!url) throw new Error('DATABASE_OWNER_URL is required');
+if (process.env.NODE_ENV === 'production') throw new Error('seed-demo refuses to run in production (fixed demo password)');
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 export const DEMO = { slug: 'demo', email: 'demo@example.test', password: 'demo-password-123', teamKey: 'DEM' };
 
@@ -33,15 +34,16 @@ try {
   await c.query("insert into memberships (id, workspace_id, user_id, role) values ($1,$2,$3,'admin') on conflict (workspace_id, user_id) do nothing", [id(6), W, uid]);
   await c.query('insert into teams (id, workspace_id, name, key) values ($1,$2,$3,$4) on conflict (id) do update set name = excluded.name', [T, W, 'Demo', DEMO.teamKey]);
   await c.query('insert into team_memberships (workspace_id, team_id, user_id) values ($1,$2,$3) on conflict do nothing', [W, T, uid]);
-  for (const [n, name, color, cat, pos, legacy] of STATES)
-    await c.query('insert into workflow_states (id, workspace_id, team_id, name, color, category, position, legacy_status) values ($1,$2,$3,$4,$5,$6::workflow_state_category,$7,$8::issue_status) on conflict (id) do nothing', [id(n), W, T, name, color, cat, pos, legacy]);
+  // The teams_seed_states trigger (0101) creates the 6 default states on team insert (random ids): reuse them by legacy_status.
+  const st = await c.query('select id, legacy_status from workflow_states where team_id = $1', [T]);
+  const stateId = (i: number) => { const r = st.rows.find((x) => x.legacy_status === STATES[i]![5]); if (!r) throw new Error(`missing state ${STATES[i]![1]}`); return r.id as string; };
   await c.query('insert into projects (id, workspace_id, name, description) values ($1,$2,$3,$4) on conflict (id) do update set name = excluded.name', [P, W, 'Launch', 'Demo project']);
   await c.query('insert into project_teams (workspace_id, project_id, team_id) values ($1,$2,$3) on conflict do nothing', [W, P, T]);
   await c.query("insert into cycles (id, workspace_id, team_id, name, start_date, end_date) values ($1,$2,$3,'Cycle 1', current_date - 3, current_date + 10) on conflict (id) do nothing", [C, W, T]);
   for (const [n, title, st, prio] of ISSUES)
     await c.query(`insert into issues (id, workspace_id, team_id, number, title, state_id, priority, sort_key, created_by, assignee_id, project_id, cycle_id)
       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9,$10,$11) on conflict (id) do update set title = excluded.title`,
-      [id(100 + n), W, T, n, title, id(10 + st), prio, `a${n}`, uid, P, C]);
+      [id(100 + n), W, T, n, title, stateId(st), prio, `a${n}`, uid, P, C]);
   await c.query('update teams set issue_seq = greatest(issue_seq, $2) where id = $1', [T, ISSUES.length]);
   await c.query('commit');
   console.log(`seed-demo ok: workspace ${DEMO.slug}, login ${DEMO.email}`);
