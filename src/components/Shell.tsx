@@ -13,6 +13,7 @@ import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, t
 import { ProgressRing } from '@/components/ProgressRing';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
+import { GROUPING_LABEL, ORDERING_LABEL, hueOfId, initialsOf, orderIssues, relDate, type Grouping, type Ordering } from '@/lib/list-ui';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
 import { SelectionBar, type BulkKind } from './SelectionBar';
@@ -131,6 +132,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [filters, setFiltersState] = useState<Filters>(initialFilters);
   const [projPick, setProjPick] = useState<DOMRect | null | false>(false);
   const [filterPick, setFilterPick] = useState<{ kind: FilterKey; rect: DOMRect | null } | null>(null);
+  const [tbMenu, setTbMenu] = useState<'filter' | 'display' | null>(null);
+  const [grouping, setGrouping] = useState<Grouping>('status');
+  const [ordering, setOrdering] = useState<Ordering>('manual');
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
   // Filters live in the URL: replaceState keeps other params (seed, state) and does not refetch.
   function setFilters(f: Filters) {
@@ -383,20 +389,21 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     return LABELS.map((l) => ({ id: l.id, label: l.name, badge: scopeBadge(l.scope), checked: sel.every((x) => x.label_ids.includes(l.id)), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
   // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
-  function create() {
+  function create(status?: Status) {
     if (readOnly) { setToast('Guests have read-only access.'); return; }
     if (api) {
       void apiCreate(api.slug, api.teamId, 'New issue').then((row) => {
         if (!row) { setToast('Could not create the issue.'); return; }
         versions.current.set(row.id, row.version);
         store.current.upsert({ ...row, sort_key: String(Date.now()) });
+        if (status && row.status !== status) { store.current.update(row.id, { status }); push(row.id, { status }); }
         sync();
         if (view === 'cycles' || view === 'projects') setView('list');
         setSelId(row.id);
       });
       return;
     }
-    const made = store.current.create({ title: 'New issue' });
+    const made = store.current.create({ title: 'New issue', ...(status ? { status } : {}) });
     sync();
     if (view === 'cycles' || view === 'projects') setView('list');
     if (made && activeCount(filters) > 0 && applyFilters([made], filters).length === 0) setFilters(emptyFilters());
@@ -576,8 +583,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const who = (id: string | null) => USERS.find((u) => u.id === id);
-  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />; };
+  // API mode: resolve through the members API (nlPeople); mock mode keeps USERS.
+  const who = (id: string | null) => {
+    if (!id) return undefined;
+    const m = USERS.find((u) => u.id === id); if (m) return m;
+    const p = nlPeople.users.find((u) => u.id === id);
+    return p ? { id: p.id, name: p.name, initials: initialsOf(p.name), hue: hueOfId(p.id) } : undefined;
+  };
+  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av av-none' aria-hidden='true' title='Unassigned' />; };
   const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
   const row = (i: Issue) => (
@@ -587,8 +600,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <span className='id'>{i.identifier ?? i.id}</span>
       <StatusIcon status={i.status} />
       <span className='title'>{i.title}</span>
-      <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</span>
-      <span className='date'>{fmtDate(i.created_at)}</span>
+      <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{(() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
+      <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>
       {assignee(i)}
     </div>
   );
@@ -604,7 +617,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     <div className='shell'>
       <aside className='side' aria-label='Sidebar'>
         <div className='ws'><span className='ws-logo' aria-hidden='true'>D</span><span className='ws-name'>Delos</span></div>
-        {!readOnly && <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
+        {!readOnly && <button className='side-btn new' onClick={() => create()}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
         <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
         <nav aria-label='Primary'>
           <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><Icon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
@@ -638,11 +651,19 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </header>
         {view !== 'cycles' && view !== 'projects' && view !== 'inbox' && !loadError && allIssues.length > 0 && (
           <div className='filterbar' role='toolbar' aria-label='Filters'>
-            {FILTER_KEYS.map((k) => (
-              <button key={k} id={`fb-${k}`} className={`fchip${filters[k].length ? ' on' : ''}`} aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed={filters[k].length > 0} onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
-                {FILTER_LABEL[k]}{filters[k].length > 0 && <span className='fval'>: {filterValueLabel(k)}</span>}
+            {FILTER_KEYS.filter((k) => filters[k].length > 0).map((k) => (
+              <button key={k} id={`fb-${k}`} className='fchip on' aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
+                {FILTER_LABEL[k]}<span className='fval'>: {filterValueLabel(k)}</span>
               </button>
             ))}
+            <div className='fwrap'>
+              <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='views' /><span>Filter</span></button>
+              {tbMenu === 'filter' && (
+                <div className='tb-menu' role='menu' aria-label='Filter by' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-add')?.focus(); } }}>
+                  {FILTER_KEYS.map((k, n) => <button key={k} id={`fb-${filters[k].length ? 'm-' : ''}${k}`} role='menuitem' autoFocus={n === 0} onClick={() => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }}>{FILTER_LABEL[k]}</button>)}
+                </div>
+              )}
+            </div>
             {activeCount(filters) > 0 && <button className='fclear' onClick={() => setFilters(emptyFilters())}>Clear filters</button>}
             {activeCount(filters) > 0 && !readOnly && !activeViewId && !saving && <button className='fchip save-view' onClick={() => setSaving({ name: '', shared: false, err: false })}>Save view</button>}
             {saving && (
@@ -654,6 +675,17 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                 {saving.err && <span role='alert' className='save-err'>Enter a name (could not save).</span>}
               </form>
             )}
+            {view === 'list' && (
+              <div className='tb-right'>
+                <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='list' /><span>Display</span></button>
+                {tbMenu === 'display' && (
+                  <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
+                    <label>Grouping<select autoFocus value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>{(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => <option key={g} value={g}>{GROUPING_LABEL[g]}</option>)}</select></label>
+                    <label>Ordering<select value={ordering} onChange={(e) => setOrdering(e.target.value as Ordering)}>{(Object.keys(ORDERING_LABEL) as Ordering[]).map((o) => <option key={o} value={o}>{ORDERING_LABEL[o]}</option>)}</select></label>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {loadError ? (
@@ -664,7 +696,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : allIssues.length === 0 ? (
           <div className='state empty' role='status'>
             <p>No issues yet.</p>
-            {!readOnly && <button onClick={create}>Create issue <kbd>C</kbd></button>}
+            {!readOnly && <button onClick={() => create()}>Create issue <kbd>C</kbd></button>}
           </div>
         ) : view === 'inbox' ? (
           <Inbox client={inboxClient} refreshKey={rtTick} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
@@ -708,13 +740,18 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         ) : view === 'list' ? (
           <div className='scroll'>
-            {STATUSES.map((s) => {
-              const items = issues.filter((i) => i.status === s);
+            {(grouping === 'none' ? [null] : STATUSES).map((s) => {
+              const items = orderIssues(s ? issues.filter((i) => i.status === s) : ordered, ordering);
               if (!items.length) return null;
+              const key = s ?? 'all';
+              const shut = collapsed.has(key);
               return (
-                <section key={s} className={`group${overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${s}`} {...zoneProps(s)}>
-                  <h2 id={`g-${s}`}><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{items.length}</span></h2>
-                  <div role='listbox' aria-labelledby={`g-${s}`}>{items.map(row)}</div>
+                <section key={key} className={`group${s && overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${key}`} {...(s ? zoneProps(s) : {})}>
+                  <h2 id={`g-${key}`}>
+                    <button className='gh-toggle' aria-expanded={!shut} aria-controls={`gl-${key}`} onClick={() => toggleGroup(key)}><span className='chev' aria-hidden='true'>▾</span>{s && <StatusIcon status={s} />}<span>{s ? STATUS_LABEL[s] : 'All issues'}</span><span className='count'>{items.length}</span></button>
+                    {s && !readOnly && <button className='gh-add' aria-label={`New issue in ${STATUS_LABEL[s]}`} onClick={() => create(s)}>+</button>}
+                  </h2>
+                  {!shut && <div id={`gl-${key}`} role='listbox' aria-labelledby={`g-${key}`}>{items.map(row)}</div>}
                 </section>
               );
             })}
