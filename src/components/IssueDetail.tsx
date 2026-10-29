@@ -14,6 +14,8 @@ import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { IssueHeaderBar, type HeaderNav } from '@/components/IssueHeaderBar';
 import { PropIcon } from '@/components/PropIcons';
+import { PresenceStack } from '@/components/PresenceStack';
+import { usePresence } from '@/lib/presence/use-presence';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
 type PickKind = 'status' | 'priority' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent' | 'relation';
@@ -55,6 +57,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [issue, setIssue] = useState<DetailIssue>(initial);
   const [others, setOthers] = useState<DetailIssue[]>(all.filter((i) => i.id !== initial.id));
   const [title, setTitle] = useState(initial.title);
+  const viewers = usePresence(slug, initial.id, viewer?.userId, api);
   const [desc, setDesc] = useState(initial.description);
   const [tab, setTab] = useState<'write' | 'preview'>(initial.description ? 'preview' : 'write');
   const [pick, setPick] = useState<{ kind: PickKind; rect: DOMRect | null; relType?: Relation['type'] } | null>(null);
@@ -283,6 +286,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
       <main className='idp-main' aria-label={`Issue ${ident}`}>
         <header className='idp-head'>
           <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>Issues</Link><span className='sep' aria-hidden='true'>/</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>/</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
+          <PresenceStack presence={viewers} size='md' />
           <IssueHeaderBar ident={ident} nav={nav} archived={!!issue.archived_at} readOnly={readOnly} onCopyLink={() => void copyLink()} onCopyBranch={() => void copyBranch()} onArchive={() => void lifecycle('archive')} onUnarchive={() => void lifecycle('unarchive')} onDelete={() => { if (window.confirm(`Delete ${ident}? You can restore it from the trash.`)) void lifecycle('delete'); }} onRestore={() => void lifecycle('restore')} />
         </header>
         {(issue.archived_at || issue.deleted_at) && <p className='idp-banner' role='status'>{issue.deleted_at ? 'This issue is in the trash. Restore it to edit.' : `Archived ${fmtDate(issue.archived_at as string)}.`}</p>}

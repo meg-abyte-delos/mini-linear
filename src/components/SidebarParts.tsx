@@ -32,6 +32,7 @@ export function WorkspaceSwitcher({ slug, name = 'Delos', people }: { slug: stri
       {open && (
         <div className='ws-menu' role='menu' aria-label='Workspace'>
           {me && <div className='ws-menu-who'>{me.name}</div>}
+          {slug && <a role='menuitem' href={`/w/${slug}/members`}>Members</a>}
           {slug && <a role='menuitem' href={`/w/${slug}/settings`}>Workspace settings</a>}
           <button role='menuitem' onClick={() => void logout()}>Log out</button>
         </div>
