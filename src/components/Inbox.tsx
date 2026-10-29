@@ -1,12 +1,12 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TABS, TYPE_LABEL, relTime, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
 
 /**
  * Inbox. Tabs All/Unread/Archived/Snoozed, bulk read/archive on checked rows, detail panel on the right.
  * Keys: j/k move, x check, e archive, u toggle read, s snooze menu (1-3 pick a preset), h snooze until tomorrow, Enter open issue, Esc closes menus.
  */
-export function Inbox({ client, onUnread, onOpenIssue }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void }) {
+export function Inbox({ client, onUnread, onOpenIssue, refreshKey = 0 }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; refreshKey?: number }) {
   const [tab, setTab] = useState<InboxTab>('all');
   const [items, setItems] = useState<Notif[] | null>(null);
   const [err, setErr] = useState(false);
@@ -18,6 +18,13 @@ export function Inbox({ client, onUnread, onOpenIssue }: { client: InboxClient; 
     try { const r = await client.list(tab); setItems(r.items); onUnread(r.unread_count); setErr(false); setChecked(new Set()); } catch { setErr(true); }
   }, [client, onUnread, tab]);
   useEffect(() => { setItems(null); setCur(0); void load(); }, [load]);
+  // Realtime: a change elsewhere may have produced a notification; reload quietly (keeps selection).
+  const firstKey = useRef(refreshKey);
+  useEffect(() => {
+    if (refreshKey === firstKey.current) return;
+    const t = setTimeout(() => { void client.list(tab).then((r) => { setItems(r.items); onUnread(r.unread_count); }).catch(() => undefined); }, 400);
+    return () => clearTimeout(t);
+  }, [refreshKey]);
   const list = items ?? [];
   const unread = list.filter((n) => !n.read_at).length;
   const presets = useMemo(() => snoozePresets(), [snoozeOpen]);

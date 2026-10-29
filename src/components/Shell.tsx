@@ -8,6 +8,7 @@ import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/mock-api';
+import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
@@ -71,6 +72,30 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // The store is the single source of truth; React state is a snapshot refreshed after each mutation.
   const [allIssues, setIssues] = useState(() => store.current.list());
   const sync = () => setIssues(store.current.list());
+  // API mode: live updates from the SSE change feed (other tabs/users). Own writes are skipped by version.
+  const [rtTick, setRtTick] = useState(0);
+  useEffect(() => {
+    if (!api) return;
+    return startIssueRealtime({
+      slug: api.slug,
+      known: (id) => versions.current.get(id),
+      upsert: (row) => {
+        const prev = store.current.list().find((x) => x.id === row.id);
+        versions.current.set(row.id, row.version);
+        store.current.upsert({ ...row, sort_key: prev?.sort_key ?? String(store.current.list().length).padStart(8, '0') });
+        sync();
+      },
+      remove: (id) => { store.current.remove(id); versions.current.delete(id); sync(); },
+      resync: async () => {
+        const rows = await fetchAllIssues(api.slug);
+        const have = new Set(rows.map((r) => r.id));
+        for (const cur of store.current.list()) if (!have.has(cur.id)) store.current.remove(cur.id);
+        rows.forEach((r, i) => { versions.current.set(r.id, r.version); store.current.upsert({ ...r, sort_key: store.current.list().find((x) => x.id === r.id)?.sort_key ?? String(i).padStart(8, '0') }); });
+        sync();
+      },
+      onActivity: () => setRtTick((n) => n + 1),
+    });
+  }, [api?.slug]);
   // Push a change to the API (no-op in mock mode). Local state is already updated (optimistic); the server row then wins.
   // 412 -> refetch the issue, toast "modified elsewhere", no automatic retry.
   function push(id: string, patch: Record<string, unknown>) {
@@ -621,7 +646,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             {!readOnly && <button onClick={create}>Create issue <kbd>C</kbd></button>}
           </div>
         ) : view === 'inbox' ? (
-          <Inbox client={inboxClient} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
+          <Inbox client={inboxClient} refreshKey={rtTick} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
           <ProjectDetail slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
             issues={allIssues.filter((i) => i.project_id === detailId).map((i) => ({ id: i.id, identifier: i.identifier ?? i.id, title: i.title, done: i.status === 'done' || i.status === 'canceled' }))}
