@@ -1,0 +1,17 @@
+import { test as base, expect, Page } from '@playwright/test';
+export const test = base;
+export { expect };
+// [H] seed attendu: admin@t1.test / Passw0rd!
+export async function login(page: Page, email = 'admin@t1.test', password = 'Passw0rd!') {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: /sign in|log in/i }).click();
+  await expect(page).not.toHaveURL(/login/);
+}
+export async function createIssue(page: Page, title: string) {
+  await page.getByRole('button', { name: /new issue|create issue/i }).click();
+  await page.getByRole('textbox', { name: /title/i }).fill(title);
+  await page.getByRole('button', { name: /^create/i }).click();
+  await expect(page.getByRole('link', { name: title })).toBeVisible();
+}

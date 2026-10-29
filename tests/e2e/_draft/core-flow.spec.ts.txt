@@ -1,0 +1,107 @@
+import { test, expect, login, createIssue } from './_helpers';
+
+test.describe('Login', () => {
+  test('valid credentials land on the app', async ({ page }) => {
+    await login(page);
+    await expect(page).not.toHaveURL(/login/);
+  });
+  test('wrong password shows an error and stays on login', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByLabel('Email').fill('admin@t1.test');
+    await page.getByLabel('Password').fill('wrong-password');
+    await page.getByRole('button', { name: /sign in|log in/i }).click();
+    await expect(page.getByRole('alert').or(page.getByText(/invalid|incorrect/i))).toBeVisible();
+    await expect(page).toHaveURL(/login/);
+  });
+  test('empty form is refused', async ({ page }) => {
+    await page.goto('/login');
+    await page.getByRole('button', { name: /sign in|log in/i }).click();
+    await expect(page).toHaveURL(/login/);
+  });
+  test('protected route redirects to login when anonymous', async ({ page }) => {
+    await page.goto('/issues');
+    await expect(page).toHaveURL(/login/);
+  });
+  test('session survives reload; logout ends it', async ({ page }) => {
+    await login(page);
+    await page.goto('/issues');
+    await page.reload();
+    await expect(page).not.toHaveURL(/login/);
+    await page.getByRole('button', { name: /account|profile|user menu/i }).click();
+    await page.getByRole('menuitem', { name: /log ?out|sign out/i }).click();
+    await page.goto('/issues');
+    await expect(page).toHaveURL(/login/);
+  });
+});
+
+test.describe('Create issue', () => {
+  test.beforeEach(async ({ page }) => { await login(page); await page.goto('/issues'); });
+  test('created issue appears in the list', async ({ page }) => {
+    const t = `E2E create ${Date.now()}`;
+    await createIssue(page, t);
+    await expect(page.getByRole('link', { name: t })).toBeVisible();
+  });
+  test('empty title is refused, no issue created', async ({ page }) => {
+    await page.getByRole('button', { name: /new issue|create issue/i }).click();
+    await page.getByRole('button', { name: /^create/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText(/required|title/i).first()).toBeVisible();
+  });
+  test('title with special characters is stored verbatim (no XSS)', async ({ page }) => {
+    const t = `E2E <b>x</b> "q" & é ${Date.now()}`;
+    await createIssue(page, t);
+    await expect(page.getByRole('link', { name: t })).toBeVisible();
+    await expect(page.locator('b', { hasText: 'x' })).toHaveCount(0);
+  });
+  test('double click on Create makes a single issue', async ({ page }) => {
+    const t = `E2E dbl ${Date.now()}`;
+    await page.getByRole('button', { name: /new issue|create issue/i }).click();
+    await page.getByRole('textbox', { name: /title/i }).fill(t);
+    await page.getByRole('button', { name: /^create/i }).dblclick();
+    await expect(page.getByRole('link', { name: t })).toHaveCount(1);
+  });
+  test('two issues get distinct identifiers', async ({ page }) => {
+    const a = `E2E idA ${Date.now()}`, b = `E2E idB ${Date.now()}`;
+    await createIssue(page, a); await createIssue(page, b);
+    const ha = await page.getByRole('link', { name: a }).getAttribute('href');
+    const hb = await page.getByRole('link', { name: b }).getAttribute('href');
+    expect(ha).not.toBe(hb);
+  });
+});
+
+test.describe('Persistence after reload', () => {
+  test.beforeEach(async ({ page }) => { await login(page); await page.goto('/issues'); });
+  test('issue survives reload', async ({ page }) => {
+    const t = `E2E persist ${Date.now()}`;
+    await createIssue(page, t);
+    await page.reload();
+    await expect(page.getByRole('link', { name: t })).toBeVisible();
+  });
+  test('issue survives a fresh session (new context, same user)', async ({ page, browser }) => {
+    const t = `E2E fresh ${Date.now()}`;
+    await createIssue(page, t);
+    const ctx = await browser.newContext();
+    const p2 = await ctx.newPage();
+    await login(p2);
+    await p2.goto('/issues');
+    await expect(p2.getByRole('link', { name: t })).toBeVisible();
+    await ctx.close();
+  });
+  test('status change persists after reload', async ({ page }) => {
+    const t = `E2E pstatus ${Date.now()}`;
+    await createIssue(page, t);
+    await page.getByRole('link', { name: t }).click();
+    await page.getByRole('button', { name: /status/i }).click();
+    await page.getByRole('option', { name: /in progress/i }).click();
+    await page.reload();
+    await expect(page.getByRole('button', { name: /status/i })).toContainText(/in progress/i);
+  });
+  test('detail page opened by URL after reload shows the same issue', async ({ page }) => {
+    const t = `E2E url ${Date.now()}`;
+    await createIssue(page, t);
+    await page.getByRole('link', { name: t }).click();
+    const url = page.url();
+    await page.goto(url);
+    await expect(page.getByRole('heading', { name: t })).toBeVisible();
+  });
+});
