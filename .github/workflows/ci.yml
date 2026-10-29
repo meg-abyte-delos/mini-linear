@@ -22,6 +22,8 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-retries 10
     env:
+      SEED_DEMO_PASSWORD: ${{ secrets.SEED_DEMO_PASSWORD }}
+      E2E_PASSWORD: ${{ secrets.SEED_DEMO_PASSWORD }}
       PGSUPER_URL: postgres://postgres:ci_super@localhost:5432/mini_linear
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
       DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
@@ -66,6 +68,8 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-retries 10
     env:
+      SEED_DEMO_PASSWORD: ${{ secrets.SEED_DEMO_PASSWORD }}
+      E2E_PASSWORD: ${{ secrets.SEED_DEMO_PASSWORD }}
       PGSUPER_URL: postgres://postgres:ci_super@localhost:5432/mini_linear
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
       DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear

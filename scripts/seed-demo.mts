@@ -5,9 +5,12 @@ import { hashPassword } from '../src/lib/auth/password';
 
 const url = process.env.DATABASE_OWNER_URL;
 if (!url) throw new Error('DATABASE_OWNER_URL is required');
-if (process.env.NODE_ENV === 'production') throw new Error('seed-demo refuses to run in production (fixed demo password)');
+if (process.env.NODE_ENV === 'production') throw new Error('seed-demo refuses to run in production');
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-export const DEMO = { slug: 'demo', email: 'demo@example.test', password: 'demo-password-123', teamKey: 'DEM' };
+// The demo password is never in the repo: SEED_DEMO_PASSWORD (CI secret / local env) is required.
+const password = process.env.SEED_DEMO_PASSWORD;
+if (!password || password.length < 8) throw new Error('SEED_DEMO_PASSWORD is required (8+ characters)');
+export const DEMO = { slug: 'demo', email: 'demo@example.test', teamKey: 'DEM' };
 
 const W = id(1), U = id(2), T = id(3), P = id(4), C = id(5);
 const STATES: [number, string, string, string, number, string][] = [
@@ -25,11 +28,13 @@ const c = await pool.connect();
 try {
   await c.query('begin');
   await c.query("select set_config('app.workspace_id', $1, true)", [W]);
-  const hash = await hashPassword(DEMO.password);
+  const hash = await hashPassword(password);
   // users/sessions are exempt from RLS. Existing demo user keeps its row (id is the conflict target via email lookup).
   const ex = await c.query('select id from users where lower(email) = $1', [DEMO.email]);
   const uid: string = ex.rows[0]?.id ?? U;
-  if (!ex.rows[0]) await c.query('insert into users (id, email, password_hash, email_verified_at) values ($1,$2,$3,now())', [U, DEMO.email, hash]);
+  // Re-seeding resets the password to the env value, so e2e login always matches SEED_DEMO_PASSWORD.
+  if (ex.rows[0]) await c.query('update users set password_hash = $2, email_verified_at = coalesce(email_verified_at, now()) where id = $1', [uid, hash]);
+  else await c.query('insert into users (id, email, password_hash, email_verified_at) values ($1,$2,$3,now())', [U, DEMO.email, hash]);
   await c.query('insert into workspaces (id, slug, name) values ($1,$2,$3) on conflict (id) do update set name = excluded.name', [W, DEMO.slug, 'Demo']);
   await c.query("insert into memberships (id, workspace_id, user_id, role) values ($1,$2,$3,'admin') on conflict (workspace_id, user_id) do nothing", [id(6), W, uid]);
   await c.query('insert into teams (id, workspace_id, name, key) values ($1,$2,$3,$4) on conflict (id) do update set name = excluded.name', [T, W, 'Demo', DEMO.teamKey]);

@@ -21,7 +21,10 @@ test('dnd board: dropping a card on another column changes its status', async ({
   const src = page.getByRole('option').first();
   const id = (await src.getAttribute('data-id'))!;
   const from = await statusOf(page, id);
-  const h = page.locator('section.col').nth(1).locator('h2');
+  // Pick a column that is not the card's current one (the seed's first issue may already sit in column 1).
+  const cols = page.locator('section.col');
+  const idx = (await cols.nth(1).locator(`[data-id="${id}"]`).count()) ? 2 : 1;
+  const h = cols.nth(idx).locator('h2');
   await h.scrollIntoViewIfNeeded();
   await src.dragTo(h);
   expect(await statusOf(page, id)).not.toBe(from);
