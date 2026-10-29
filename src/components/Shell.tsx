@@ -33,7 +33,7 @@ const BUCKETS: { id: CycleBucket; title: string }[] = [{ id: 'active', title: 'A
 type PickKind = 'priority' | 'assignee' | 'label' | BulkKind;
 interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit; disabled?: boolean }
 
-function Column({ status, items, renderCard, selectedId, overZone, zone }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object }) {
+function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object; onAdd?: (s: Status) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState(0);
   const [vh, setVh] = useState(800);
@@ -55,7 +55,10 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
   const w = visibleWindowVar(heights, top, vh);
   return (
     <section className={`col${overZone ? ' over-zone' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
-      <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
+      <div className='col-head'>
+        <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
+        {onAdd && <button type='button' className='col-act' aria-label={`Add issue to ${STATUS_LABEL[status]}`} title='Add issue' onClick={() => onAdd(status)}><Icon name='plus' /></button>}
+      </div>
       <div className='col-scroll' ref={ref} onScroll={(e) => setTop(e.currentTarget.scrollTop)} data-testid={`col-${status}`}>
         <div role='listbox' aria-labelledby={`c-${status}`} style={{ paddingTop: w.padTop, paddingBottom: w.padBottom }}>
           {items.slice(w.start, w.end).map((i, k) => renderCard(i, w.start + k + 1, items.length))}
@@ -641,7 +644,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
-      <div className='card-meta'><PriorityIcon priority={i.priority} />{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
+      <div className='card-meta'><span className='card-prio' title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
   );
 
@@ -797,7 +800,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : (
           <div className='board'>
             {STATUSES.map((s) => (
-              <Column key={s} status={s} items={issues.filter((i) => i.status === s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} />
+              <Column key={s} status={s} items={issues.filter((i) => i.status === s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} onAdd={readOnly ? undefined : create} />
             ))}
           </div>
         )}
