@@ -12,16 +12,17 @@ test('priority filter, save as view, list in sidebar, reopen from shareable URL'
   expect(await page.locator('.row').count()).toBeLessThan(total);
 
   await page.getByRole('button', { name: 'Save view' }).click();
-  await page.getByLabel('View name').fill('Urgent only');
+  const name = `Urgent only ${Date.now()}`; // unique: a failed earlier run on the persistent DB may have left its view behind
+  await page.getByLabel('View name').fill(name);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   const side = page.getByTestId('saved-views');
-  await expect(side.getByRole('link', { name: /Urgent only/ })).toBeVisible();
-  await expect(page).toHaveURL(/v=mv1/);
+  await expect(side.getByRole('link', { name: new RegExp(name) })).toBeVisible();
+  await expect(page).toHaveURL(/[?&]v=[0-9a-f-]{36}/);
 
   // Leave the view, then open it from the sidebar.
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await expect(page).not.toHaveURL(/priority=|v=/);
-  await side.getByRole('link', { name: /Urgent only/ }).click();
+  await side.getByRole('link', { name: new RegExp(name) }).click();
   await expect(page).toHaveURL(/priority=1/);
   await expect(page.getByRole('button', { name: /^Priority: Urgent/ })).toBeVisible();
 
@@ -30,10 +31,10 @@ test('priority filter, save as view, list in sidebar, reopen from shareable URL'
   await page.getByRole('option', { name: /^Todo/ }).click();
   await page.getByRole('combobox', { name: /Filter by status/ }).press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page).not.toHaveURL(/v=mv1/);
+  await expect(page).not.toHaveURL(/[?&]v=/);
 
-  await page.getByRole('button', { name: 'Delete view Urgent only' }).click();
-  await expect(side.getByRole('link', { name: /Urgent only/ })).toHaveCount(0);
+  await page.getByRole('button', { name: `Delete view ${name}` }).click();
+  await expect(side.getByRole('link', { name: new RegExp(name) })).toHaveCount(0);
 });
 
 test('save needs a name', async ({ page }) => {

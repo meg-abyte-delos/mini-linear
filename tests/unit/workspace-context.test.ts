@@ -6,7 +6,7 @@ vi.mock('next/navigation', () => ({ redirect: (to: string) => redirect(to) }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ toString: () => 'ml_session=tok' }) }));
 vi.mock('@/lib/dev-auth', () => ({ installDevAuth: () => {} }));
 
-import { pickWorkspace, getWorkspaceContext } from '@/lib/auth/workspace-context';
+import { pickWorkspace, getWorkspaceContext, problemFor } from '@/lib/auth/workspace-context';
 
 const ok = (items: unknown[]) => new Response(JSON.stringify({ items }), { status: 200 });
 const status = (s: number) => new Response('{}', { status: s });
@@ -16,6 +16,13 @@ describe('pickWorkspace', () => {
   it('prefers demo when the user is a member', () => expect(pickWorkspace([a, d])).toBe(d));
   it('falls back to the first membership, never to a workspace the user is not in', () => expect(pickWorkspace([a])).toBe(a));
   it('returns null without memberships', () => expect(pickWorkspace([])).toBeNull());
+});
+
+describe('problemFor', () => {
+  it('404 means no workspace; everything else is unavailable', () => {
+    expect(problemFor(404)).toBe('no-workspace');
+    for (const s of [403, 500, 502]) expect(problemFor(s)).toBe('unavailable');
+  });
 });
 
 describe('getWorkspaceContext', () => {
