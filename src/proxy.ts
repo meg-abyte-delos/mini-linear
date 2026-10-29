@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { originAllowed } from '@/lib/auth/origin';
+import { loginRedirect } from '@/lib/auth/guard';
 import { buildCsp, SECURITY_HEADERS } from '@/lib/csp';
 
 export function proxy(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith('/api/') && !originAllowed(req)) {
     return NextResponse.json({ error: { code: 'forbidden', message: 'cross-origin request refused', request_id: crypto.randomUUID() } }, { status: 403 });
   }
+  const to = loginRedirect(req.nextUrl.pathname, req.nextUrl.search, !!req.cookies.get('ml_session')?.value, process.env.ML_API === '1' && process.env.ML_DEV_AUTH !== '1');
+  if (to) return NextResponse.redirect(new URL(to, req.url));
   const nonce = btoa(crypto.randomUUID());
   const csp = buildCsp(nonce);
   const headers = new Headers(req.headers);
