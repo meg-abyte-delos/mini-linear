@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { settled } from './helpers/settled';
 
 // Golden flows: the journeys a Linear user does every day.
 // Flows whose feature has not landed on main yet are test.fixme with the reason,
@@ -79,7 +80,11 @@ test.fixme('golden: inbox lists notifications and marks one read', async ({ page
   await expect(item).toHaveAttribute('data-read', 'true');
 });
 
-const wcag = (page: import('@playwright/test').Page) => new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+// Axe reads computed colours: scanning mid-animation (pal-in opacity, bulk-in) blends text with the backdrop and reports false color-contrast.
+const wcag = async (page: import('@playwright/test').Page) => {
+  await settled(page);
+  return new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+};
 
 test('a11y: cycles and projects views have no wcag2a/aa violations', async ({ page }) => {
   for (const v of ['cycles', 'projects']) {
