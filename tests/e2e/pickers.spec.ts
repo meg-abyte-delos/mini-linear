@@ -20,24 +20,7 @@ test('P sets priority via popover, focus returns to the issue', async ({ page })
   await expect(detail(page)).toContainText('Urgent');
 });
 
-// FIXME(PR 4, Shell): the assignee picker lists the mock USERS (non-UUID ids); needs the members directory (GET members) wired into Shell.
-test.fixme('A assigns, Unassigned clears', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForSelector('html[data-ready]');
-  const id = (await first(page).getAttribute('data-id'))!;
-  await first(page).focus();
-  await page.keyboard.press('a');
-  await expect(page.getByRole('dialog', { name: 'Set assignee' })).toBeVisible();
-  await page.keyboard.type('tess');
-  await page.keyboard.press('Enter');
-  await page.locator(`[data-id="${id}"]`).click();
-  await expect(detail(page)).toContainText('Tess Tester');
-  await page.locator(`[data-id="${id}"]`).focus();
-  await page.keyboard.press('a');
-  await page.keyboard.type('unas');
-  await page.keyboard.press('Enter');
-  await expect(detail(page)).toContainText('Unassigned');
-});
+// The assignee picker flow runs on the API and real members: tests/e2e/members-assignee-api.spec.ts (assign + Unassigned clears).
 
 test('L toggles labels, stays open, Esc closes; axe clean', async ({ page }) => {
   await page.goto('/');
