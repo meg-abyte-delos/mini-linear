@@ -61,6 +61,10 @@ jobs:
           for f in db/migrations/*.sql; do psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f "$f"; done
           psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f db/roles/900_grants.sql
       - run: pnpm check:rls
+      - name: Seed demo workspace (idempotent; run twice to prove it)
+        run: |
+          pnpm db:seed-demo
+          pnpm db:seed-demo
       - run: pnpm build
       - name: Start app (2 instances, for T6 cross-instance rate limit)
         run: |
