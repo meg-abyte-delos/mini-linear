@@ -22,8 +22,6 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-retries 10
     env:
-      SEED_DEMO_PASSWORD: ${{ secrets.SEED_DEMO_PASSWORD }}
-      E2E_PASSWORD: ${{ secrets.SEED_DEMO_PASSWORD }}
       PGSUPER_URL: postgres://postgres:ci_super@localhost:5432/mini_linear
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
       DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
@@ -52,12 +50,14 @@ jobs:
           for f in db/migrations/*.sql; do psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f "$f"; done
           psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f db/roles/900_grants.sql
       - name: Seed demo workspace (run twice to prove idempotence)
+        env: { SEED_DEMO_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}', E2E_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}' }
         run: |
           pnpm db:seed-demo
           pnpm db:seed-demo
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - name: API-mode e2e (Playwright starts `pnpm start` with the env above)
+        env: { SEED_DEMO_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}', E2E_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}' }
         run: pnpm exec playwright test tests/e2e/core-flow.spec.ts tests/e2e/auth.spec.ts
   build-test:
     runs-on: ubuntu-latest
@@ -68,8 +68,6 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd pg_isready --health-interval 5s --health-retries 10
     env:
-      SEED_DEMO_PASSWORD: ${{ secrets.SEED_DEMO_PASSWORD }}
-      E2E_PASSWORD: ${{ secrets.SEED_DEMO_PASSWORD }}
       PGSUPER_URL: postgres://postgres:ci_super@localhost:5432/mini_linear
       DATABASE_OWNER_URL: postgres://owner:ci_only@localhost:5432/mini_linear
       DATABASE_URL: postgres://app_user:ci_only_app@localhost:5432/mini_linear
@@ -111,6 +109,7 @@ jobs:
           psql "$DATABASE_OWNER_URL" -v ON_ERROR_STOP=1 -f db/roles/900_grants.sql
       - run: pnpm check:rls
       - name: Seed demo workspace (idempotent; run twice to prove it)
+        env: { SEED_DEMO_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}', E2E_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}' }
         run: |
           pnpm db:seed-demo
           pnpm db:seed-demo
@@ -149,4 +148,6 @@ jobs:
         run: pnpm exec playwright install-deps chromium
       - name: Stop integration servers (Playwright starts its own on :3000)
         run: fuser -k 3000/tcp 3001/tcp || true
-      - run: pnpm test:e2e
+      - name: e2e (mock + API specs)
+        env: { SEED_DEMO_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}', E2E_PASSWORD: '${{ secrets.SEED_DEMO_PASSWORD }}' }
+        run: pnpm test:e2e
