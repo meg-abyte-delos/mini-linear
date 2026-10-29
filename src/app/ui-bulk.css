@@ -108,3 +108,25 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
   html:not([data-theme]) .card[aria-selected=true]:hover { border-color:var(--accent); box-shadow:var(--accent-glow); }
   html:not([data-theme]) .card[aria-selected=true]:focus-visible { border-color:var(--accent); box-shadow:var(--accent-glow), var(--accent-ring); }
 }
+
+/* ---------- Linear-style content: icons, shortcut hints, inline clear (x) ---------- */
+[data-theme='dark'] .selbar > button { display:inline-flex; align-items:center; gap:6px; }
+[data-theme='dark'] .selbar-ic { color:var(--muted); flex:none; }
+[data-theme='dark'] .selbar > button:hover .selbar-ic, [data-theme='dark'] .selbar > button[aria-expanded=true] .selbar-ic { color:var(--fg); }
+[data-theme='dark'] .selbar kbd { font:500 11px/16px var(--font-mono, ui-monospace, monospace); min-width:16px; padding:0 4px; border-radius:4px; text-align:center; color:var(--muted); background:rgba(255,255,255,.06); border:1px solid var(--line); }
+[data-theme='dark'] .selbar > .selbar-x { width:24px; height:24px; padding:0; justify-content:center; color:var(--muted); margin-left:-6px; }
+[data-theme='dark'] .selbar > .selbar-x:hover { color:var(--fg); }
+[data-theme='dark'] .selbar-count { border-right:0; margin-right:0; padding-right:4px; }
+[data-theme='dark'] .selbar-sep { width:1px; height:16px; background:var(--line); margin:0 4px; flex:none; }
+[data-theme='dark'] .selbar .selbar-undo { margin-left:0; border-left:0; border-radius:7px; }
+@media (prefers-color-scheme: dark) {
+html:not([data-theme]) .selbar > button { display:inline-flex; align-items:center; gap:6px; }
+html:not([data-theme]) .selbar-ic { color:var(--muted); flex:none; }
+html:not([data-theme]) .selbar > button:hover .selbar-ic, html:not([data-theme]) .selbar > button[aria-expanded=true] .selbar-ic { color:var(--fg); }
+html:not([data-theme]) .selbar kbd { font:500 11px/16px var(--font-mono, ui-monospace, monospace); min-width:16px; padding:0 4px; border-radius:4px; text-align:center; color:var(--muted); background:rgba(255,255,255,.06); border:1px solid var(--line); }
+html:not([data-theme]) .selbar > .selbar-x { width:24px; height:24px; padding:0; justify-content:center; color:var(--muted); margin-left:-6px; }
+html:not([data-theme]) .selbar > .selbar-x:hover { color:var(--fg); }
+html:not([data-theme]) .selbar-count { border-right:0; margin-right:0; padding-right:4px; }
+html:not([data-theme]) .selbar-sep { width:1px; height:16px; background:var(--line); margin:0 4px; flex:none; }
+html:not([data-theme]) .selbar .selbar-undo { margin-left:0; border-left:0; border-radius:7px; }
+}
