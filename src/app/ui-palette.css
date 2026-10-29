@@ -18,3 +18,6 @@
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
 @media (prefers-reduced-motion: reduce) { .palette { animation: none; } ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
 [data-theme='light'] .palette { background: color-mix(in srgb, #fff 85%, transparent); border-color: rgb(0 0 0 / 0.08); }
+
+/* NL row blocked (me loading / ambiguous name): visible, never actionable. */
+.palette li.nl-action.is-disabled { opacity: .55; cursor: not-allowed; }
