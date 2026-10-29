@@ -9,7 +9,8 @@ import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/mock-api';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
-import { publishPresence, resetPresence } from '@/lib/presence';
+import { publishPresence, resetPresence, usePresenceMap, toPresenceUsers } from '@/lib/presence';
+import { PresenceStack } from '@/components/PresenceStack';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { ProgressRing } from '@/components/ProgressRing';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
@@ -104,6 +105,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // NL palette: real people (me + workspace members) in API mode.
   const [nlPeople, setNlPeople] = useState<NlPeople>(EMPTY_PEOPLE);
   const [nlPeopleLoaded, setNlPeopleLoaded] = useState(false);
+  const presenceMap = usePresenceMap();
   useEffect(() => {
     if (!api) return;
     let live = true;
@@ -463,23 +465,26 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   if (!readOnly) commands.splice(3, 0, { id: 'create', label: 'Create issue', hint: hint('create'), run: create });
   // Cmd+K search: top 8 hits from GET /search (API mode) or a local match (mock mode), debounced, stale responses dropped.
   const [hits, setHits] = useState<SearchHit[]>([]);
-  const [searchState, setSearchState] = useState<'idle' | 'loading' | 'error'>('idle'); // server search state, API mode
+  const [settled, setSettled] = useState<{ term: string; ok: boolean } | null>(null); // last server answer (API mode): term it answers + whether it succeeded
   const issuesRef = useRef<Issue[]>([]);
   issuesRef.current = allIssues;
   useEffect(() => {
     const term = q.trim();
-    if (!palette || term.length < MIN_QUERY) { setHits([]); setSearchState('idle'); return; }
+    if (!palette || term.length < MIN_QUERY) { setHits([]); setSettled(null); return; }
     const ctl = new AbortController();
-    if (api) setSearchState('loading');
     const t = setTimeout(async () => {
       if (api) {
         const r = await searchApi(api.slug, term, { limit: 8, signal: ctl.signal });
         if (ctl.signal.aborted) return;
-        setHits(r?.items ?? []); setSearchState(r ? 'idle' : 'error');
+        setHits(r?.items ?? []); setSettled({ term, ok: !!r });
       } else setHits(searchLocal(issuesRef.current, term, undefined, 8).items);
     }, api ? 150 : 0);
     return () => { clearTimeout(t); ctl.abort(); };
   }, [q, palette, api]);
+  // Derived, so the very first frame after typing already says Searching (never a stale No results): loading = the answer is not for the current term yet.
+  const searchTerm = q.trim();
+  const searchActive = api && searchTerm.length >= MIN_QUERY;
+  const searchState: 'idle' | 'loading' | 'error' = !searchActive ? 'idle' : settled?.term !== searchTerm ? 'loading' : settled.ok ? 'idle' : 'error';
   function openHit(h: SearchHit) {
     if (h.kind === 'project') { goToProject(h.id); return; }
     setFilters(emptyFilters()); setView('list'); setSelId(h.issue_id ?? h.id); setOpen(true);
@@ -597,7 +602,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   );
   const card = (i: Issue, pos?: number, size?: number) => (
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
-      <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
+      <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{api && <PresenceStack presence={toPresenceUsers(presenceMap.get(i.id)?.viewers ?? [], nlPeople.users, nlPeople.me)} max={2} />}{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
       <div className='card-meta'><PriorityIcon priority={i.priority} />{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
@@ -782,9 +787,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               {results.map((c, idx) => (
                 <li key={c.id} id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
               ))}
-              {api && q.trim().length >= MIN_QUERY && searchState === 'loading' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-searching'>Searching…</li>}
-              {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-search-error'>Search failed. Try again.</li>}
-              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-no-results'>No results for “{q.trim()}”</li>}
+              {api && q.trim().length >= MIN_QUERY && searchState === 'loading' && <li role='presentation' data-testid='palette-searching'><span role='status' aria-live='polite'>Searching…</span></li>}
+              {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='presentation' data-testid='palette-search-error'><span role='status' aria-live='polite'>Search failed. Try again.</span></li>}
+              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='presentation' data-testid='palette-no-results'><span role='status' aria-live='polite'>No results for “{q.trim()}”</span></li>}
               {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
             </ul>
             <div className='palette-foot'><kbd>↑↓</kbd> navigate <kbd>↵</kbd> run <kbd>esc</kbd> close</div>

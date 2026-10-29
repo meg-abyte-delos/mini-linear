@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
+import { PresenceStack } from '@/components/PresenceStack';
+import { usePresence, toPresenceUsers } from '@/lib/presence';
+import { fetchNlPeople, EMPTY_PEOPLE, type NlPeople } from '@/lib/nl-people';
 import { Picker, type PickOption } from '@/components/Picker';
 import { Markdown } from '@/components/Markdown';
 import { createIssue, patchIssue } from '@/lib/api-client';
@@ -56,6 +59,11 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
   const children = others.filter((i) => i.parent_id === issue.id && !i.deleted_at);
   const parent = others.find((i) => i.id === issue.parent_id);
   const byId = (id: string) => others.find((i) => i.id === id);
+  // Live presence (API mode): heartbeat + viewers, names from the members list, myself hidden.
+  const [people, setPeople] = useState<NlPeople>(EMPTY_PEOPLE);
+  useEffect(() => { if (!api) return; let live = true; void fetchNlPeople(slug).then((p) => { if (live) setPeople(p); }); return () => { live = false; }; }, [api, slug]);
+  const presence = usePresence(api ? slug : null, issue.id);
+  const viewers = useMemo(() => toPresenceUsers(presence.viewers, people.users, viewer?.userId ?? people.me), [presence.viewers, people, viewer?.userId]);
 
   // Feature-detected loads: endpoints not on main yet keep the local (empty) state.
   useEffect(() => {
@@ -251,6 +259,7 @@ export function IssueDetail({ slug, initial, all, meta, api, today, viewer = nul
       <main className='idp-main' aria-label={`Issue ${ident}`}>
         <header className='idp-head'>
           <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>Issues</Link><span className='sep' aria-hidden='true'>/</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>/</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
+          {api && <PresenceStack presence={viewers} max={2} />}
           <div className='idp-actions' role='toolbar' aria-label='Issue actions'>
             <button onClick={() => void copyLink()} aria-keyshortcuts='Meta+. Control+.' title='Copy issue URL (⌘.)'>Copy link</button>
             <button onClick={() => void copyBranch()} aria-keyshortcuts='Meta+Shift+. Control+Shift+.' title='Copy git branch name (⌘⇧.)'>Copy branch</button>

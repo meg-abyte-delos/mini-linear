@@ -58,6 +58,25 @@ test.describe('Search on the server route', () => {
     await page.route('**/search?*', (route) => route.fulfill({ status: 500, body: '{}' }));
     await box.fill('qqzzxxfails');
     await expect(page.getByTestId('palette-search-error')).toBeVisible();
+    await expect(page.getByTestId('palette-search-error').getByRole('status')).toHaveText(/Search failed/);
+    await box.fill('create issue');
+    await expect(page.getByTestId('palette-search-error')).toBeVisible();
+    await expect(page.getByRole('option', { name: /Create issue/ })).toBeVisible();
+  });
+
+  test('palette: no No-results flash on the first frame of a new query', async ({ page }) => {
+    await page.goto('/'); await page.waitForSelector('html[data-ready]');
+    const box = page.getByRole('combobox', { name: 'Search commands' });
+    await page.keyboard.press('Control+k');
+    await box.fill('qqzzxxone');
+    await expect(page.getByTestId('palette-no-results')).toBeVisible();
+    let release!: () => void; const gate = new Promise<void>((r) => { release = r; });
+    await page.route('**/search?*', async (route) => { await gate; await route.continue(); });
+    await box.fill('qqzzxxtwo');
+    await expect(page.getByTestId('palette-searching').getByRole('status')).toHaveText(/Searching/);
+    await expect(page.getByTestId('palette-no-results')).toHaveCount(0);
+    release();
+    await expect(page.getByTestId('palette-no-results')).toHaveText(/qqzzxxtwo/);
   });
 
   test('/search page lists server results', async ({ page }) => {

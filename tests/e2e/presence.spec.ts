@@ -130,3 +130,25 @@ test('guest sees only themselves plus the count, and not a deleted issue', async
   await pgst.request.delete(url, { data: { issue_id: issue.id } });
   await ctxG.close();
 });
+
+test('UI: PresenceStack shows B on the board card and in the issue header, never myself', async ({ page, browser }) => {
+  await page.goto('/'); await page.waitForSelector('html[data-ready]');
+  const issue = await (await page.request.post(`/api/v1/w/${DEMO.slug}/issues`, { data: { team_id: DEMO.teamId, title: `presence-ui-${Date.now()}`, status: 'canceled' } })).json() as { id: string; identifier: string };
+  const ctxB = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const pb = await ctxB.newPage();
+  expect((await pb.request.post('/api/v1/auth/login', { data: { email: B_EMAIL, password: pass } })).ok()).toBeTruthy();
+  const url = `/api/v1/w/${DEMO.slug}/presence`;
+  await page.reload(); await page.waitForSelector('html[data-ready]');
+  await page.getByRole('button', { name: /board/i }).click();
+  expect((await pb.request.post(url, { data: { issue_id: issue.id } })).status()).toBe(200);
+  const card = page.locator(`[data-id="${issue.id}"]`);
+  await expect(card).toBeVisible();
+  await expect(card.locator('.presence')).toHaveAttribute('aria-label', /Viewing now: Presence B/, { timeout: 15_000 });
+  await expect(card.locator('.presence-av')).toHaveCount(1);
+  await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
+  const header = page.locator('.idp-head');
+  await expect(header.getByRole('group', { name: /Viewing now: Presence B/ })).toBeVisible({ timeout: 15_000 });
+  await expect(header.locator('.presence-av')).toHaveCount(1);
+  await pb.request.delete(url, { data: { issue_id: issue.id } });
+  await ctxB.close();
+});
