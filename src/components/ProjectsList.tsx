@@ -3,15 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/icons';
 import { ProgressRing } from '@/components/ProgressRing';
 import { USERS, fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
+import { hueFor, initialsOf, type Hue } from '@/lib/member-hue';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, timelineWidth, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
 
 // slug set = API mode: leads are workspace member UUIDs, resolved via GET members (same source as the Cmd+K palette).
 // Without slug (mock mode) the USERS mock still applies.
 interface Props { projects: readonly ProjectMeta[]; issues: readonly Issue[]; today: string; canOpen: boolean; onOpen: (id: string) => void; onViewIssues: (id: string) => void; slug?: string | null }
-
-type Hue = (typeof USERS)[number]['hue'];
-const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
 
 export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewIssues, slug = null }: Props) {
   const [mode, setMode] = useState<'list' | 'roadmap'>('list');
@@ -28,12 +26,12 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
   const person = (id?: string | null): { name: string; initials: string; hue: Hue } | null => {
     if (!id) return null;
     const m = people.users.find((u) => u.id === id);
-    if (m) return { name: m.name, initials: initialsOf(m.name), hue: 'h2' as Hue };
+    if (m) return { name: m.name, initials: initialsOf(m.name), hue: hueFor(m.id) };
     const u = USERS.find((x) => x.id === id);
     return u ? { name: u.name, initials: u.initials, hue: u.hue } : null;
   };
-  // While members load, show nothing rather than a flash of 'Unknown'.
-  const lead = (id?: string | null) => (!id ? 'No lead' : person(id)?.name ?? (peopleLoaded ? 'Unknown' : '\u00a0'));
+  // Unresolvable lead (members fetch failed or member left): 'No lead', never 'Unknown'. Blank while loading.
+  const lead = (id?: string | null) => person(id)?.name ?? (!id || peopleLoaded ? 'No lead' : '\u00a0');
   const dated = sorted.some((p) => p.start_date || p.target_date);
   const range = dated ? roadmapRange([...sorted.map((p) => ({ start: p.start_date, end: p.target_date })), { start: today, end: today }]) : null;
   const tp = range ? todayPct(today, range) : null;
