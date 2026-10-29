@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { GUEST_STATE } from './global-setup';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -72,19 +73,6 @@ test('Esc clears the multi-selection first, then closes the panel', async ({ pag
   await expect(page.getByRole('complementary', { name: 'Issue detail' })).toBeHidden();
 });
 
-test('guests are read-only: no Create issue, c does nothing', async ({ page }) => {
-  await page.goto('/?role=guest');
-  await page.waitForSelector('html[data-ready]');
-  await expect(page.getByRole('button', { name: /New issue/ })).toHaveCount(0);
-  const n = await page.locator('[role=option]').count();
-  await page.keyboard.press('c');
-  await expect(page.locator('[role=option]')).toHaveCount(n);
-  await page.keyboard.press('Control+k');
-  await page.getByRole('combobox', { name: 'Search commands' }).fill('create issue');
-  // Since Cmd+K search, a query always offers 'Search all for …', so assert the command itself is absent.
-  await expect(page.getByRole('option', { name: /^Create issue/ })).toHaveCount(0);
-});
-
 test('? overlay screenshot', async ({ page }) => {
   await page.keyboard.press('?');
   await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
@@ -109,10 +97,30 @@ test('bulk: priority picker applies to all selected', async ({ page }) => {
   for (const id of ids) await expect(page.locator(`[data-id="${id}"] .pi-urgent`)).toHaveCount(1);
 });
 
-test('bulk: guests cannot bulk-edit', async ({ page }) => {
-  await page.goto('/?role=guest');
-  await page.waitForSelector('html[data-ready]');
-  await page.keyboard.press('x');
-  await page.keyboard.press('s');
-  await expect(page.getByText('Guests have read-only access.')).toBeVisible();
+// Real guest session (seeded guest@example.test, role guest, 2 shared issues): read-only is derived from the session role, no ?role= hook.
+test.describe('guest (read-only)', () => {
+  test.use({ storageState: GUEST_STATE });
+
+  test('guests are read-only: no Create issue, c does nothing', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('html[data-ready]');
+    await expect(page.getByRole('button', { name: /New issue/ })).toHaveCount(0);
+    // The seeded guest sees exactly the issues shared with them (2), nothing else.
+    const n = await page.locator('[role=option]').count();
+    expect(n).toBe(2);
+    await page.keyboard.press('c');
+    await expect(page.locator('[role=option]')).toHaveCount(n);
+    await page.keyboard.press('Control+k');
+    await page.getByRole('combobox', { name: 'Search commands' }).fill('create issue');
+    // Since Cmd+K search, a query always offers 'Search all for …', so assert the command itself is absent.
+    await expect(page.getByRole('option', { name: /^Create issue/ })).toHaveCount(0);
+  });
+
+  test('bulk: guests cannot bulk-edit', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('html[data-ready]');
+    await page.keyboard.press('x');
+    await page.keyboard.press('s');
+    await expect(page.getByText('Guests have read-only access.')).toBeVisible();
+  });
 });
