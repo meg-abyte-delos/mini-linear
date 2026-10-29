@@ -9,7 +9,7 @@ import { snapshotCycle } from "./cycles-schedule";
 
 /**
  * Burndown: one point per day of the cycle {day, scope, done, remaining, ideal}, replayed from audit_events (status / cycle_id diffs).
- * Days that have a cycle_snapshots row use it (scope/done as captured); today's row is written lazily here when missing (idempotent per day).
+ * Days that have a cycle_snapshots row use it (scope/done as captured); today's row is upserted here on every read (one row per day, always the live counts).
  * The replay only runs for days without a snapshot, and the span cap only applies then. Response also carries scopeChange: [{day, delta}] (scope added/removed per day).
  * Deleted issues drop out of the past scope (the replay only sees live issues). Cycles longer than MAX_DAYS days are refused (422): the replay is O(days x issues x events).
  * `?on=YYYY-MM-DD` is the chart's "today" (default: server date); days after it carry null scope/done/remaining. Empty history is fine.
@@ -27,7 +27,8 @@ export const cycleBurndown = (req: Request, slug: string, rawId: string) => with
   const cid = c.id as string;
   const cy = { start_date: c.start_date as string, end_date: c.end_date as string };
   const real = new Date().toISOString().slice(0, 10), on = q.on ?? real;
-  if (real >= cy.start_date && real <= cy.end_date && !(await ctx.tx`select 1 from cycle_snapshots where cycle_id = ${cid} and day = ${real}::date`).length) await snapshotCycle(ctx, cid, real);
+  // Refresh today's row on EVERY read (upsert), so today's point tracks the live counts instead of freezing at the day's first read.
+  if (real >= cy.start_date && real <= cy.end_date) await snapshotCycle(ctx, cid, real);
   const snaps = await ctx.tx<SnapRow[]>`select day::text as day, scope, completed from cycle_snapshots where cycle_id = ${cid} order by day`;
   if (!daysWithoutSnapshot(cy, snaps, on).length) {
     const pts = mergeSnapshots(cy, null, snaps, on);
