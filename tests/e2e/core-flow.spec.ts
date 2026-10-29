@@ -5,6 +5,9 @@ import { API_MODE, DEMO, login, logout, apiCreateIssue, withSession } from './he
 // Skipped in the default mock-mode run. Spec by Tess; adapted to the real routes (/ and /w/[slug]) and labels.
 test.skip(!API_MODE || !DEMO.teamId, 'API-mode e2e: needs ML_API=1, ML_WORKSPACE_SLUG, ML_TEAM_ID and the demo seed');
 
+// Every test here starts signed out (the global storageState would skip the login redirects); it logs in through helpers/auth.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 // Serial: one worker, so the per-email login rate limit (10/min) is not hit.
 test.describe.configure({ mode: 'serial' });
 
