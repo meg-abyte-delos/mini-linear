@@ -22,7 +22,7 @@
 .group h2 { gap:6px; padding:0 var(--sp-4) 0 8px; background:color-mix(in srgb, var(--fg) 5%, transparent); }
 .group h2 .gh-toggle { display:inline-flex; align-items:center; gap:8px; height:28px; padding:0 6px; border:0; border-radius:4px; background:none; color:inherit; font:inherit; cursor:pointer; }
 .group h2 .gh-toggle:hover { background:var(--hover); }
-.group h2 .chev { display:inline-block; width:10px; color:var(--muted); transition:transform .1s; }
+.group h2 .chev { order:-1; font-style:normal; display:inline-block; width:10px; color:var(--muted); transition:transform .1s; }
 .group h2 .gh-toggle[aria-expanded=false] .chev { transform:rotate(-90deg); }
 .group h2 .gh-add { margin-left:auto; width:24px; height:24px; border:0; border-radius:4px; background:none; color:var(--muted-strong); cursor:pointer; font-size:16px; line-height:1; opacity:0; }
 .group h2:hover .gh-add, .group h2 .gh-add:focus-visible { opacity:1; }
