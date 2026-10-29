@@ -92,3 +92,33 @@ describe('connectRealtime', () => {
     expect(states).toEqual(['connecting', 'live', 'offline', 'live']);
   });
 });
+
+describe('presence', () => {
+  it('connectRealtime forwards `presence` events and ignores malformed frames', () => {
+    const { es, fire } = fakeES(); const got: unknown[] = [];
+    connectRealtime({ slug: 'w1', store: new SyncStore(), onResync: vi.fn(), onPresence: (p) => got.push(p), eventSource: () => es });
+    fire('presence', { issue_id: 'a', viewers: ['u1'], count: 1 });
+    expect(got).toEqual([{ issue_id: 'a', viewers: ['u1'], count: 1 }]);
+  });
+  it('publishPresence replaces the list, notifies once per change, and empties on count 0', async () => {
+    const { publishPresence, presenceOf, resetPresence } = await import('@/lib/presence');
+    resetPresence();
+    publishPresence({ issue_id: 'a', viewers: ['u1', 'u2'], count: 2 });
+    expect(presenceOf('a')).toEqual({ viewers: ['u1', 'u2'], count: 2 });
+    publishPresence({ issue_id: 'a', viewers: ['u2'], count: 1 });
+    expect(presenceOf('a').viewers).toEqual(['u2']);
+    publishPresence({ issue_id: 'a', viewers: [], count: 0 });
+    expect(presenceOf('a')).toEqual({ viewers: [], count: 0 });
+  });
+  it('startHeartbeat POSTs {issue_id}, publishes the answer, DELETEs on stop', async () => {
+    const { startHeartbeat, presenceOf, resetPresence } = await import('@/lib/presence');
+    resetPresence();
+    const f = vi.fn(async () => new Response(JSON.stringify({ viewers: [{ user_id: 'u9' }], count: 1 }), { status: 200 }));
+    const stop = startHeartbeat('w1', 'iss', { fetch: f as never, intervalMs: 1_000_000 });
+    await flush(); await flush();
+    expect(f).toHaveBeenCalledWith('/api/v1/w/w1/presence', expect.objectContaining({ method: 'POST', body: JSON.stringify({ issue_id: 'iss' }) }));
+    expect(presenceOf('iss').viewers).toEqual(['u9']);
+    stop();
+    expect(f).toHaveBeenLastCalledWith('/api/v1/w/w1/presence', expect.objectContaining({ method: 'DELETE' }));
+  });
+});

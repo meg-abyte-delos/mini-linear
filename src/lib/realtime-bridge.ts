@@ -15,6 +15,7 @@ export type BridgeDeps = {
   /** Any issue/comment change: inbox & detail panels may refresh. */
   onActivity?: () => void;
   onState?: (s: ConnState) => void;
+  onPresence?: (p: { issue_id: string; viewers: string[]; count: number }) => void;
   eventSource?: Parameters<typeof connectRealtime>[0]['eventSource'];
   fetch?: typeof fetch;
 };
@@ -30,7 +31,7 @@ export function startIssueRealtime(d: BridgeDeps): () => void {
       else if (c.op === 'upsert' && c.row) d.upsert(c.row as unknown as Issue);
     },
   } as unknown as SyncStore;
-  const c = connectRealtime({ slug: d.slug, store, onResync: async () => { await d.resync(); d.onActivity?.(); }, onReconnect: () => d.onActivity?.(), onState: d.onState, eventSource: d.eventSource, fetch: d.fetch });
+  const c = connectRealtime({ slug: d.slug, store, onResync: async () => { await d.resync(); d.onActivity?.(); }, onReconnect: () => d.onActivity?.(), onState: d.onState, onPresence: d.onPresence, eventSource: d.eventSource, fetch: d.fetch });
   return () => c.close();
 }
 
