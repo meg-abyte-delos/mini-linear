@@ -8,6 +8,9 @@
 .project.pj-row { min-height:36px; padding:0 var(--sp-4); gap:var(--sp-4); }
 .project.pj-row:hover { background:color-mix(in srgb, var(--fg) 4%, transparent); }
 .project.pj-row:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+/* Row stays one line: name/lead ellipsize, both actions share the last (auto) cell. */
+.project.pj-row > .cy-name, .project.pj-row > .pj-lead { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pj-actions { display:inline-flex; align-items:center; gap:var(--sp-2); justify-self:end; white-space:nowrap; }
 .pj-late { font-weight:500; color:var(--danger); }
 .pdetail { max-width:880px; padding:24px 32px; gap:24px; }
 .pd-head h2 { font-size:24px; font-weight:600; letter-spacing:-.01em; }
