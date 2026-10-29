@@ -97,6 +97,26 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect((await go(T.listTeams, seed.a.owner, "GET", undefined, seed.a.slug)).status).toBe(200);
   });
 
+  it("guests: team list is limited to teams with an active share, team member emails are 404", async () => {
+    const s = seed.b.slug, g = seed.b.guest;
+    const mkTeam = async (name: string, key: string) => (await (await go(T.createTeam, seed.b.admin, "POST", { name, key }, s)).json()).id as string;
+    const shared = await mkTeam("Shared", "GSH"), hidden = await mkTeam("Hidden", "GHD");
+    await owner.begin(async (tx) => {
+      await tx`select set_config('app.workspace_id', ${seed.b.id}, true)`;
+      for (const [team, n] of [[shared, 1], [hidden, 1]] as const) {
+        const id = randomUUID();
+        await tx`insert into issues (id, workspace_id, team_id, number, title, sort_key, created_by) values (${id}, ${seed.b.id}, ${team}, ${n}, 'x', 'a1', ${seed.b.admin})`;
+        if (team === shared) await tx`insert into issue_shares (workspace_id, issue_id, guest_user_id, shared_by) values (${seed.b.id}, ${id}, ${g}, ${seed.b.admin})`;
+      }
+    });
+    const list = await go(T.listTeams, g, "GET", undefined, s);
+    expect(list.status).toBe(200);
+    expect((await list.json()).items.map((t: { id: string }) => t.id)).toEqual([shared]); // the other team is not disclosed
+    expect((await (await go(T.listTeams, seed.b.admin, "GET", undefined, s)).json()).items.length).toBeGreaterThanOrEqual(2);
+    for (const t of [shared, hidden]) expect((await go(T.listTeamMembers, g, "GET", undefined, s, t)).status).toBe(404);
+    expect((await go(T.listTeamMembers, seed.b.admin, "GET", undefined, s, shared)).status).toBe(200);
+  });
+
   it("Origin check applies to workspace-scoped writes", async () => {
     const r = new Request("http://x/api", { method: "POST", headers: { "x-u": seed.b.admin, origin: "http://evil.test", "content-type": "application/json" }, body: JSON.stringify({ name: "T", key: "EVL" }) });
     expect((await T.createTeam(r, seed.b.slug)).status).toBe(403);
