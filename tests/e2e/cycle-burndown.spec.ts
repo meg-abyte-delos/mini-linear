@@ -17,6 +17,10 @@ test('burndown API: one point per day, ideal reaches 0, remaining = scope - done
   expect(points[0]!.day).toBe('2026-10-14');
   expect(points[13]!.day).toBe('2026-10-27');
   expect(points[0]!.scope).toBeGreaterThan(0);
+  const sc = ((await (await page.request.get(url('2026-10-27'))).json()) as { scopeChange: { day: string; delta: number | null }[] }).scopeChange;
+  expect(sc).toHaveLength(14);
+  expect(sc[0]).toEqual({ day: '2026-10-14', delta: 0 });
+  expect(sc.every((x) => x.delta !== null)).toBe(true);
   expect(points[0]!.ideal).toBe(points[0]!.scope);
   expect(points[13]!.ideal).toBe(0);
   for (const p of points) expect(p.remaining).toBe((p.scope as number) - (p.done as number));
@@ -44,6 +48,7 @@ test('cycles page: Burndown toggles an SVG chart with remaining and ideal lines'
   await expect(chart).toBeVisible();
   await expect(chart).toHaveAttribute('aria-label', /^Burndown for Cycle 2: \d+ of \d+ issues remaining on 2026-10-27$/);
   await expect(chart.locator('path.bd-line')).toHaveAttribute('d', /^M/);
+  await expect(page.locator(`[data-cycle-burndown="${CYCLES.c2}"] .bd-k-chg`)).toHaveText('Scope change');
   await expect(chart.locator('path.bd-ideal')).toHaveAttribute('stroke-dasharray', '5 4');
   await btn.click();
   await expect(chart).toHaveCount(0);
