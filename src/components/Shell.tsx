@@ -11,6 +11,7 @@ import { createStore } from '@/lib/mock-api';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
+import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
 import { SelectionBar, type BulkKind } from './SelectionBar';
@@ -95,6 +96,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       },
       onActivity: () => setRtTick((n) => n + 1),
     });
+  }, [api?.slug]);
+  // NL palette: real people (me + workspace members) in API mode.
+  const [nlPeople, setNlPeople] = useState<NlPeople>(EMPTY_PEOPLE);
+  useEffect(() => {
+    if (!api) return;
+    let live = true;
+    void fetchNlPeople(api.slug).then((p) => { if (live) setNlPeople(p); });
+    return () => { live = false; };
   }, [api?.slug]);
   // Push a change to the API (no-op in mock mode). Local state is already updated (optimistic); the server row then wins.
   // 412 -> refetch the issue, toast "modified elsewhere", no automatic retry.
@@ -470,7 +479,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // An identifier-looking query (DEL-12) puts the hits first; otherwise commands keep priority.
   const baseResults: Cmd[] = looksLikeIdentifier(q) ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...hitCmds, ...allCmd];
   // Natural-language action: an extra row next to the search results, never a replacement.
-  const nl = q.trim().length >= 4 && !readOnly ? parseNlCommand(q, USERS, LABELS, null) : null;
+  const nl = q.trim().length >= 4 && !readOnly ? (api ? parseNlCommand(q, nlPeople.users, LABELS, nlPeople.me) : parseNlCommand(q, USERS, LABELS, USERS[0]!.id)) : null;
   // A status-only phrase is already covered by the built-in 'Move to …' commands: no duplicate NL row.
   const nlStatusOnly = !!nl && Object.keys(nl.patch).every((k) => k === 'status');
   // Render-time: use state, not targetIds() (multiRef is declared further down: calling it here is a TDZ crash).
