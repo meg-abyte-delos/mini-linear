@@ -103,7 +103,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   useEffect(() => {
     if (!api) return;
     let live = true;
-    setNlPeopleLoaded(false);
+    setNlPeople(EMPTY_PEOPLE); setNlPeopleLoaded(false);
     void fetchNlPeople(api.slug).then((p) => { if (live) setNlPeople(p); }).finally(() => { if (live) setNlPeopleLoaded(true); });
     return () => { live = false; };
   }, [api?.slug]);
@@ -483,7 +483,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // Natural-language action: an extra row next to the search results, never a replacement.
   const nl = q.trim().length >= 4 && !readOnly ? (api ? parseNlCommand(q, nlPeople.users, LABELS, nlPeople.me, { peopleLoading: !nlPeopleLoaded }) : parseNlCommand(q, USERS, LABELS, USERS[0]!.id)) : null;
   // A status-only phrase is already covered by the built-in 'Move to …' commands: no duplicate NL row.
-  const nlStatusOnly = !!nl && Object.keys(nl.patch).every((k) => k === 'status');
+  const nlStatusOnly = !!nl && !nl.blocked && Object.keys(nl.patch).every((k) => k === 'status');
   // Render-time: use state, not targetIds() (multiRef is declared further down: calling it here is a TDZ crash).
   const nlIds = nl && !nlStatusOnly ? (multi.length ? multi : current?.id ? [current.id] : []) : [];
   const nlCmd: Cmd[] = nl?.blocked && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), disabled: true, run: () => {} }] : nl && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), hint: '↵', run: () => {
@@ -501,7 +501,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     sync(); if (nlIds.length === 1) setSelId(nlIds[0]!); } }] : [];
   // Only an explicit leading verb puts the action first; otherwise ('fix for Ada') search hits keep Enter.
   const nlFirst = /^\s*(assign|unassign|move|mark|set|label|prioriti[sz]e)\b/i.test(q);
-  const results: Cmd[] = nlFirst ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
+  const results: Cmd[] = nlFirst && !nl?.blocked ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
