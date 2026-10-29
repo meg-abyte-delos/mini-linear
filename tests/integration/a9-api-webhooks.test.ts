@@ -124,7 +124,10 @@ describe.runIf(runIntegration)('A9 rework: key scope, invalid-key rate limit, he
   });
   it('invalid keys are rate limited (429) per client', async () => {
     const codes: number[] = [];
-    for (let i = 0; i < 40; i++) codes.push((await api(null, 'GET', `${P1}/issues`, undefined, bearer(`mlk_abcdefgh_${'B'.repeat(43)}`), process.env.TEST_BASE_URL_2 ?? undefined)).status);
+    // Fixed 60s window: N requests can straddle a boundary and stay under the limit in both halves.
+    // 2*limit+1 always overflows one window; stop at the first 429.
+    const limit = Number(process.env.API_BAD_KEY_LIMIT ?? 30);
+    for (let i = 0; i < 2 * limit + 1 && !codes.includes(429); i++) codes.push((await api(null, 'GET', `${P1}/issues`, undefined, bearer(`mlk_abcdefgh_${'B'.repeat(43)}`), process.env.TEST_BASE_URL_2 ?? undefined)).status);
     expect(codes[0]).toBe(401);
     expect(codes).toContain(429);
   }, 30_000);
