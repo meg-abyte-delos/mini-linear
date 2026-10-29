@@ -7,7 +7,8 @@ test('saved view is persisted by the API: POST /views, survives reload, DELETE r
   await page.goto('/');
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('option').first()).toBeVisible();
-  await page.getByRole('button', { name: /^Priority/ }).click();
+  await page.locator('#fb-add').click();
+  await page.getByRole('menuitem', { name: 'Priority' }).click();
   await page.getByRole('option', { name: /^Urgent/ }).click();
   await page.getByRole('combobox', { name: /Filter by priority/ }).press('Escape');
   await expect(page).toHaveURL(/priority=1/);
