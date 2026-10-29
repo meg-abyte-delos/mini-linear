@@ -42,9 +42,10 @@ test('inline title, properties and activity', async ({ page }) => {
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set status to Done');
   await page.getByLabel('Estimate').selectOption('5');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
-  await page.getByLabel('Due date').fill('2026-10-20');
-  // Wait for the update to land (activity entry) before asserting the derived Overdue state.
-  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2026-10-20');
+  // The ?today= override is ignored when the server runs a production build (CI), so the page compares against the real clock.
+  // Use a date that is in the past on any clock, not one relative to the pinned 2026-10-28.
+  await page.getByLabel('Due date').fill('2020-01-01');
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2020-01-01');
   await expect(page.getByText('Overdue')).toBeVisible();
 });
 
@@ -111,16 +112,19 @@ test('copy branch shortcut, archive and unarchive', async ({ page, context }) =>
   await page.keyboard.press('Control+Shift+.');
   await expect(page.getByRole('status')).toContainText('Copied branch name');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`demo/${identifier.toLowerCase()}-board-drag-and-drop`);
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
   await expect(page.locator('.idp-banner')).toContainText('Archived');
-  await page.getByRole('button', { name: 'Unarchive' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Unarchive' }).click();
   await expect(page.locator('.idp-banner')).toHaveCount(0);
 });
 
 test('delete and restore', async ({ page }) => {
   await ready(page);
   page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
   await expect(page.locator('.idp-banner')).toContainText('trash');
   await expect(page.getByLabel('Title', { exact: true })).toHaveAttribute('readonly', '');
   await page.getByRole('button', { name: 'Restore' }).click();
