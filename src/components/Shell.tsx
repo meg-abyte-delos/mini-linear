@@ -459,15 +459,20 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   if (!readOnly) commands.splice(3, 0, { id: 'create', label: 'Create issue', hint: hint('create'), run: create });
   // Cmd+K search: top 8 hits from GET /search (API mode) or a local match (mock mode), debounced, stale responses dropped.
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [searchState, setSearchState] = useState<'idle' | 'loading' | 'error'>('idle'); // server search state, API mode
   const issuesRef = useRef<Issue[]>([]);
   issuesRef.current = allIssues;
   useEffect(() => {
     const term = q.trim();
-    if (!palette || term.length < MIN_QUERY) { setHits([]); return; }
+    if (!palette || term.length < MIN_QUERY) { setHits([]); setSearchState('idle'); return; }
     const ctl = new AbortController();
+    if (api) setSearchState('loading');
     const t = setTimeout(async () => {
-      if (api) { const r = await searchApi(api.slug, term, { limit: 8, signal: ctl.signal }); if (!ctl.signal.aborted) setHits(r?.items ?? []); }
-      else setHits(searchLocal(issuesRef.current, term, undefined, 8).items);
+      if (api) {
+        const r = await searchApi(api.slug, term, { limit: 8, signal: ctl.signal });
+        if (ctl.signal.aborted) return;
+        setHits(r?.items ?? []); setSearchState(r ? 'idle' : 'error');
+      } else setHits(searchLocal(issuesRef.current, term, undefined, 8).items);
     }, api ? 150 : 0);
     return () => { clearTimeout(t); ctl.abort(); };
   }, [q, palette, api]);
@@ -773,7 +778,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               {results.map((c, idx) => (
                 <li key={c.id} id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
               ))}
-              {results.length === 0 && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
+              {api && q.trim().length >= MIN_QUERY && searchState === 'loading' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-searching'>Searching…</li>}
+              {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-search-error'>Search failed. Try again.</li>}
+              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-no-results'>No results for “{q.trim()}”</li>}
+              {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
             </ul>
             <div className='palette-foot'><kbd>↑↓</kbd> navigate <kbd>↵</kbd> run <kbd>esc</kbd> close</div>
           </div>
