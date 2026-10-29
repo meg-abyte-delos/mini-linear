@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/icons';
+import { ProgressRing } from '@/components/ProgressRing';
 import { USERS, fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
 import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, timelineWidth, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
 
@@ -46,8 +47,8 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
               <span className='pj-status' data-status={p.status ?? 'backlog'}>{statusLabel(p.status)}</span>
               <span className='cy-dates'>{lead(p.lead_id)}</span>
               <span className={`cy-dates${late ? ' pj-late' : ''}`} data-testid={`target-${p.id}`}>{p.target_date ? `Target ${fmtDate(p.target_date)}${late ? ' (overdue)' : ''}` : 'No target date'}</span>
-              {/* SVG rect width is an attribute, not an inline style: it survives the strict CSP (style-src 'self'). */}
-              <svg className='cy-prog' role='img' aria-label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`}><rect className='cy-prog-fill' x='0' y='0' height='100%' width={`${pr.pct}%`} /></svg>
+              {/* Ring geometry is SVG attributes only (pathLength + dasharray): survives the strict CSP. */}
+              <ProgressRing pct={pr.pct} size={18} showPct={false} label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`} />
               <span className='cy-count'>{pr.pct}%</span>
               {canOpen && <button onClick={() => onOpen(p.id)}>Open</button>}<button onClick={() => onViewIssues(p.id)}>View issues</button>
             </div>
@@ -75,7 +76,7 @@ export function ProjectsList({ projects, issues, today, canOpen, onOpen, onViewI
                     const u = USERS.find((x) => x.id === p.lead_id);
                     return (
                       <div key={p.id} className='rm-row' data-project={p.id}>
-                        <span className='rm-name'>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />}<span className='rm-name-t'>{p.name}</span></span>
+                        <span className='rm-name'>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />}<span className='rm-name-t'>{p.name}</span><ProgressRing pct={pr.pct} size={14} label={`${p.name} progress ${pr.pct}%`} /></span>
                         <div className='rm-track'>
                           {gridTicks.map((t) => <span key={t.label} className='rm-grid' style={{ left: `${t.leftPct}%` }} aria-hidden='true' />)}
                           {tp !== null && <span className='rm-today' data-testid='rm-today' style={{ left: `${tp}%` }} aria-hidden='true' />}
