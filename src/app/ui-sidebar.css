@@ -1,0 +1,23 @@
+/* Sidebar (Linear parity): workspace switcher + avatar, collapsible team, quiet active fill. */
+.ws { position:relative; display:flex; align-items:center; gap:6px; padding:2px 0 8px; }
+.ws-btn { flex:1; min-width:0; display:flex; align-items:center; gap:8px; height:28px; padding:0 8px; border:0; border-radius:6px; background:none; color:var(--fg); font:inherit; font-weight:600; cursor:pointer; text-align:left; }
+.ws-btn:hover, .ws-btn[aria-expanded=true] { background:var(--hover); }
+.ws-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ws-caret { color:var(--muted); flex:none; }
+.ws-avatar { margin-right:6px; }
+.ws-menu { position:absolute; top:32px; left:0; right:0; z-index:60; padding:4px; border:1px solid var(--line); border-radius:8px; background:var(--raised); box-shadow:0 8px 24px rgba(0,0,0,.35); display:flex; flex-direction:column; }
+.ws-menu-who { padding:6px 8px; font-size:var(--fs-sm); color:var(--muted); border-bottom:1px solid var(--line-soft); margin-bottom:4px; }
+.ws-menu a, .ws-menu button { display:block; width:100%; height:28px; line-height:28px; padding:0 8px; border:0; border-radius:5px; background:none; color:var(--fg); font:inherit; font-size:var(--fs-base); text-align:left; text-decoration:none; cursor:pointer; }
+.ws-menu a:hover, .ws-menu button:hover, .ws-menu a:focus-visible, .ws-menu button:focus-visible { background:var(--hover); }
+.team-toggle { font:inherit; }
+.team-toggle .sb-chev { margin-left:auto; color:var(--dim); transition:transform .12s ease; }
+.team-toggle .sb-chev.open { transform:rotate(90deg); }
+.team-nav { display:flex; flex-direction:column; gap:1px; }
+.team-nav[hidden] { display:none; }
+/* Active item: subtle neutral fill, no accent bar/halo (Linear). */
+.side-link[aria-current=page],
+[data-theme='dark'] .side-link[aria-current=page] { background:rgba(255,255,255,.06); color:var(--fg); box-shadow:none; }
+[data-theme='dark'] .side-link[aria-current=page]::before { content:none; }
+[data-theme='light'] .side-link[aria-current=page] { background:rgba(0,0,0,.05); }
+@media (prefers-color-scheme: light) { html:not([data-theme]) .side-link[aria-current=page] { background:rgba(0,0,0,.05); } }
+@media (prefers-reduced-motion: reduce) { .team-toggle .sb-chev { transition:none; } }
