@@ -22,10 +22,17 @@ async function get<T>(h: (req: Request, ...a: string[]) => Promise<Response>, pa
   return ((await res.json()) as { items: T[] }).items;
 }
 
-/** Slug + first team of the signed-in user. Redirects to /login when there is no valid session. */
-export async function getWorkspaceContext(): Promise<ApiConfig> {
+/** Pure choice for a URL slug: exactly that workspace, or null when the user is not a member (no fallback to another one). */
+export const findWorkspace = (items: Item[], slug: string): Item | null => items.find((w) => w.slug === slug) ?? null;
+
+/**
+ * Slug + first team of the signed-in user. Redirects to /login when there is no valid session.
+ * With `slug` (a page under /w/[slug]) the user must be a member of exactly that workspace, else 404.
+ */
+export async function getWorkspaceContext(slug?: string): Promise<ApiConfig> {
   try {
-    const ws = pickWorkspace(await get<Item>(listWorkspaces, '/api/v1/workspaces'));
+    const items = await get<Item>(listWorkspaces, '/api/v1/workspaces');
+    const ws = slug ? findWorkspace(items, slug) : pickWorkspace(items);
     if (!ws) throw new HttpError('no workspace for this user', 404);
     const teams = await get<{ id: string }>(listTeams as never, `/api/v1/w/${ws.slug}/teams`, ws.slug);
     if (!teams[0]) throw new HttpError('no team in workspace', 404);
