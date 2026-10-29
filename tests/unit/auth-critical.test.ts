@@ -20,6 +20,14 @@ describe("originAllowed (CSRF)", () => {
     expect(originAllowed(req("PATCH", { "x-forwarded-host": "pub.test", origin: "https://pub.test" }))).toBe(true);
     expect(originAllowed(req("PATCH", { "x-forwarded-host": "pub.test", origin: "http://app.test" }))).toBe(false);
   });
+  it("x-forwarded-host set: Host is ignored, a Host/XFH mismatch is decided by XFH only", () => {
+    expect(originAllowed(req("POST", { host: "internal.test", "x-forwarded-host": "pub.test", origin: "https://pub.test" }))).toBe(true);
+    expect(originAllowed(req("POST", { host: "pub.test", "x-forwarded-host": "internal.test", origin: "https://pub.test" }))).toBe(false);
+    expect(originAllowed(req("POST", { host: "app.test", origin: "https://app.test" }))).toBe(true); // no XFH: Host is used
+  });
+  it("multi-valued x-forwarded-host fails closed", () => {
+    expect(originAllowed(req("POST", { "x-forwarded-host": "pub.test, proxy.test", origin: "https://pub.test" }))).toBe(false);
+  });
   it("no Origin: Sec-Fetch-Site decides", () => {
     expect(originAllowed(req("PUT"))).toBe(true);
     expect(originAllowed(req("PUT", { "sec-fetch-site": "same-origin" }))).toBe(true);
