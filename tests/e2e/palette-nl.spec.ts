@@ -20,7 +20,7 @@ test('palette NL: a plain search phrase keeps search first', async ({ page }) =>
   await page.goto('/');
   await page.getByRole('option').first().click();
   await page.keyboard.press('Control+k');
-  await page.getByRole('combobox', { name: 'Search commands' }).fill('fix for Ada');
+  await page.getByRole('combobox', { name: 'Search commands' }).fill('fix login, urgent'); // no verb: NL row exists but search stays first (names are API members now, so no mock 'Ada')
   await expect(page.locator('li.nl-action')).toBeVisible();
   await expect(page.locator('li[aria-selected="true"]')).not.toHaveClass(/nl-action/);
 });
