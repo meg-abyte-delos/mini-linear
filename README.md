@@ -16,3 +16,6 @@ A small Linear clone built by the Delos Dev Swarm (Meg, Ada, Linus, Tess, Rex). 
 
 ## Public API & webhooks
 Personal API keys, REST API and outbound webhooks: see [docs/API.md](docs/API.md).
+
+## Deployment: reverse proxy
+The CSRF check (`src/lib/auth/origin.ts`) compares the request `Origin` host with `X-Forwarded-Host`, falling back to `Host`. The proxy in front of the app **must set or strip `X-Forwarded-Host`**: overwrite it with the public host, never append to a client-supplied value (a multi-valued header fails closed and refuses every write). Do not expose the app without such a proxy.
