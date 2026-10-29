@@ -22,6 +22,8 @@ test.beforeAll(async ({ request }) => {
 test('row: checkbox is hidden until hover/focus, then visible; selecting keeps it visible', async ({ page }) => {
   await home(page);
   const row = rowOf(page, T.plain); const box = row.locator('.rowsel');
+  // The list may focus a row on load (j/k), which shows its checkbox via :focus-within.
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.mouse.move(0, 0);
   await expect(box).toHaveCSS('opacity', '0');
   await row.hover();
