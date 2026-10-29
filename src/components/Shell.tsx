@@ -14,6 +14,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { CycleBurndown } from '@/components/CycleBurndown';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
+import { GROUPING_LABEL, ORDERING_LABEL, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
@@ -63,6 +64,27 @@ function Column({ status, items, renderCard, selectedId, overZone, zone }: { sta
       </div>
     </section>
   );
+}
+
+// Cmd+K sections and icons, derived from the command id (Linear groups results under small labels).
+const NAV_IDS = new Set(['list', 'board', 'cycles', 'projects', 'go-project']);
+function paletteGroup(id: string): string {
+  if (id === 'nl') return 'Suggested';
+  if (id.startsWith('hit-')) return 'Issues';
+  if (id === 'search-all') return 'Search';
+  if (NAV_IDS.has(id)) return 'Navigation';
+  if (id.startsWith('filter-') || id === 'clear-filters') return 'Filters';
+  return 'Issue actions';
+}
+function paletteIcon(id: string) {
+  if (id === 'list' || id === 'go-project') return <Icon name='list' />;
+  if (id === 'board') return <Icon name='board' />;
+  if (id === 'cycles') return <Icon name='views' />;
+  if (id === 'projects') return <Icon name='team' />;
+  if (id === 'create') return <Icon name='plus' />;
+  if (id === 'search-all' || id.startsWith('filter-')) return <Icon name='search' />;
+  if (id.startsWith('hit-')) return <Icon name='issues' />;
+  return <Icon name='inbox' />;
 }
 
 export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
@@ -136,6 +158,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [filters, setFiltersState] = useState<Filters>(initialFilters);
   const [projPick, setProjPick] = useState<DOMRect | null | false>(false);
   const [filterPick, setFilterPick] = useState<{ kind: FilterKey; rect: DOMRect | null } | null>(null);
+  const [tbMenu, setTbMenu] = useState<'filter' | 'display' | null>(null);
+  const [grouping, setGrouping] = useState<Grouping>('status');
+  const [ordering, setOrdering] = useState<Ordering>('manual');
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
   // Filters live in the URL: replaceState keeps other params (seed, state) and does not refetch.
   function setFilters(f: Filters) {
@@ -256,7 +283,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // are not sent before hydration has attached the handlers.
   useEffect(() => { document.documentElement.dataset.ready = '1'; return () => { delete document.documentElement.dataset.ready; }; }, []);
 
-  const ordered = useMemo(() => STATUSES.flatMap((s) => issues.filter((i) => i.status === s)), [issues]);
+  // Same grouping, ordering and collapsed state as the list render, so j/k never lands on a hidden row.
+  const groups = useMemo(() => listGroups(issues, STATUSES, grouping, ordering), [issues, grouping, ordering]);
+  const ordered = useMemo(
+    () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.flatMap((s) => issues.filter((i) => i.status === s))),
+    [view, groups, collapsed, issues],
+  );
+  // Manual ordering only: with priority/created ordering a drop position would be meaningless.
+  const canDrag = view !== 'list' || ordering === 'manual';
   const current = ordered.find((i) => i.id === selId) ?? ordered[0];
   const orderedRef = useRef(ordered);
   const currentIdRef = useRef<string | undefined>(current?.id);
@@ -298,14 +332,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const before = dir < 0 ? col[to]!.id : (col[to + 1]?.id ?? null);
     moveTo(id, col[at]!.status, before);
   }
-  const dragProps = (i: Issue) => ({
+  const dragProps = (i: Issue) => (!canDrag ? {} : {
     draggable: true,
     onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', i.id); e.dataTransfer.effectAllowed = 'move'; dragRef.current = i.id; setDragId(i.id); },
     onDragEnd: () => { dragRef.current = null; setDragId(null); setOverKey(null); },
     onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); e.stopPropagation(); setOverKey(i.id); } },
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); e.stopPropagation(); moveTo(d, i.status, i.id); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
-  const zoneProps = (s: Status) => ({
+  const zoneProps = (s: Status) => (!canDrag ? {} : {
     onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); setOverKey(`z-${s}`); } },
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveTo(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
@@ -387,20 +421,21 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     return LABELS.map((l) => ({ id: l.id, label: l.name, badge: scopeBadge(l.scope), checked: sel.every((x) => x.label_ids.includes(l.id)), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
   // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
-  function create() {
+  function create(status?: Status) {
     if (readOnly) { setToast('Guests have read-only access.'); return; }
     if (api) {
       void apiCreate(api.slug, api.teamId, 'New issue').then((row) => {
         if (!row) { setToast('Could not create the issue.'); return; }
         versions.current.set(row.id, row.version);
         store.current.upsert({ ...row, sort_key: String(Date.now()) });
+        if (status && row.status !== status) { store.current.update(row.id, { status }); push(row.id, { status }); }
         sync();
         if (view === 'cycles' || view === 'projects') setView('list');
         setSelId(row.id);
       });
       return;
     }
-    const made = store.current.create({ title: 'New issue' });
+    const made = store.current.create({ title: 'New issue', ...(status ? { status } : {}) });
     sync();
     if (view === 'cycles' || view === 'projects') setView('list');
     if (made && activeCount(filters) > 0 && applyFilters([made], filters).length === 0) setFilters(emptyFilters());
@@ -515,6 +550,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // Only an explicit leading verb puts the action first; otherwise ('fix for Ada') search hits keep Enter.
   const nlFirst = /^\s*(assign|unassign|move|mark|set|label|prioriti[sz]e)\b/i.test(q);
   const results: Cmd[] = nlFirst && !nl?.blocked ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
+  // Keep the active row visible while arrowing through a long, sectioned list.
+  const activeId = results[pi]?.id;
+  useEffect(() => { if (palette && activeId) document.getElementById(`pc-${activeId}`)?.scrollIntoView({ block: 'nearest' }); }, [palette, activeId]);
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
@@ -584,7 +622,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }, []);
 
   const who = (id: string | null) => findPerson(people, id);
-  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />; };
+  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av av-none' aria-hidden='true' title='Unassigned' />; };
   const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
   const row = (i: Issue) => (
@@ -594,8 +632,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <span className='id'>{i.identifier ?? i.id}</span>
       <StatusIcon status={i.status} />
       <span className='title'>{i.title}</span>
-      <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</span>
-      <span className='date'>{fmtDate(i.created_at)}</span>
+      <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{(() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
+      <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>
       {assignee(i)}
     </div>
   );
@@ -611,7 +649,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     <div className='shell'>
       <aside className='side' aria-label='Sidebar'>
         <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
-        {!readOnly && <button className='side-btn new' onClick={create}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
+        {!readOnly && <button className='side-btn new' onClick={() => create()}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
         <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
         <nav aria-label='Primary'>
           <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><Icon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
@@ -646,11 +684,19 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </header>
         {view !== 'cycles' && view !== 'projects' && view !== 'inbox' && !loadError && allIssues.length > 0 && (
           <div className='filterbar' role='toolbar' aria-label='Filters'>
-            {FILTER_KEYS.map((k) => (
-              <button key={k} id={`fb-${k}`} className={`fchip${filters[k].length ? ' on' : ''}`} aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed={filters[k].length > 0} onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
-                {FILTER_LABEL[k]}{filters[k].length > 0 && <span className='fval'>: {filterValueLabel(k)}</span>}
+            {FILTER_KEYS.filter((k) => filters[k].length > 0).map((k) => (
+              <button key={k} id={`fb-${k}`} className='fchip on' aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed='true' onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
+                {FILTER_LABEL[k]}<span className='fval'>: {filterValueLabel(k)}</span>
               </button>
             ))}
+            <div className='fwrap'>
+              <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='views' /><span>Filter</span></button>
+              {tbMenu === 'filter' && (
+                <div className='tb-menu' role='menu' aria-label='Filter by' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-add')?.focus(); } }}>
+                  {FILTER_KEYS.map((k, n) => <button key={k} id={`fb-${filters[k].length ? 'm-' : ''}${k}`} role='menuitem' autoFocus={n === 0} onClick={() => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }}>{FILTER_LABEL[k]}</button>)}
+                </div>
+              )}
+            </div>
             {activeCount(filters) > 0 && <button className='fclear' onClick={() => setFilters(emptyFilters())}>Clear filters</button>}
             {activeCount(filters) > 0 && !readOnly && !activeViewId && !saving && <button className='fchip save-view' onClick={() => setSaving({ name: '', shared: false, err: false })}>Save view</button>}
             {saving && (
@@ -662,6 +708,17 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                 {saving.err && <span role='alert' className='save-err'>Enter a name (could not save).</span>}
               </form>
             )}
+            {view === 'list' && (
+              <div className='tb-right'>
+                <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='list' /><span>Display</span></button>
+                {tbMenu === 'display' && (
+                  <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
+                    <label>Grouping<select autoFocus value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>{(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => <option key={g} value={g}>{GROUPING_LABEL[g]}</option>)}</select></label>
+                    <label>Ordering<select value={ordering} onChange={(e) => setOrdering(e.target.value as Ordering)}>{(Object.keys(ORDERING_LABEL) as Ordering[]).map((o) => <option key={o} value={o}>{ORDERING_LABEL[o]}</option>)}</select></label>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {loadError ? (
@@ -672,7 +729,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : allIssues.length === 0 ? (
           <div className='state empty' role='status'>
             <p>No issues yet.</p>
-            {!readOnly && <button onClick={create}>Create issue <kbd>C</kbd></button>}
+            {!readOnly && <button onClick={() => create()}>Create issue <kbd>C</kbd></button>}
           </div>
         ) : view === 'inbox' ? (
           <Inbox client={inboxClient} refreshKey={rtTick} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
@@ -723,13 +780,16 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         ) : view === 'list' ? (
           <div className='scroll'>
-            {STATUSES.map((s) => {
-              const items = issues.filter((i) => i.status === s);
-              if (!items.length) return null;
+            {groups.map(({ key, status, items }) => {
+              const s = status as Status | null;
+              const shut = collapsed.has(key);
               return (
-                <section key={s} className={`group${overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${s}`} {...zoneProps(s)}>
-                  <h2 id={`g-${s}`}><StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{items.length}</span></h2>
-                  <div role='listbox' aria-labelledby={`g-${s}`}>{items.map(row)}</div>
+                <section key={key} className={`group${s && overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${key}`} {...(s ? zoneProps(s) : {})}>
+                  <h2 id={`g-${key}`}>
+                    <button className='gh-toggle' aria-expanded={!shut} aria-controls={`gl-${key}`} onClick={() => toggleGroup(key)}>{s && <StatusIcon status={s} />}<span>{s ? STATUS_LABEL[s] : 'All issues'}</span><span className='count'>{items.length}</span><i className='chev' aria-hidden='true'>▾</i></button>
+                    {s && !readOnly && <button className='gh-add' aria-label={`Add issue to ${STATUS_LABEL[s]}`} onClick={() => create(s)}>+</button>}
+                  </h2>
+                  {!shut && <div id={`gl-${key}`} role='listbox' aria-labelledby={`g-${key}`}>{items.map(row)}</div>}
                 </section>
               );
             })}
@@ -792,14 +852,15 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             />
             <ul id='palette-list' role='listbox' aria-label='Commands'>
               {results.map((c, idx) => (
-                <li key={c.id} id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
+                <Fragment key={c.id}>{(idx === 0 || paletteGroup(results[idx - 1]!.id) !== paletteGroup(c.id)) && <li role='presentation' className='pal-group'>{paletteGroup(c.id)}</li>}
+                <li id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span className='pal-ic' aria-hidden='true'>{paletteIcon(c.id)}</span><span className='pal-label'>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <span className='pal-keys'>{c.hint.split(' ').map((k, j) => <kbd key={j}>{k}</kbd>)}</span>}</li></Fragment>
               ))}
               {api && q.trim().length >= MIN_QUERY && searchState === 'loading' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-searching'>Searching…</li>}
               {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-search-error'>Search failed. Try again.</li>}
-              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-no-results'>No results for “{q.trim()}”</li>}
-              {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
+              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-no-results' className='pal-empty'>No results for “{q.trim()}”</li>}
+              {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true' className='pal-empty'>No matching command</li>}
             </ul>
-            <div className='palette-foot'><kbd>↑↓</kbd> navigate <kbd>↵</kbd> run <kbd>esc</kbd> close</div>
+            <div className='palette-foot'><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>
           </div>
         </div>
       )}
