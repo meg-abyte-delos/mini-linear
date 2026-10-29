@@ -65,6 +65,12 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     const st = await (await call(S.cycleStats as never, seed.a.member, {}, seed.a.slug, cur)).json();
     expect(st).toMatchObject({ scope: 3, completed: 1, started: 1, canceled: 1, percent_complete: 33 });
     expect((await (await call(S.snapshotCycles as never, seed.a.admin, { method: "POST" }, seed.a.slug)).json()).snapshotted).toBeGreaterThanOrEqual(1);
+    // alias regression: a non-admin ctx must not error on the `cycles c` alias and only sees its own teams' cycles
+    const n = await db().begin(async (tx) => {
+      await tx`select set_config('app.workspace_id', ${seed.a.id}, true)`;
+      return S.snapshotRunning({ tx, userId: seed.a.member, workspaceId: seed.a.id, role: "member", req: new Request("http://x/") } as never);
+    });
+    expect(n).toBeGreaterThanOrEqual(1);
     const st2 = await (await call(S.cycleStats as never, seed.a.member, {}, seed.a.slug, cur)).json();
     expect(st2.series.at(-1)).toMatchObject({ scope: 3, completed: 1 });
     // complete: unfinished (todo, in_progress) move to next cycle; done/canceled stay; audit per moved issue

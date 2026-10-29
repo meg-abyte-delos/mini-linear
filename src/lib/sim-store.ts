@@ -1,4 +1,4 @@
-// Mock issues API: zod-validated input, soft delete, ids never reused.
+// Sim store: in-memory issue store plus ?state= simulation (loading/error/empty) for the shell and search pages.
 import { z } from 'zod';
 import { MOCK_ISSUES, STATUSES, type Issue, type Status } from '@/lib/issues';
 import { moveIssue } from '@/lib/move';
