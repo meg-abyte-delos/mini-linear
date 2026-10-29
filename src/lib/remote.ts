@@ -7,6 +7,12 @@ import { listProjects } from '@/lib/resources/projects-comments';
 import { getWorkspace } from '@/lib/resources/tenancy';
 import { installDevAuth } from '@/lib/dev-auth';
 import type { Issue, Meta } from '@/lib/issues';
+import { cookies } from 'next/headers';
+
+// Forward the browser's session cookie to the in-process handlers (real auth). Absent outside a request scope (tests).
+async function sessionHeaders(): Promise<HeadersInit> {
+  try { return { cookie: (await cookies()).toString() }; } catch { return {}; }
+}
 
 export type ApiConfig = { slug: string; teamId: string };
 export function apiConfig(): ApiConfig | null {
@@ -22,11 +28,12 @@ export const PAGE_CAP = 100; // pages of 100 rows -> 10k rows
 type All<T> = { items: T[]; truncated: boolean };
 async function all<T>(h: (req: Request, slug: string) => Promise<Response>, slug: string, path: string): Promise<All<T>> {
   installDevAuth();
+  const headers = await sessionHeaders();
   const out: T[] = [];
   let cursor: string | null = null;
   for (let n = 0; n < PAGE_CAP; n++) { // hard cap: 10k rows
     const url = `http://localhost/api/v1/w/${slug}/${path}?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
-    const res = await h(new Request(url), slug);
+    const res = await h(new Request(url, { headers }), slug);
     if (!res.ok) throw new HttpError(`${path} -> ${res.status}`, res.status);
     const body = (await res.json()) as Page<T>;
     out.push(...body.items);
@@ -71,7 +78,7 @@ export type Viewer = { userId: string | null; role: WsRole };
 export async function loadViewer(cfg: ApiConfig): Promise<Viewer> {
   installDevAuth();
   try {
-    const res = await getWorkspace(new Request(`http://localhost/api/v1/w/${cfg.slug}`), cfg.slug);
+    const res = await getWorkspace(new Request(`http://localhost/api/v1/w/${cfg.slug}`, { headers: await sessionHeaders() }), cfg.slug);
     if (!res.ok) return { userId: null, role: 'guest' };
     const r = (await res.json()) as { role?: string; user_id?: string };
     const role: WsRole = r.role === 'owner' || r.role === 'admin' || r.role === 'member' ? r.role : 'guest';
