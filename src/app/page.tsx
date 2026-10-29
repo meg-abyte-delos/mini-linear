@@ -1,4 +1,4 @@
-import { listIssues, parseSimState } from '@/lib/mock-api';
+import { listIssues, parseSimState } from '@/lib/sim-store';
 import { Shell } from '@/components/Shell';
 import { parseFilters, TODAY_RE } from '@/lib/filters';
 import { seedIssues, MOCK_META, type Issue, type Meta } from '@/lib/issues';
