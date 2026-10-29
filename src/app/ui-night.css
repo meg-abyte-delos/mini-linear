@@ -4,7 +4,7 @@
    darker or stay equal, so axe contrast can only stay equal or improve.
    Contrast notes (Rex review, #129):
    - --st-info #7c85e0 is >= 5.2:1 on --n-elev #1a1b1f (was #5e6ad2, < 4.5:1 as text).
-   - --line-input #63666e is >= 3:1 on --n-panel (WCAG 1.4.11 non-text contrast for inputs);
+   - --line-input #686b73 is >= 3:1 on --n-panel and elevated surfaces (WCAG 1.4.11 non-text contrast for inputs);
      decorative hairlines stay at --line. */
 
 [data-theme='dark'] {
@@ -12,7 +12,7 @@
   --n-bg:#0b0c0e; --n-panel:#121316; --n-elev:#1a1b1f;
   --bg:var(--n-bg); --side:rgba(18,19,22,.72); --panel:var(--n-panel); --raised:var(--n-elev);
   /* 1px hairlines at 6% white (4% for soft); inputs get a real 3:1 border */
-  --line:rgba(255,255,255,.06); --line-soft:rgba(255,255,255,.04); --line-input:#63666e;
+  --line:rgba(255,255,255,.06); --line-soft:rgba(255,255,255,.04); --line-input:#686b73;
   --hover:rgba(255,255,255,.04); --sel:rgba(40,171,165,.12);
   /* accent + glow tokens */
   --accent:#28aba5; --accent-soft:rgba(40,171,165,.16);
@@ -28,7 +28,7 @@
   html:not([data-theme]) {
     --n-bg:#0b0c0e; --n-panel:#121316; --n-elev:#1a1b1f;
     --bg:var(--n-bg); --side:rgba(18,19,22,.72); --panel:var(--n-panel); --raised:var(--n-elev);
-    --line:rgba(255,255,255,.06); --line-soft:rgba(255,255,255,.04); --line-input:#63666e;
+    --line:rgba(255,255,255,.06); --line-soft:rgba(255,255,255,.04); --line-input:#686b73;
     --hover:rgba(255,255,255,.04); --sel:rgba(40,171,165,.12);
     --accent-soft:rgba(40,171,165,.16);
     --accent-glow:0 0 0 1px rgba(40,171,165,.35), 0 0 16px rgba(40,171,165,.28);
