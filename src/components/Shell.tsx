@@ -7,7 +7,7 @@ import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scop
 import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
-import { createStore } from '@/lib/mock-api';
+import { createStore } from '@/lib/sim-store';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -15,6 +15,7 @@ import { CycleBurndown } from '@/components/CycleBurndown';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { GROUPING_LABEL, ORDERING_LABEL, hueOfId, initialsOf, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
+import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
 import { SelectionBar, type BulkKind } from './SelectionBar';
@@ -112,6 +113,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     void fetchNlPeople(api.slug).then((p) => { if (live) setNlPeople(p); }).finally(() => { if (live) setNlPeopleLoaded(true); });
     return () => { live = false; };
   }, [api?.slug]);
+  const people = useMemo<readonly Person[]>(() => (api ? peopleFromNl(nlPeople) : MOCK_PEOPLE), [api, nlPeople]);
   // Push a change to the API (no-op in mock mode). Local state is already updated (optimistic); the server row then wins.
   // 412 -> refetch the issue, toast "modified elsewhere", no automatic retry.
   function push(id: string, patch: Record<string, unknown>) {
@@ -207,7 +209,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const on = (id: string) => filters[kind].includes(id);
     if (kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: on(st), lead: <StatusIcon status={st} /> }));
     if (kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: on(String(n)), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (kind === 'assignee') return [{ id: NONE, label: 'Unassigned', checked: on(NONE), lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: on(u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (kind === 'assignee') return [{ id: NONE, label: 'Unassigned', checked: on(NONE), lead: <span className='av av-none' aria-hidden='true' /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: on(u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     if (kind === 'label') return LABELS.map((l) => ({ id: l.id, label: l.name, badge: scopeBadge(l.scope), checked: on(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
     if (kind === 'project') return [{ id: NONE, label: 'No project', checked: on(NONE) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: on(p.id) }))];
     return [{ id: NONE, label: 'No cycle', checked: on(NONE) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: on(c.id) }))];
@@ -323,8 +325,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   function openPick(kind: PickKind, at?: DOMRect) {
     if (readOnly) { setToast('Guests have read-only access.'); return; }
     const ids = targetIds(); const id = ids[0]; if (!id) return;
-    // Mock USERS ids are not UUIDs, so an assignment would be local-only: disabled in API mode until GET members exists.
-    if (kind === 'assignee' && api) { setToast('Assignee picker needs the members API (not available yet).'); return; }
+    if (kind === 'assignee' && api && !nlPeopleLoaded) { setToast('Loading members…'); return; }
     const rect = at ?? document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.getBoundingClientRect() ?? null;
     setPick({ kind, id, ids, rect });
   }
@@ -344,7 +345,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       closePick(); return;
     }
     if (pick.kind === 'priority') { for (const cur of items) { store.current.update(cur.id, { priority: Number(optId) as Issue['priority'] }); push(cur.id, { priority: Number(optId) }); } sync(); closePick(); }
-    else if (pick.kind === 'assignee') { for (const cur of items) { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); if (isUuid(optId)) push(cur.id, { assignee_id: optId }); else if (optId === 'none') push(cur.id, { assignee_id: null }); /* mock USERS ids are not UUIDs: local only until GET members exists */ } sync(); closePick(); }
+    else if (pick.kind === 'assignee') { for (const cur of items) { store.current.update(cur.id, { assignee_id: optId === 'none' ? null : optId }); if (isUuid(optId)) push(cur.id, { assignee_id: optId }); else if (optId === 'none') push(cur.id, { assignee_id: null }); } sync(); closePick(); }
     else {
       // Label toggle on a selection: if every issue has it, remove it from all; otherwise add it to all.
       const all = items.every((c) => c.label_ids.includes(optId));
@@ -392,7 +393,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const cur = sel[0];
     if (!pick || !cur) return [];
     if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: sel.every((x) => x.priority === n), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <span className='av av-none' aria-hidden='true' /> }, ...USERS.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <span className='av av-none' aria-hidden='true' /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     if (pick.kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: sel.every((x) => x.status === st), lead: <StatusIcon status={st} /> }));
     if (pick.kind === 'project') return [{ id: 'none', label: 'No project', checked: sel.every((x) => x.project_id === null) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: sel.every((x) => x.project_id === p.id) }))];
     if (pick.kind === 'cycle') return [{ id: 'none', label: 'No cycle', checked: sel.every((x) => x.cycle_id === null) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: sel.every((x) => x.cycle_id === c.id) }))];
@@ -422,7 +423,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // Mock mode: the current user is the first mock user. API mode needs the session user + members API (same gap as the A picker).
   function assignToMe() {
     const id = currentIdRef.current; if (!id) return;
-    if (api) { setToast('Assign to me needs the session user API (not available yet).'); return; }
+    if (api) {
+      const meId = nlPeople.me; if (!meId) { setToast(nlPeopleLoaded ? 'No session user.' : 'Loading members…'); return; }
+      store.current.update(id, { assignee_id: meId }); push(id, { assignee_id: meId }); sync(); setToast(`Assigned to ${findPerson(people, meId)?.name ?? 'you'}`); return;
+    }
     store.current.update(id, { assignee_id: USERS[0]!.id }); sync(); setToast(`Assigned to ${USERS[0]!.name}`);
   }
   function copyId() {
@@ -593,13 +597,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // API mode: resolve through the members API (nlPeople); mock mode keeps USERS.
-  const who = (id: string | null) => {
-    if (!id) return undefined;
-    const m = USERS.find((u) => u.id === id); if (m) return m;
-    const p = nlPeople.users.find((u) => u.id === id);
-    return p ? { id: p.id, name: p.name, initials: initialsOf(p.name), hue: hueOfId(p.id) } : undefined;
-  };
+  const who = (id: string | null) => findPerson(people, id);
   const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av av-none' aria-hidden='true' title='Unassigned' />; };
   const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
@@ -717,7 +715,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             leadName={who(PROJECTS.find((p) => p.id === detailId)?.lead_id ?? null)?.name ?? null}
             onOpenIssue={(id) => { setDetailId(null); setView('list'); setSelId(id); }} />
         ) : view === 'projects' ? (
-          <ProjectsList projects={PROJECTS} issues={allIssues} today={today} canOpen={!!api} onOpen={setDetailId} onViewIssues={goToProject} slug={api?.slug ?? null} />
+          <ProjectsList people={people} projects={PROJECTS} issues={allIssues} today={today} canOpen={!!api} onOpen={setDetailId} onViewIssues={goToProject} />
         ) : view === 'cycles' ? (
           <div className='scroll cycles'>
             {BUCKETS.map((b) => {
@@ -792,7 +790,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </dl>
         </aside>
       )}
-      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} />}
+      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} openKind={pick && pick.ids.length > 1 ? (pick.kind as BulkKind) : null} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} />}
       {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
       {help && (
         <div className='overlay' onClick={() => setHelp(false)}>

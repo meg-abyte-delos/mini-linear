@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createStore } from '@/lib/mock-api';
+import { createStore } from '@/lib/sim-store';
 
 describe('mock api', () => {
   it('validates title and description bounds', () => {
