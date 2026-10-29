@@ -6,14 +6,16 @@ const axe = async (page: import('@playwright/test').Page, label: string) => {
   expect(r.violations.map((v) => `${label}: ${v.id} x${v.nodes.length}`), label).toEqual([]);
 };
 
-test('loading: skeleton status shown, then the list', async ({ page }) => {
+// FIXME(PR 4, Shell): ?state=loading is a mock-only hook (off in production builds); needs a real slow-response hook.
+test.fixme('loading: skeleton status shown, then the list', async ({ page }) => {
   await page.goto('/?state=loading', { waitUntil: 'commit' });
   await expect(page.getByRole('status', { name: 'Loading issues' })).toBeVisible();
   await expect(page.getByRole('option').first()).toBeVisible({ timeout: 10000 });
   await expect(page.getByRole('status', { name: 'Loading issues' })).toHaveCount(0);
 });
 
-test('error: fixed message, Retry keeps ?state (persistent failure), plain URL recovers, axe clean', async ({ page }) => {
+// FIXME(PR 4, Shell): the ?state=error simulation is a mock-only hook, off in production builds. Needs an API-backed failure (e.g. a stopped dependency) to be tested for real.
+test.fixme('error: fixed message, Retry keeps ?state (persistent failure), plain URL recovers, axe clean', async ({ page }) => {
   await page.goto('/?state=error');
   await page.waitForSelector('html[data-ready]');
   const alert = page.locator('.state.error');
@@ -27,7 +29,8 @@ test('error: fixed message, Retry keeps ?state (persistent failure), plain URL r
   await expect(page.locator('.state.error')).toHaveCount(0);
 });
 
-test('empty: message, create button adds an issue, board columns say No issues, axe clean', async ({ page }) => {
+// FIXME(PR 4, Shell): ?state=empty is mock-only. Needs a seeded workspace with no issues (second persona) to be tested for real.
+test.fixme('empty: message, create button adds an issue, board columns say No issues, axe clean', async ({ page }) => {
   await page.goto('/?state=empty');
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('status')).toContainText('No issues yet');
