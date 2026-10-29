@@ -30,6 +30,7 @@ test('inbox: badge, keyboard triage', async ({ page }) => {
 test('inbox: mark all as read and empty state', async ({ page }) => {
   await page.goto('/?view=inbox');
   await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('option').first()).toBeVisible(); // the list loads after hydration: keys pressed earlier hit an empty list
   await page.getByRole('button', { name: 'Mark all as read' }).click();
   await expect(page.getByTestId('inbox-badge')).toHaveCount(0);
   await page.keyboard.press('e');
@@ -41,10 +42,14 @@ test('inbox: mark all as read and empty state', async ({ page }) => {
 test('inbox: tabs, snooze menu, bulk archive, detail panel', async ({ page }) => {
   await page.goto('/?view=inbox');
   await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('option').first()).toBeVisible(); // the list loads after hydration: keys pressed earlier hit an empty list
   await expect(page.getByRole('complementary', { name: 'Notification detail' })).toContainText('DEM-1');
   await page.keyboard.press('s');
   await expect(page.getByRole('menu', { name: 'Snooze until' })).toBeVisible();
+  // Wait for the server to commit the snooze: the Snoozed tab reads from the API and would race the optimistic update.
+  const snoozed = page.waitForResponse((r) => r.url().includes('/snooze') && r.request().method() === 'POST');
   await page.keyboard.press('2');
+  expect((await snoozed).ok()).toBe(true);
   await expect(page.getByRole('option')).toHaveCount(2);
   await page.getByRole('tab', { name: 'Snoozed' }).click();
   await expect(page.getByRole('option')).toHaveCount(1);
@@ -52,8 +57,12 @@ test('inbox: tabs, snooze menu, bulk archive, detail panel', async ({ page }) =>
   await page.getByTestId('select-DEM-2').click();
   await page.getByTestId('select-DEM-3').click();
   await expect(page.getByText('2 selected')).toBeVisible();
+  // Same race as the snooze: the Archived tab reads from the API while the optimistic update is already on screen.
+  let archived = 0;
+  const both = new Promise<void>((done) => page.on('response', (r) => { if (r.url().includes('/archive') && r.request().method() === 'POST' && r.ok() && ++archived === 2) done(); }));
   await page.getByRole('button', { name: 'Archive', exact: true }).click();
   await expect(page.getByText('Inbox zero')).toBeVisible();
+  await both;
   await page.getByRole('tab', { name: 'Archived' }).click();
   await expect(page.getByRole('option')).toHaveCount(2);
 });
@@ -61,6 +70,7 @@ test('inbox: tabs, snooze menu, bulk archive, detail panel', async ({ page }) =>
 test('inbox: x toggles selection of the focused notification', async ({ page }) => {
   await page.goto('/?view=inbox');
   await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('option').first()).toBeVisible(); // the list loads after hydration: keys pressed earlier hit an empty list
   await page.keyboard.press('x');
   await expect(page.getByText('1 selected')).toBeVisible();
   await page.keyboard.press('j');
