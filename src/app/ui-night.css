@@ -42,7 +42,7 @@
 [data-theme='dark'] .side {
   background:var(--side);
   -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
-  position:sticky; top:0; height:100vh;
+  position:sticky; top:0; height:100vh; height:100dvh;
 }
 
 /* Active nav item: accent bar + halo */
@@ -73,3 +73,9 @@
 [data-theme='dark'] :focus-visible { outline-color:var(--accent); box-shadow:0 0 0 3px rgba(40,171,165,.25); }
 
 @media (prefers-reduced-motion: reduce) { [data-theme='dark'] .side-link { transition:none; } }
+
+/* Layering: the sticky header (z 20) must stay under every fixed layer, or it eats their clicks
+   (the detail panel's Esc button was covered: golden a11y e2e). Scrim/pickers already sit at 60. */
+[data-theme='dark'] .panel { z-index:30; }
+[data-theme='dark'] .selbar, [data-theme='dark'] .toast { z-index:40; }
+[data-theme='dark'] .overlay { z-index:50; }
