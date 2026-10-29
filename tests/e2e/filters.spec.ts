@@ -15,7 +15,8 @@ test('filter by status is applied and written to the URL', async ({ page }) => {
   await page.goto('/');
   await page.waitForSelector('html[data-ready]');
   const before = await page.locator('.row').count();
-  await page.getByRole('button', { name: /^Status/ }).click();
+  await page.locator('#fb-add').click();
+  await page.getByRole('menuitem', { name: 'Status' }).click();
   await page.getByRole('option', { name: /^Todo/ }).click();
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/status=todo/);

@@ -4,7 +4,8 @@ test('priority filter, save as view, list in sidebar, reopen from shareable URL'
   await page.goto('/');
   await page.waitForSelector('html[data-ready]');
   const total = await page.locator('.row').count();
-  await page.getByRole('button', { name: /^Priority/ }).click();
+  await page.locator('#fb-add').click();
+  await page.getByRole('menuitem', { name: 'Priority' }).click();
   await page.getByRole('option', { name: /^Urgent/ }).click();
   await page.getByRole('combobox', { name: /Filter by priority/ }).press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -27,7 +28,8 @@ test('priority filter, save as view, list in sidebar, reopen from shareable URL'
   await expect(page.getByRole('button', { name: /^Priority: Urgent/ })).toBeVisible();
 
   // Editing the filters detaches from the saved view.
-  await page.getByRole('button', { name: /^Status/ }).click();
+  await page.locator('#fb-add').click();
+  await page.getByRole('menuitem', { name: 'Status' }).click();
   await page.getByRole('option', { name: /^Todo/ }).click();
   await page.getByRole('combobox', { name: /Filter by status/ }).press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);

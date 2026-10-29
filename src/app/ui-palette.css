@@ -21,3 +21,25 @@
 
 /* NL row blocked (me loading / ambiguous name): visible, never actionable. */
 .palette li.nl-action.is-disabled { opacity: .55; cursor: not-allowed; }
+
+/* Linear-style palette: wider panel, larger input, neutral selected fill, section labels, icons, keycaps. */
+.palette { width: 640px; }
+.palette input { font-size: 17px; height: 56px; padding: 0 20px; }
+.palette ul { padding: 4px 0 8px; }
+.palette li[role='option'] { gap: 10px; height: 40px; padding: 0 12px; margin: 0 8px; font-size: 13px; }
+.palette li[aria-selected='true'] { background: rgb(255 255 255 / 0.07); box-shadow: none; }
+.palette li.pal-group { list-style: none; height: 30px; padding: 10px 20px 0; margin: 0; font-size: 11.5px; font-weight: 500; color: var(--muted); cursor: default; }
+.palette .pal-ic { display: inline-flex; width: 16px; color: var(--muted); flex: none; }
+.palette li[aria-selected='true'] .pal-ic { color: var(--fg); }
+.palette .pal-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette .pal-keys { display: inline-flex; gap: 4px; margin-left: auto; }
+.palette .pal-keys kbd, .palette-foot kbd { margin: 0; min-width: 18px; text-align: center; }
+.palette li.pal-empty { justify-content: center; height: 72px; color: var(--muted); cursor: default; }
+.palette li.pal-empty .pal-ic { display: none; }
+.palette li.nl-action::before { content: none; }
+.palette li.nl-action .pal-ic { color: #28aba5; }
+.palette-foot { gap: 16px; padding: 10px 20px; }
+.palette-foot > span { display: inline-flex; align-items: center; gap: 4px; }
+[data-theme='light'] .palette li[aria-selected='true'] { background: rgb(0 0 0 / 0.05); }
+.palette { background: color-mix(in srgb, var(--bg-elevated, #1c1d1f) 97%, transparent); }
+.palette ul { scroll-padding: 30px 0 8px; }
