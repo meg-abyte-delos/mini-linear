@@ -5,7 +5,7 @@ import { decodeCursor, page } from "../http/cursor";
 import { listQuery, parseId, parseJson, parseQuery } from "../http/validate";
 import { recordAudit, diffOf, type Diff } from "../audit";
 import { uuidv7 } from "../uuid7";
-import { load } from "./handlers";
+import { load, visible } from "./handlers";
 
 type Row = Record<string, unknown>;
 
@@ -157,7 +157,18 @@ export const listActivity = (req: Request, slug: string, rawIssue: string) => wi
     order by a.created_at desc, a.id desc limit ${q.limit + 1}`;
   const p = page(rows, q.limit, ctx.workspaceId, scope, (r) => ({ k: r._k as string, id: r.id as string }));
   // Guests never see the description history of other fields they cannot otherwise read; issue diffs only expose issue fields.
-  const items = p.items.map((r) => {
+  // Relation events carry the other end's issue id: drop those whose other end the caller cannot see (same rule as listRelations).
+  const otherEnds = (diff: Diff): string[] => {
+    const d = diff as Record<string, { before?: unknown; after?: unknown } | undefined>;
+    return [d.relation?.before, d.relation?.after, d.related_issue_id?.before, d.related_issue_id?.after].flatMap((v) => {
+      const id = v && typeof v === "object" ? (v as { related_issue_id?: unknown }).related_issue_id : v;
+      return typeof id === "string" && id !== issueId ? [id] : [];
+    });
+  };
+  const wanted = [...new Set(p.items.flatMap((r) => otherEnds((r.diff ?? {}) as Diff)))];
+  const seen = new Set(wanted.length ? (await t<Row[]>`select i.id from issues i where i.id = any(${wanted}::uuid[]) and i.deleted_at is null and ${visible(ctx)}`).map((r) => r.id as string) : []);
+  const shown = p.items.filter((r) => otherEnds((r.diff ?? {}) as Diff).every((id) => seen.has(id)));
+  const items = shown.map((r) => {
     const diff = (r.diff ?? {}) as Diff;
     return { id: r.id, issue_id: issue.id, actor_id: r.actor_id, entity: r.entity, entity_id: r.entity_id, action: r.action,
       summary: summarize(r.entity as string, r.action as string, diff), changes: describeChanges(diff), created_at: r.created_at };

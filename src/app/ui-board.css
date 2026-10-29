@@ -1,15 +1,41 @@
-/* Board view: flat columns, compact cards, token-based borders (no hard-coded hex). */
-.board { gap: var(--sp-2); }
-.board .col { background: transparent; border: 0; }
-.board .col > header,
-.board .col-head { height: 36px; min-height: 36px; display: flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-2); font-size: var(--fs-base); font-weight: 500; }
+/* Board view: flat columns, compact cards, token-based borders (no hard-coded hex). Matches Linear's board. */
+.board { gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+.board .col { width: 300px; background: transparent; border: 0; border-radius: 8px; padding-bottom: var(--sp-2); }
+.board .col:hover { background: color-mix(in srgb, var(--fg) 2%, transparent); }
+
+/* Column header: icon, name, muted count, actions revealed on hover / focus. */
+.board .col-head { height: 36px; min-height: 36px; display: flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 0; }
+.board .col-head h2 { flex: 1; min-width: 0; height: 36px; padding: 0 var(--sp-2); gap: var(--sp-2); font-size: var(--fs-base); font-weight: 500; background: none; border: 0; }
+.board .col-head h2 .count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.board .col-act { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity .12s ease, background-color .12s ease; }
+.board .col:hover .col-act, .board .col-act:focus-visible { opacity: 1; }
+.board .col-act:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); }
+.board .col-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Cards: 86px tall (virtual.ts CARD_H 92 = 86 + 6 gap), single-line title. */
 .board .card {
-  min-height: auto;
+  min-height: 86px;
+  margin: 6px 4px 0;
+  gap: 4px;
   padding: var(--sp-2) 10px;
   border-radius: 6px;
+  background: var(--raised);
   border: 1px solid color-mix(in srgb, var(--fg) 6%, transparent);
+  box-shadow: 0 1px 2px color-mix(in srgb, #000 25%, transparent);
   transition: border-color .12s ease, background-color .12s ease;
 }
-.board .card:hover { border-color: color-mix(in srgb, var(--fg) 12%, transparent); }
+.board .card:hover { border-color: color-mix(in srgb, var(--fg) 14%, transparent); background: color-mix(in srgb, var(--fg) 3%, var(--raised)); }
+.board .card[aria-selected=true] { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--sel); }
 .board .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.board .card .id { font-size: var(--fs-sm); color: var(--muted); }
+.board .card.dragging { opacity: .5; transform: rotate(1.5deg); box-shadow: 0 6px 16px color-mix(in srgb, #000 40%, transparent); }
+.board .card .id { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+.board .card-title { font-size: var(--fs-base); line-height: 1.35; }
+.board .card-meta { gap: var(--sp-1); margin-top: auto; }
+
+/* Priority sits in a small bordered box, like Linear's property chips. */
+.board .card-prio { width: 22px; height: 20px; display: inline-grid; place-items: center; border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent); border-radius: 4px; }
+.board .card .chip { height: 20px; display: inline-flex; align-items: center; padding: 0 6px; border-radius: 10px; font-size: var(--fs-sm); }
+
+/* Empty column: quiet drop target instead of bare text. */
+.board .col-empty { margin: 6px 4px 0; padding: var(--sp-3) var(--sp-2); text-align: center; border: 1px dashed color-mix(in srgb, var(--fg) 10%, transparent); border-radius: 6px; }
+.board .col.over-zone .col-empty { border-color: var(--accent); }

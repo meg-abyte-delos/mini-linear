@@ -14,3 +14,7 @@
 .bd-k-ideal::before { border-top-style:dashed; border-color:var(--muted-strong); }
 .bd-k-scope::before { border-color:var(--st-info); opacity:.7; }
 .bd-empty { color:var(--muted-strong); font-size:var(--fs-sm); padding:8px 16px; margin:0; }
+
+.bd-scopechg { stroke:var(--st-warn, #e5a23c); stroke-width:1.25; opacity:.8; }
+.bd-scopechg-t { fill:var(--st-warn, #e5a23c); }
+.bd-k-chg::before { border-color:var(--st-warn, #e5a23c); border-top-style:dashed; }

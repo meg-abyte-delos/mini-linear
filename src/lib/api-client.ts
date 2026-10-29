@@ -22,12 +22,34 @@ export async function getIssue(slug: string, id: string, f: Fetch = fetch, prev?
   } catch { return null; }
 }
 
+// PATCHes of one issue are serialized. Two edits in quick succession (estimate, then due date) would otherwise both go out with the
+// same If-Match: the second gets a 412, and the caller replaces its optimistic state with the server row, which lacks the new value.
+const patchChain = new Map<string, Promise<unknown>>();
+const knownVersion = new Map<string, number>();
+const PATCH_TIMEOUT_MS = 15_000; // a hung request must not block the queue for that issue forever
+
 /** PATCH with If-Match: "<version>". On 412 the issue is refetched once; there is no automatic retry. */
 export async function patchIssue(slug: string, prev: Issue, version: number, patch: Record<string, unknown>, f: Fetch = fetch): Promise<SyncResult> {
+  const run = (patchChain.get(prev.id) ?? Promise.resolve()).then(() => send(slug, prev, version, patch, f));
+  patchChain.set(prev.id, run.catch(() => undefined));
+  return run;
+}
+
+async function send(slug: string, prev: Issue, version: number, patch: Record<string, unknown>, f: Fetch): Promise<SyncResult> {
+  // Versions only grow: when an earlier PATCH of this issue succeeded while this one was queued, use its resulting version.
+  const v = Math.max(version, knownVersion.get(prev.id) ?? 0);
   try {
-    const res = await f(`${base(slug)}/issues/${prev.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json', 'if-match': `"${version}"` }, body: JSON.stringify(patch) });
-    if (res.ok) return { kind: 'ok', issue: fromApi((await res.json()) as Record<string, unknown>, prev) };
+    const res = await f(`${base(slug)}/issues/${prev.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json', 'if-match': `"${v}"` }, body: JSON.stringify(patch), signal: AbortSignal.timeout(PATCH_TIMEOUT_MS) });
+    if (res.ok) {
+      const issue = fromApi((await res.json()) as Record<string, unknown>, prev);
+      knownVersion.set(prev.id, issue.version);
+      return { kind: 'ok', issue };
+    }
     const fresh = await getIssue(slug, prev.id, f, prev);
+    // After a failure (412 included) forget the remembered version instead of adopting the fresh one: a queued PATCH then goes out with
+    // its caller's own, possibly older, version and gets its own 412 + conflict toast. Adopting `fresh` would let it silently overwrite
+    // another user's edit of the same field.
+    knownVersion.delete(prev.id);
     return { kind: res.status === 412 ? 'conflict' : 'error', issue: fresh };
   } catch { return { kind: 'error', issue: null }; }
 }
