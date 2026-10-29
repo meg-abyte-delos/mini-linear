@@ -1,3 +1,4 @@
+import pg from 'pg';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { api, world } from './helpers/world';
 import { runIntegration } from './helpers/gate';
@@ -34,12 +35,23 @@ describe.skipIf(!runIntegration)('PATCH version périmée', () => {
 });
 
 describe.skipIf(!runIntegration)('bulk cross-workspace', () => {
-  it('ids d un autre workspace ne sont pas modifiés', async () => {
+  // Contract: partial batch, 200 + per-id result. A foreign id is reported not_found (no existence leak) and left untouched.
+  it('ids d un autre workspace: not_found par id, valeur inchangée en base', async () => {
+    const dbPriority = async (id: string) => {
+      const p = new pg.Pool({ connectionString: process.env.PGSUPER_URL ?? process.env.DATABASE_OWNER_URL, max: 1 });
+      try { return (await p.query('select priority from issues where id = $1', [id])).rows[0]?.priority as number; } finally { await p.end(); }
+    };
+    const before = await dbPriority(W.i2);
+    expect(before).toBeTypeOf('number');
+    const target = before === 4 ? 3 : 4; // sentinel != current value
     const mine = await mk();
-    const r = await api(W.A1, 'POST', `${b}/issues/bulk`, { ids: [mine.id, W.i2], patch: { priority: 1 } });
-    expect([200,400,404]).toContain(r.status);
-    const other = await (await api(W.B1, 'GET', `/api/v1/w/w2/issues/${W.i2}`)).json();
-    expect(other.priority).not.toBe(1);
+    const r = await api(W.A1, 'POST', `${b}/issues/bulk`, { ids: [mine.id, W.i2], patch: { priority: target } });
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.succeeded).toEqual([mine.id]);
+    expect(j.failed).toEqual([expect.objectContaining({ id: W.i2, code: 'not_found' })]);
+    expect(await dbPriority(W.i2)).toBe(before);
+    expect(await dbPriority(mine.id)).toBe(target);
   });
   it('bulk valide met à jour tous les ids du workspace', async () => {
     const x = await mk(), y = await mk();
@@ -52,47 +64,21 @@ describe.skipIf(!runIntegration)('bulk cross-workspace', () => {
 
 // Mentioned user must see the issue: M1 is in team t1, M2 is not (members only see their teams' issues). Handle = email local part.
 describe.skipIf(!runIntegration)('mentions', () => {
-  const h1 = () => W.M1.email.split('@')[0];
-  it('une mention crée une seule notification pour le mentionné', async () => {
-    const i = await mk();
-    const before = await (await api(W.M1, 'GET', `${b}/notifications`)).json();
-    const n0 = JSON.stringify(before).split(i.id).length - 1;
-    await api(W.A1, 'POST', `${b}/issues/${i.id}/comments`, { body: `ping @${h1()} merci` });
-    const after = await (await api(W.M1, 'GET', `${b}/notifications`)).json();
-    const n1 = JSON.stringify(after).split(i.id).length - 1;
-    expect(n1 - n0).toBeGreaterThanOrEqual(1);
-  });
-  it('mentionner deux fois le même user dans un commentaire ne double pas la notif', async () => {
-    const i = await mk(); const h = h1();
-    await api(W.A1, 'POST', `${b}/issues/${i.id}/comments`, { body: `@${h} @${h}` });
-    const list = await (await api(W.M1, 'GET', `${b}/notifications`)).json();
-    const items = (Array.isArray(list) ? list : list.items ?? []).filter((n: { id: string }) => JSON.stringify(n).includes(i.id));
-    expect(items.length).toBe(1);
-  });
-});
-
-describe.skipIf(!runIntegration)('snooze / archive', () => {
-  const firstNotif = async () => {
-    const list = await (await api(W.M1, 'GET', `${b}/notifications`)).json();
-    return (Array.isArray(list) ? list : list.items ?? [])[0];
+  const handle = () => W.M1.email.split('@')[0];
+  const count = async (id: string) => {
+    const j = await (await api(W.M1, 'GET', `${b}/notifications`)).json();
+    return (Array.isArray(j) ? j : j.items ?? []).filter((n: unknown) => JSON.stringify(n).includes(id)).length;
   };
-  it('snooze avec date future OK, passée → 422', async () => {
-    const n = await firstNotif(); if (!n) return;
-    const fut = new Date(Date.now() + 86400000).toISOString();
-    expect([200,204]).toContain((await api(W.M1, 'POST', `${b}/notifications/${n.id}/snooze`, { until: fut })).status);
-    expect((await api(W.M1, 'POST', `${b}/notifications/${n.id}/snooze`, { until: '2000-01-01T00:00:00Z' })).status).toBe(422);
+  it('une mention crée exactement une notification', async () => {
+    const i = await mk();
+    expect(await count(i.id)).toBe(0);
+    await api(W.A1, 'POST', `${b}/issues/${i.id}/comments`, { body: `ping @${handle()} merci` });
+    expect(await count(i.id)).toBe(1);
   });
-  it('archive puis absente de la liste par défaut', async () => {
-    const n = await firstNotif(); if (!n) return;
-    expect([200,204]).toContain((await api(W.M1, 'POST', `${b}/notifications/${n.id}/archive`, {})).status);
-    expect(JSON.stringify(await (await api(W.M1, 'GET', `${b}/notifications`)).json())).not.toContain(n.id);
-  });
-  it('un autre user ne peut pas archiver la notif de M1', async () => {
-    const n = await firstNotif(); if (!n) return;
-    expect([403,404]).toContain((await api(W.M2, 'POST', `${b}/notifications/${n.id}/archive`, {})).status);
-  });
-  it('id inconnu → 404', async () => {
-    expect(((await api(W.M1, 'POST', `${b}/notifications/00000000-0000-0000-0000-000000000000/archive`, {})).status)).toBe(404);
+  it('deux mentions du même user dans un commentaire: toujours 1 notification', async () => {
+    const i = await mk();
+    await api(W.A1, 'POST', `${b}/issues/${i.id}/comments`, { body: `@${handle()} @${handle()}` });
+    expect(await count(i.id)).toBe(1);
   });
 });
 

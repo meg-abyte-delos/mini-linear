@@ -18,9 +18,12 @@ describe.skipIf(!runIntegration)('issues', () => {
   it('titre > 255 → 422', async () => { expect((await api(W.M1, 'POST', `${b}/issues`, { team_id: W.t1, title: 'x'.repeat(256) })).status).toBe(422); });
   it('priority hors 0..4 → 422', async () => { expect((await api(W.M1, 'POST', `${b}/issues`, { team_id: W.t1, title: 'p', priority: 9 })).status).toBe(422); });
   it('team d un autre workspace refusée', async () => { expect(((await api(W.M1, 'POST', `${b}/issues`, { team_id: W.t2, title: 'x' })).status)).toBeGreaterThanOrEqual(400); });
-  it('guest ne voit que les issues partagées', async () => {
+  it('guest voit l issue partagée, pas les non partagées', async () => {
+    const hidden = await mk('hidden-from-guest');
     const r = await api(W.G1, 'GET', `${b}/issues`); expect(r.status).toBe(200);
-    const ids = JSON.stringify(await r.json()); expect(ids).toContain(W.i1);
+    const body = JSON.stringify(await r.json());
+    expect(body).toContain(W.i1);
+    expect(body).not.toContain(hidden.id);
   });
   it('isolation: w2 ne voit pas i1', async () => { expect(JSON.stringify(await (await api(W.B1, 'GET', '/api/v1/w/w2/issues')).json())).not.toContain(W.i1); });
   it('bulk: état vide → 422', async () => { expect((await api(W.A1, 'POST', `${b}/issues/bulk`, { ids: [] })).status).toBe(422); });
@@ -52,8 +55,10 @@ describe.skipIf(!runIntegration)('cycles', () => {
   it('end < start → 422', async () => { expect((await api(W.A1, 'POST', `${b}/cycles`, { team_id: W.t1, name: 'c', start_date: '2030-02-10', end_date: '2030-02-01' })).status).toBe(422); });
   it('chevauchement refusé (EXCLUDE gist)', async () => {
     const mkc = (s: string, e: string) => api(W.A1, 'POST', `${b}/cycles`, { team_id: W.t1, name: 'c', start_date: s, end_date: e });
-    expect([200,201]).toContain((await mkc('2031-01-01', '2031-01-14')).status);
-    expect([400,409]).toContain((await mkc('2031-01-10', '2031-01-20')).status);
+    const y = 3000 + Math.floor(Math.random() * 6000); // fresh range on a reused DB
+    const d = (m: number, day: number) => `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    expect([200,201]).toContain((await mkc(d(1, 1), d(1, 14))).status);
+    expect((await mkc(d(1, 10), d(1, 20))).status).toBe(409);
   });
 });
 
