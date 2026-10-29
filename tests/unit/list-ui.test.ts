@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hueOfId, initialsOf, orderIssues, relDate } from '@/lib/list-ui';
+import { hueOfId, initialsOf, listGroups, orderIssues, relDate, visibleOrder } from '@/lib/list-ui';
 
 const now = new Date('2026-10-29T15:00:00Z');
 describe('list-ui', () => {
@@ -22,5 +22,23 @@ describe('list-ui', () => {
     expect(orderIssues(xs, 'priority').map((x) => x.priority)).toEqual([1, 3, 0]);
     expect(orderIssues(xs, 'created').map((x) => x.created_at)).toEqual(['2026-03-01', '2026-02-01', '2026-01-01']);
     expect(orderIssues(xs, 'manual')).toEqual(xs);
+  });
+});
+
+describe('listGroups / visibleOrder (j/k order = render order)', () => {
+  const mk = (id: string, status: string, priority: number, created_at: string) => ({ id, status, priority, created_at });
+  const items = [mk('a', 'todo', 3, '2026-01-01'), mk('b', 'done', 1, '2026-01-03'), mk('c', 'todo', 1, '2026-01-02')];
+  const S = ['todo', 'done', 'canceled'];
+  it('groups by status, drops empty groups, applies ordering', () => {
+    const g = listGroups(items, S, 'status', 'priority');
+    expect(g.map((x) => x.key)).toEqual(['todo', 'done']);
+    expect(g[0]!.items.map((x) => x.id)).toEqual(['c', 'a']);
+  });
+  it('grouping none orders across statuses', () => {
+    expect(listGroups(items, S, 'none', 'created')[0]!.items.map((x) => x.id)).toEqual(['b', 'c', 'a']);
+  });
+  it('skips collapsed groups', () => {
+    const g = listGroups(items, S, 'status', 'manual');
+    expect(visibleOrder(g, new Set(['todo'])).map((x) => x.id)).toEqual(['b']);
   });
 });

@@ -14,7 +14,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { CycleBurndown } from '@/components/CycleBurndown';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
-import { GROUPING_LABEL, ORDERING_LABEL, hueOfId, initialsOf, orderIssues, relDate, type Grouping, type Ordering } from '@/lib/list-ui';
+import { GROUPING_LABEL, ORDERING_LABEL, hueOfId, initialsOf, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
 import { SelectionBar, type BulkKind } from './SelectionBar';
@@ -260,7 +260,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // are not sent before hydration has attached the handlers.
   useEffect(() => { document.documentElement.dataset.ready = '1'; return () => { delete document.documentElement.dataset.ready; }; }, []);
 
-  const ordered = useMemo(() => STATUSES.flatMap((s) => issues.filter((i) => i.status === s)), [issues]);
+  // Same grouping, ordering and collapsed state as the list render, so j/k never lands on a hidden row.
+  const groups = useMemo(() => listGroups(issues, STATUSES, grouping, ordering), [issues, grouping, ordering]);
+  const ordered = useMemo(
+    () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.flatMap((s) => issues.filter((i) => i.status === s))),
+    [view, groups, collapsed, issues],
+  );
+  // Manual ordering only: with priority/created ordering a drop position would be meaningless.
+  const canDrag = view !== 'list' || ordering === 'manual';
   const current = ordered.find((i) => i.id === selId) ?? ordered[0];
   const orderedRef = useRef(ordered);
   const currentIdRef = useRef<string | undefined>(current?.id);
@@ -302,14 +309,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const before = dir < 0 ? col[to]!.id : (col[to + 1]?.id ?? null);
     moveTo(id, col[at]!.status, before);
   }
-  const dragProps = (i: Issue) => ({
+  const dragProps = (i: Issue) => (!canDrag ? {} : {
     draggable: true,
     onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', i.id); e.dataTransfer.effectAllowed = 'move'; dragRef.current = i.id; setDragId(i.id); },
     onDragEnd: () => { dragRef.current = null; setDragId(null); setOverKey(null); },
     onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); e.stopPropagation(); setOverKey(i.id); } },
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); e.stopPropagation(); moveTo(d, i.status, i.id); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
-  const zoneProps = (s: Status) => ({
+  const zoneProps = (s: Status) => (!canDrag ? {} : {
     onDragOver: (e: React.DragEvent) => { if (dragRef.current) { e.preventDefault(); setOverKey(`z-${s}`); } },
     onDrop: (e: React.DragEvent) => { const d = dragRef.current; if (!d) return; e.preventDefault(); moveTo(d, s, null); dragRef.current = null; setDragId(null); setOverKey(null); },
   });
@@ -656,7 +663,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         {view !== 'cycles' && view !== 'projects' && view !== 'inbox' && !loadError && allIssues.length > 0 && (
           <div className='filterbar' role='toolbar' aria-label='Filters'>
             {FILTER_KEYS.filter((k) => filters[k].length > 0).map((k) => (
-              <button key={k} id={`fb-${k}`} className='fchip on' aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
+              <button key={k} id={`fb-${k}`} className='fchip on' aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed='true' onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
                 {FILTER_LABEL[k]}<span className='fval'>: {filterValueLabel(k)}</span>
               </button>
             ))}
@@ -751,10 +758,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         ) : view === 'list' ? (
           <div className='scroll'>
-            {(grouping === 'none' ? [null] : STATUSES).map((s) => {
-              const items = orderIssues(s ? issues.filter((i) => i.status === s) : ordered, ordering);
-              if (!items.length) return null;
-              const key = s ?? 'all';
+            {groups.map(({ key, status, items }) => {
+              const s = status as Status | null;
               const shut = collapsed.has(key);
               return (
                 <section key={key} className={`group${s && overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${key}`} {...(s ? zoneProps(s) : {})}>

@@ -42,3 +42,18 @@ export function orderIssues<T extends { priority: number; created_at: string }>(
     return c || a.k - b.k;
   }).map((e) => e.x);
 }
+
+/** List groups exactly as rendered: one group per non-empty status (or a single 'all' group), each ordered. */
+export function listGroups<T extends { status: string; priority: number; created_at: string }>(
+  items: readonly T[], statuses: readonly string[], g: Grouping, o: Ordering,
+): { key: string; status: string | null; items: T[] }[] {
+  const groups = g === 'none'
+    ? [{ key: 'all', status: null as string | null, items: orderIssues(statuses.flatMap((s) => items.filter((i) => i.status === s)), o) }]
+    : statuses.map((s) => ({ key: s, status: s as string | null, items: orderIssues(items.filter((i) => i.status === s), o) }));
+  return groups.filter((x) => x.items.length > 0);
+}
+
+/** Keyboard order (j/k): visible rows only, skipping collapsed groups. */
+export function visibleOrder<T>(groups: readonly { key: string; items: T[] }[], collapsed: ReadonlySet<string>): T[] {
+  return groups.flatMap((x) => (collapsed.has(x.key) ? [] : x.items));
+}
