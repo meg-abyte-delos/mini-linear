@@ -114,11 +114,11 @@ export const cycleStats = (req: Request, slug: string, rawId: string) => withWor
 /** Record today's snapshot for every cycle running today (called by the scheduler; idempotent per day). */
 export async function snapshotRunning(ctx: Ctx, on = today()): Promise<number> {
   const r = await ctx.tx`insert into cycle_snapshots (cycle_id, workspace_id, day, scope, started, completed)
-    select c.id, c.workspace_id, ${on}::date,
+    select cycles.id, cycles.workspace_id, ${on}::date,
       count(i.id) filter (where i.status <> 'canceled'), count(i.id) filter (where i.status in ('in_progress','in_review')), count(i.id) filter (where i.status = 'done')
-    from cycles c left join issues i on i.cycle_id = c.id and i.deleted_at is null
-    where c.start_date <= ${on}::date and c.end_date >= ${on}::date and ${teamVisible(ctx, "team_id")}
-    group by c.id, c.workspace_id
+    from cycles left join issues i on i.cycle_id = cycles.id and i.deleted_at is null
+    where cycles.start_date <= ${on}::date and cycles.end_date >= ${on}::date and ${teamVisible(ctx, "team_id")}
+    group by cycles.id, cycles.workspace_id
     on conflict (cycle_id, day) do update set scope = excluded.scope, started = excluded.started, completed = excluded.completed returning cycle_id`;
   return r.length;
 }
