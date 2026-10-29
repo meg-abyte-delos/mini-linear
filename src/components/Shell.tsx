@@ -9,6 +9,7 @@ import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/mock-api';
 import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
+import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
 import { SelectionBar, type BulkKind } from './SelectionBar';
@@ -438,7 +439,24 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const hitCmds: Cmd[] = hits.map((h) => ({ id: `hit-${h.kind}-${h.id}`, label: `${h.identifier ? `${h.identifier} ` : ''}${h.title}`, hint: h.kind === 'issue' ? undefined : h.kind, run: () => openHit(h), hit: h }));
   const allCmd: Cmd[] = q.trim().length >= MIN_QUERY ? [{ id: 'search-all', label: `Search all for “${q.trim()}”`, run: () => router.push(`/search?q=${encodeURIComponent(q.trim())}`) }] : [];
   // An identifier-looking query (DEL-12) puts the hits first; otherwise commands keep priority.
-  const results: Cmd[] = looksLikeIdentifier(q) ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...hitCmds, ...allCmd];
+  const baseResults: Cmd[] = looksLikeIdentifier(q) ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...hitCmds, ...allCmd];
+  // Natural-language action: an extra row next to the search results, never a replacement.
+  const nl = q.trim().length >= 4 && !readOnly ? parseNlCommand(q, USERS, LABELS, null) : null;
+  const nlIds = nl ? targetIds() : [];
+  const nlCmd: Cmd[] = nl && nlIds.length ? [{ id: 'nl', label: nlLabel(nl, nlIds.length), hint: '↵', run: () => {
+    const { add_label_ids, assignee_id, ...rest } = nl.patch;
+    for (const id of nlIds) {
+      const cur = store.current.list().find((x) => x.id === id); if (!cur) continue;
+      const local: Record<string, unknown> = { ...rest };
+      const remote: Record<string, unknown> = { ...rest };
+      if (assignee_id !== undefined) { local.assignee_id = assignee_id; if (assignee_id === null) remote.assignee_id = null; else if (isUuid(assignee_id)) remote.assignee_id = assignee_id; }
+      if (add_label_ids?.length) { const label_ids = [...new Set([...cur.label_ids, ...add_label_ids])]; local.label_ids = label_ids; remote.label_ids = label_ids; }
+      if (rest.status !== undefined && rest.status !== cur.status) store.current.move(id, rest.status, null);
+      store.current.update(id, local);
+      if (Object.keys(remote).length) push(id, remote);
+    }
+    sync(); } }] : [];
+  const results: Cmd[] = [...nlCmd, ...baseResults];
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
@@ -709,7 +727,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             />
             <ul id='palette-list' role='listbox' aria-label='Commands'>
               {results.map((c, idx) => (
-                <li key={c.id} id={`pc-${c.id}`} role='option' aria-selected={idx === pi} onClick={() => { closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
+                <li key={c.id} id={`pc-${c.id}`} className={c.id === 'nl' ? 'nl-action' : undefined} role='option' aria-selected={idx === pi} onClick={() => { closePalette(); c.run(); }}><span>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <kbd>{c.hint}</kbd>}</li>
               ))}
               {results.length === 0 && <li role='option' aria-selected='false' aria-disabled='true'>No matching command</li>}
             </ul>
