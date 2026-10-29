@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeBurndown, type BurnEvent, type BurnIssue } from "../../src/lib/cycles/burndown";
+import { computeBurndown, daysWithoutSnapshot, mergeSnapshots, scopeChange, type BurnEvent, type BurnIssue } from "../../src/lib/cycles/burndown";
 
 const C = { id: "c1", start_date: "2026-10-26", end_date: "2026-10-30" };
 const iss = (id: string, over: Partial<BurnIssue> = {}): BurnIssue => ({ id, created_at: "2026-10-20T10:00:00.000Z", updated_at: "2026-10-20T10:00:00.000Z", status: "todo", cycle_id: "c1", ...over });
@@ -41,5 +41,18 @@ describe("computeBurndown", () => {
   it("single-day cycle", () => {
     const p = computeBurndown({ id: "c1", start_date: "2026-10-26", end_date: "2026-10-26" }, [iss("a")], [], "2026-10-26");
     expect(p).toEqual([{ day: "2026-10-26", scope: 1, done: 0, remaining: 1, ideal: 0 }]);
+  });
+});
+
+describe("snapshots merge + scope change", () => {
+  const cy = { start_date: "2040-01-01", end_date: "2040-01-04" };
+  it("lists the days without a snapshot up to `on`", () => {
+    expect(daysWithoutSnapshot(cy, [{ day: "2040-01-02", scope: 1, completed: 0 }], "2040-01-03")).toEqual(["2040-01-01", "2040-01-03"]);
+  });
+  it("snapshots override replay, later days stay null, ideal restarts from the first known scope", () => {
+    const pts = mergeSnapshots(cy, null, [{ day: "2040-01-01", scope: 3, completed: 0 }, { day: "2040-01-02", scope: 5, completed: 2 }], "2040-01-02");
+    expect(pts.map((p) => [p.scope, p.done, p.remaining])).toEqual([[3, 0, 3], [5, 2, 3], [null, null, null], [null, null, null]]);
+    expect(pts.map((p) => p.ideal)).toEqual([3, 2, 1, 0]);
+    expect(scopeChange(pts).map((c) => c.delta)).toEqual([0, 2, null, null]);
   });
 });

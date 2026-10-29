@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react';
 
 // Burndown chart for one cycle: remaining work (teal line), ideal (dashed), scope (dim step line).
 // Geometry is SVG attributes only (no inline styles: strict CSP); colors come from ui-burndown.css (Delos Night tokens).
+export interface ScopeChange { day: string; delta: number | null }
 export interface BurnPoint { day: string; scope: number | null; done: number | null; remaining: number | null; ideal: number }
 
 const W = 640, H = 180, L = 36, R = 12, T = 12, B = 26;
 
-export function BurndownChart({ points, label }: { points: BurnPoint[]; label: string }) {
+export function BurndownChart({ points, label, scopeChange = [] }: { points: BurnPoint[]; label: string; scopeChange?: ScopeChange[] }) {
   const n = points.length;
   if (n === 0) return <p className='bd-empty'>No data for this cycle.</p>;
   const maxY = Math.max(1, ...points.map((p) => Math.max(p.scope ?? 0, p.ideal)));
@@ -23,6 +24,7 @@ export function BurndownChart({ points, label }: { points: BurnPoint[]; label: s
     });
     return d;
   };
+  const changes = scopeChange.map((c, i) => ({ ...c, i })).filter((c) => c.delta !== null && c.delta !== 0);
   const ticks = Array.from(new Set([0, Math.round(maxY / 2), maxY]));
   const last = [...points].reverse().find((p) => p.remaining !== null);
   const every = Math.max(1, Math.ceil(n / 7));
@@ -38,6 +40,12 @@ export function BurndownChart({ points, label }: { points: BurnPoint[]; label: s
         <text key={p.day} className='bd-tick' x={x(i)} y={H - 8} textAnchor='middle'>{p.day.slice(5)}</text>
       ))}
       <path className='bd-scope' d={path((p) => p.scope, true)} fill='none' />
+      {changes.map((c) => (
+        <g key={`sc-${c.day}`} data-testid='burndown-scope-change' data-day={c.day} data-delta={c.delta}>
+          <line className='bd-scopechg' x1={x(c.i)} x2={x(c.i)} y1={y(0)} y2={y(points[c.i]!.scope ?? 0)} strokeDasharray='2 3' />
+          <text className='bd-tick bd-scopechg-t' x={x(c.i)} y={Math.max(T + 8, y(points[c.i]!.scope ?? 0) - 4)} textAnchor='middle'>{(c.delta as number) > 0 ? '+' : ''}{c.delta}</text>
+        </g>
+      ))}
       <path className='bd-ideal' d={path((p) => p.ideal)} fill='none' strokeDasharray='5 4' />
       <path className='bd-line' d={path((p) => p.remaining)} fill='none' strokeLinejoin='round' strokeLinecap='round' />
       {last && <circle className='bd-dot' cx={x(points.indexOf(last))} cy={y(last.remaining as number)} r={3.5} />}
@@ -47,12 +55,13 @@ export function BurndownChart({ points, label }: { points: BurnPoint[]; label: s
 
 export function CycleBurndown({ slug, cycleId, name, today }: { slug: string; cycleId: string; name: string; today: string }) {
   const [points, setPoints] = useState<BurnPoint[] | null>(null);
+  const [sc, setSc] = useState<ScopeChange[]>([]);
   const [err, setErr] = useState(false);
   useEffect(() => {
     let live = true;
     fetch(`/api/v1/w/${slug}/cycles/${cycleId}/burndown?on=${today}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((j: { points: BurnPoint[] }) => { if (live) setPoints(j.points); })
+      .then((j: { points: BurnPoint[]; scopeChange?: ScopeChange[] }) => { if (live) { setPoints(j.points); setSc(j.scopeChange ?? []); } })
       .catch(() => { if (live) setErr(true); });
     return () => { live = false; };
   }, [slug, cycleId, today]);
@@ -62,8 +71,8 @@ export function CycleBurndown({ slug, cycleId, name, today }: { slug: string; cy
   const label = `Burndown for ${name}: ${last ? `${last.remaining} of ${last.scope} issues remaining on ${last.day}` : 'not started'}`;
   return (
     <div className='bd' data-cycle-burndown={cycleId}>
-      <BurndownChart points={points} label={label} />
-      <div className='bd-legend' aria-hidden='true'><span className='bd-k bd-k-line'>Remaining</span><span className='bd-k bd-k-ideal'>Ideal</span><span className='bd-k bd-k-scope'>Scope</span></div>
+      <BurndownChart points={points} label={label} scopeChange={sc} />
+      <div className='bd-legend' aria-hidden='true'><span className='bd-k bd-k-line'>Remaining</span><span className='bd-k bd-k-ideal'>Ideal</span><span className='bd-k bd-k-scope'>Scope</span><span className='bd-k bd-k-chg'>Scope change</span></div>
     </div>
   );
 }
