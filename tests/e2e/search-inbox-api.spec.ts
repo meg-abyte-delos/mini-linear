@@ -1,3 +1,4 @@
+
 import { test, expect } from '@playwright/test';
 import postgres from 'postgres';
 import { randomUUID } from 'node:crypto';
@@ -86,7 +87,11 @@ test.describe('Inbox on real notifications', () => {
     await expect.poll(() => unreadCount(page)).toBe(before - 1);
     // snooze one (press 1 = later today): it leaves All, appears under Snoozed
     await rows.first().click();
-    await page.keyboard.press('s'); await page.keyboard.press('1');
+    await page.keyboard.press('s');
+    // Wait for the server to commit: the Snoozed tab reads from the API and would race the optimistic update.
+    const snoozed = page.waitForResponse((r) => r.url().includes('/snooze') && r.request().method() === 'POST');
+    await page.keyboard.press('1');
+    expect((await snoozed).ok()).toBe(true);
     await expect(rows).toHaveCount(2);
     await page.getByRole('tab', { name: 'Snoozed' }).click();
     await expect(page.getByRole('option').filter({ hasText: title })).toHaveCount(1);
@@ -94,7 +99,9 @@ test.describe('Inbox on real notifications', () => {
     await page.getByRole('tab', { name: 'All' }).click();
     await expect(rows).toHaveCount(2);
     await rows.first().click();
+    const archived = page.waitForResponse((r) => r.url().includes('/archive') && r.request().method() === 'POST');
     await page.keyboard.press('e');
+    expect((await archived).ok()).toBe(true);
     await expect(rows).toHaveCount(1);
     await page.getByRole('tab', { name: 'Archived' }).click();
     await expect(page.getByRole('option').filter({ hasText: title })).toHaveCount(1);

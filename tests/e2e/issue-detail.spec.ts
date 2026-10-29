@@ -43,6 +43,8 @@ test('inline title, properties and activity', async ({ page }) => {
   await page.getByLabel('Estimate').selectOption('5');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
   await page.getByLabel('Due date').fill('2026-10-20');
+  // Wait for the update to land (activity entry) before asserting the derived Overdue state.
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set due date to 2026-10-20');
   await expect(page.getByText('Overdue')).toBeVisible();
 });
 

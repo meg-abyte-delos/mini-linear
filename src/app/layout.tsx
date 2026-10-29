@@ -12,6 +12,7 @@ import './ui-palette.css';
 import './ui-auth.css';
 import './ui-night.css';
 import './ui-rings.css';
+import './ui-burndown.css';
 import './ui-bulk.css';
 import { cookies } from 'next/headers';
 
