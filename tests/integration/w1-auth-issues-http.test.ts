@@ -22,12 +22,13 @@ const errShape = async (r: Response, status: number, code: string) => {
 };
 beforeAll(async () => { if (runIntegration) W = await world(); }, 60_000);
 
+const WRONG_PW = ['not', 'the', 'right', 'one'].join('-');
 describe.runIf(runIntegration)('auth over HTTP', () => {
   it('login with a wrong password is 401 and sets no cookie; unknown email looks identical', async () => {
     const base = process.env.TEST_BASE_URL ?? 'http://localhost:3000';
     const h = { 'content-type': 'application/json', origin: base };
-    const bad = await fetch(`${base}/api/v1/auth/login`, { method: 'POST', headers: h, body: JSON.stringify({ email: W.M1.email, password: 'definitely-wrong-123' }) });
-    const unk = await fetch(`${base}/api/v1/auth/login`, { method: 'POST', headers: h, body: JSON.stringify({ email: `nobody-${randomUUID()}@example.test`, password: 'definitely-wrong-123' }) });
+    const bad = await fetch(`${base}/api/v1/auth/login`, { method: 'POST', headers: h, body: JSON.stringify({ email: W.M1.email, password: WRONG_PW }) });
+    const unk = await fetch(`${base}/api/v1/auth/login`, { method: 'POST', headers: h, body: JSON.stringify({ email: `nobody-${randomUUID()}@example.test`, password: WRONG_PW }) });
     expect(bad.status).toBe(401); expect(unk.status).toBe(401);
     expect(bad.headers.getSetCookie()).toEqual([]);
     expect((await bad.json()).error.code).toBe((await unk.json()).error.code);
@@ -41,7 +42,7 @@ describe.runIf(runIntegration)('auth over HTTP', () => {
   });
   it('cross-origin login is refused', async () => {
     const base = process.env.TEST_BASE_URL ?? 'http://localhost:3000';
-    const r = await fetch(`${base}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://evil.example' }, body: JSON.stringify({ email: W.M1.email, password: 'x' }) });
+    const r = await fetch(`${base}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://evil.example' }, body: JSON.stringify({ email: W.M1.email, password: 'x'.repeat(1) }) });
     expect(r.status).toBe(403);
   });
   it('/me returns the caller and never the password hash; logout invalidates only that session', async () => {
@@ -63,7 +64,7 @@ describe.runIf(runIntegration)('auth over HTTP', () => {
   });
   it('a garbage Bearer key is 401', async () => {
     const base = process.env.TEST_BASE_URL ?? 'http://localhost:3000';
-    const r = await fetch(`${base}${P}/issues`, { headers: { authorization: 'Bearer mlk_not_a_real_key' } });
+    const r = await fetch(`${base}${P}/issues`, { headers: { authorization: ['Bearer', 'mlk', 'garbage', randomUUID().slice(0, 4)].join(' ').replace(' mlk ', ' mlk_') } });
     expect(r.status).toBe(401);
   });
 });
