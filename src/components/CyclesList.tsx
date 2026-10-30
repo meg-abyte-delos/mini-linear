@@ -6,6 +6,7 @@ import { cycleScope, cycleTiming } from '@/lib/cycles-ui';
 import { isUuid } from '@/lib/api-client';
 import { ProgressRing } from '@/components/ProgressRing';
 import { CycleBurndown } from '@/components/CycleBurndown';
+import { Icon } from '@/components/icons';
 import '@/app/ui-cycles.css';
 
 const BUCKETS: { id: CycleBucket; title: string; empty: string; hint: string }[] = [
@@ -58,8 +59,8 @@ export function CyclesList({ cycles, issues, today, slug, onViewIssues }: Props)
                       <span className='cy-count'>{s.done}/{s.total}</span>
                     </span>
                     <span className='cy-actions'>
-                      {slug && isUuid(c.id) && <button aria-expanded={bdOpen} aria-controls={`bd-${c.id}`} onClick={() => toggle(c.id)}>Burndown</button>}
-                      <button onClick={() => onViewIssues(c.id)}>View issues</button>
+                      {slug && isUuid(c.id) && <button aria-expanded={bdOpen} aria-controls={`bd-${c.id}`} aria-label={`${bdOpen ? 'Hide' : 'Show'} burndown for ${c.name}`} title='Burndown' onClick={() => toggle(c.id)}><Icon name='chart' /></button>}
+                      <button aria-label={`View issues in ${c.name}`} title='View issues' onClick={() => onViewIssues(c.id)}><Icon name='arrowRight' /></button>
                     </span>
                   </div>
                   {bdOpen && slug && <div id={`bd-${c.id}`}><CycleBurndown slug={slug} cycleId={c.id} name={c.name} today={today} /></div>}

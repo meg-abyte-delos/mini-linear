@@ -44,6 +44,8 @@ const PATHS = {
   team: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z',
   filter: 'M3 6h18M7 12h10M10 18h4',
   display: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4',
+  chart: 'M3 3v18h18M7 15l4-4 3 3 5-6',
+  arrowRight: 'M5 12h14M13 6l6 6-6 6',
   cycle: 'M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8M21 3v5h-5',
 } as const;
 
