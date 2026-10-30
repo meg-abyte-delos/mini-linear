@@ -4,7 +4,7 @@ button { font:inherit; color:inherit; }
 kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); background:var(--raised); border:1px solid var(--line); border-radius:4px; padding:2px 5px; margin-left:auto; }
 :focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 
-.shell { display:grid; grid-template-columns:232px 1fr; min-height:100vh; }
+.shell { display:grid; grid-template-columns:232px minmax(0,1fr); min-height:100vh; }
 .side { background:var(--side); border-right:1px solid var(--line); padding:10px 8px; display:flex; flex-direction:column; gap:2px; }
 .ws { display:flex; align-items:center; gap:8px; padding:6px 8px 10px; font-weight:600; }
 .ws-logo { width:20px; height:20px; border-radius:5px; background:var(--accent); color:var(--accent-fg); display:grid; place-items:center; font-size:11px; font-weight:700; }

@@ -36,15 +36,16 @@
 @media (prefers-reduced-motion: reduce) { .inbox-bar button, .inbox-detail-actions button { transition:none; } }
 
 /* Inbox polish (Pierre 18:46): each element inspected at 1280, dark + light. */
-/* Shell: 1fr is minmax(auto,1fr), so wide inbox content pushed the grid past the viewport and the page scrolled sideways (sidebar cut left, detail bleeding right). */
-.shell { grid-template-columns:232px minmax(0,1fr); }
 .side { min-width:0; }
 .inbox-wrap { display:flex; min-height:0; min-width:0; flex:1; overflow:hidden; }
 /* Rows: no checkbox at rest, actor avatar at the left. */
 .nrow .rowsel { flex:none; width:14px; height:14px; display:grid; place-items:center; font-size:12px; line-height:1; color:var(--muted); opacity:0; transition:opacity var(--dur-instant) var(--ease-out); }
 .nrow:hover .rowsel, .nrow:focus-within .rowsel, .nrow .rowsel.on, .inbox ul:has(.rowsel.on) .rowsel { opacity:1; }
 .nrow .ndot { flex:none; }
-.nrow .nav-av { flex:none; width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:600; background:#5e6ad2; color:#fff; text-transform:uppercase; }
+.nrow .nav-av { flex:none; width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:600; background:var(--accent); color:var(--accent-fg); text-transform:uppercase; }
+/* System notifications (kind=system, no actor): neutral glyph, not a fake "S" avatar. */
+.nrow .nav-av[data-kind=system] { background:color-mix(in srgb, var(--fg) 8%, transparent); color:var(--muted); }
+.nrow .nav-av svg { width:11px; height:11px; }
 .nrow .nid { width:48px; flex:none; color:var(--muted); font-size:var(--fs-sm); }
 .nrow .ntitle { flex:1 1 auto; color:var(--muted-strong); font-weight:400; min-width:0; }
 .nrow.unread .ntitle { color:var(--fg); font-weight:500; }
@@ -69,9 +70,12 @@
 /* Actions: Linear ghost buttons, 28px, text aligned on the content edge; Open issue keeps a hairline border. */
 .inbox-detail-actions { gap:4px; margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft); }
 .inbox-detail-actions button { height:28px; padding:0 10px; border-color:transparent; background:transparent; color:var(--muted-strong); font-weight:500; }
-.inbox-detail-actions button:first-child { margin-left:-10px; }
 .inbox-detail-actions button:hover { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; color:var(--fg); }
-.inbox-detail-actions button:last-child { margin-left:auto; border-color:var(--line); color:var(--fg); }
+.inbox-detail-actions button.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
+.inbox-detail-actions button.primary:hover { background:var(--accent-hover); border-color:var(--accent-hover); color:var(--accent-fg); }
+/* Status pill in the detail grid (Linus #277 markup). */
+.inbox-detail .inbox-status { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border:1px solid var(--line); border-radius:11px; font-size:var(--fs-sm); color:var(--fg); vertical-align:middle; }
+.inbox-detail .inbox-status svg { width:12px; height:12px; flex:none; }
 .inbox-bar button { border-color:transparent; background:transparent; color:var(--muted-strong); }
 .inbox-bar button:hover:not(:disabled) { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; }
 @media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }

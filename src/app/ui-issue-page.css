@@ -1,6 +1,6 @@
 /* Issue page, Wave B: centered column, ID + status in the header, grouped properties, WYSIWYG description.
    Tokens only (tokens.css #187). Motion uses --dur-* / --ease-out; with prefers-reduced-motion the durations are 0ms (tokens.css). */
-:root { --idp-col-w:720px; --idp-side-w:300px; --re-bar-h:32px; --re-btn:28px; --re-min-h:96px; --re-link-w:240px; --re-check:16px; }
+:root { --idp-col-w:720px; --idp-side-w:300px; }
 
 /* Layout: the writing column is centered with a readable measure; the properties rail keeps its own width. */
 .idp { grid-template-columns:minmax(0,1fr) var(--idp-side-w); }
@@ -23,40 +23,10 @@
 /* Title */
 .idp-title { font-size:var(--fs-xl); }
 
-/* Description editor */
-.re { position:relative; }
-.re-bar { position:relative; display:flex; align-items:center; gap:2px; min-height:var(--re-bar-h); margin-bottom:var(--sp-1); opacity:0; transition:opacity var(--dur-fast) var(--ease-out); }
-.re:focus-within .re-bar, .re-bar:hover { opacity:1; }
-.idp .re-btn { display:inline-grid; place-items:center; width:var(--re-btn); height:var(--re-btn); padding:0; border:0; border-radius:var(--r-sm); color:var(--muted-strong); transition:background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
-.idp .re-btn:hover { background:var(--hover); color:var(--fg); }
-.idp .re-btn[aria-pressed='true'] { background:var(--sel); color:var(--fg); }
-.re-sep { width:1px; height:calc(var(--re-btn) - var(--sp-3)); margin:0 var(--sp-1); background:var(--line); }
-.re-link { position:absolute; top:calc(100% + var(--sp-1)); left:0; z-index:5; display:flex; gap:var(--sp-1); padding:var(--sp-1); background:var(--raised); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); animation:prim-fade-in var(--dur-base) var(--ease-out); }
-.re-link input { width:var(--re-link-w); height:var(--re-btn); padding:0 var(--sp-2); color:var(--fg); background:var(--panel); border:1px solid var(--line); border-radius:var(--r-sm); font:inherit; }
-.idp .re-apply { height:var(--re-btn); padding:0 var(--sp-2); }
-
-.re-surface { position:relative; min-height:var(--re-min-h); padding:var(--sp-1) 0 var(--sp-3); line-height:1.6; color:var(--fg); outline:none; word-break:break-word; caret-color:var(--accent); }
-.re-surface[data-empty='true']::before { content:attr(data-placeholder); position:absolute; top:var(--sp-1); left:0; color:var(--muted); pointer-events:none; }
-.re-surface > :first-child { margin-top:0; }
-.re-surface p { margin:0 0 var(--sp-2); }
-.re-surface h1, .re-surface h2, .re-surface h3 { margin:var(--sp-3) 0 var(--sp-2); font-weight:var(--fw-semibold); line-height:var(--lh-tight); }
-.re-surface h1 { font-size:var(--fs-xl); } .re-surface h2 { font-size:var(--fs-lg); } .re-surface h3 { font-size:var(--fs-base); }
-.re-surface ul, .re-surface ol { margin:0 0 var(--sp-2); padding-left:calc(var(--sp-4) + var(--sp-2)); }
-.re-surface li { margin:2px 0; }
-.re-surface a { color:var(--accent-text); text-decoration:underline; }
-.re-surface code { padding:1px var(--sp-1); background:var(--raised); border-radius:var(--r-sm); font-size:var(--fs-sm); }
-.re-surface pre { margin:0 0 var(--sp-2); padding:var(--sp-3); background:var(--panel); border:1px solid var(--line); border-radius:var(--r-md); white-space:pre-wrap; }
-.re-surface pre code { padding:0; background:none; }
-.re-surface blockquote { margin:0 0 var(--sp-2); padding-left:var(--sp-3); color:var(--muted-strong); border-left:3px solid var(--line); }
-.re-surface hr { border:0; border-top:1px solid var(--line); margin:var(--sp-3) 0; }
-.re-surface ul[data-tasks] { list-style:none; padding-left:0; }
-.re-surface ul[data-tasks] > li { position:relative; padding-left:calc(var(--re-check) + var(--sp-2)); }
-.re-surface ul[data-tasks] > li::before { content:''; position:absolute; left:0; top:calc((1.6em - var(--re-check)) / 2); width:var(--re-check); height:var(--re-check); box-sizing:border-box; border:1.5px solid var(--muted); border-radius:var(--r-sm); background:transparent; cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
-.re-surface ul[data-tasks] > li[data-done='1']::before { background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 3px var(--accent), inset 0 0 0 5px var(--accent-fg); }
-.re-surface ul[data-tasks] > li[data-done='1'] { color:var(--muted); text-decoration:line-through; }
-.re[data-readonly] .re-surface ul[data-tasks] > li::before { cursor:default; }
-.re-surface .mention { color:var(--accent-text); font-weight:var(--fw-medium); }
-.re-surface:focus-visible { outline:none; }
+/* Issue page (#265): toolbar floats above the editor instead of reserving a row; scoped so the New issue modal keeps the shared bar. */
+.idp .re-bar { position:absolute; z-index:2; right:0; bottom:calc(100% + var(--sp-1)); display:flex; align-items:center; gap:2px; min-height:var(--re-bar-h); padding:0 2px; background:var(--raised); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); opacity:0; pointer-events:none; transition:opacity var(--dur-fast) var(--ease-out); }
+.idp .re:focus-within .re-bar, .idp .re-bar:focus-within { opacity:1; pointer-events:auto; }
+.idp .re[data-readonly] .re-bar { display:none; }
 
 @media (max-width:860px) { .idp { grid-template-columns:1fr; } }
-@media (prefers-reduced-motion: reduce) { .re-bar, .re-link, .idh-btn, .idh-status, .re-btn, .re-surface ul[data-tasks] > li::before { transition:none; animation:none; } .re-bar { opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .re-bar, .re-link, .idh-btn, .idh-status, .re-btn, .re-surface ul[data-tasks] > li::before { transition:none; animation:none; } }

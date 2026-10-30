@@ -3,6 +3,7 @@ import { withWorkspaceCtx, requireRole, type Ctx } from '../http/ctx';
 import { ApiError } from '../http/errors';
 import { parseQuery, uuidSchema } from '../http/validate';
 import { teamVisible } from './common';
+import { pvisible } from './projects-comments';
 
 const KINDS = ['project', 'cycle', 'team', 'label'] as const;
 type Kind = (typeof KINDS)[number];
@@ -17,7 +18,7 @@ async function assertVisible(ctx: Ctx, kind: Kind, id: string) {
   const t = ctx.tx;
   const rows = kind === 'team' ? await t`select 1 from teams where id = ${id} and ${teamVisible(ctx, 'team_id')}`
     : kind === 'cycle' ? await t`select 1 from cycles where id = ${id} and ${teamVisible(ctx, 'team_id')}`
-    : kind === 'project' ? await t`select 1 from projects where id = ${id}`
+    : kind === 'project' ? await t`select 1 from projects p where p.id = ${id} and ${pvisible(ctx)}`
     : await t`select 1 from labels where id = ${id}`;
   if (rows.length === 0) throw new ApiError('not_found');
 }
@@ -38,6 +39,7 @@ export const entitySubscription = (req: Request, slug: string, rawKind: string, 
   if (!idr.success) throw new ApiError('validation_failed', 'entityId must be a uuid');
   const id = idr.data;
   if (req.method === 'DELETE') {
+    if (kind === 'project') await assertVisible(ctx, kind, id);
     await ctx.tx`delete from entity_subscriptions where user_id = ${ctx.userId} and kind = ${kind} and entity_id = ${id}`;
     return new Response(null, { status: 204 });
   }
