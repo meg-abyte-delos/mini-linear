@@ -89,6 +89,9 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `GET /issues/{issue}/attachments` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
 | `POST /issues/{issue}/attachments` | 201 | 201 | 201 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /issues/{issue}/attachments/{attachment}` | 204 | 204 | 204 | 404 | 403 | 403 | 401 | 403 | 404 |
+| `POST /issues/{issue}/attachments/uploads` | 201 | 201 | 201 | 404 | 403 | 403 | 401 | 403 | 404 |
+| `GET /issues/{issue}/attachments/{attachment}/content` | 404 | 404 | 404 | 404 | 404 | 404 | 401 | 404 | 404 |
+| `PUT /issues/{issue}/attachments/{attachment}/content` | 404 | 404 | 404 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `GET /issues/{issue}/comments` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
 | `POST /issues/{issue}/comments` | 201 | 201 | 201 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `GET /issues/{issue}/relations` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
@@ -100,6 +103,9 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `GET /issues/{issue}/subscription` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
 | `PUT /issues/{issue}/subscription` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 403 | 404 |
 | `DELETE /issues/{issue}/subscription` | 204 | 204 | 204 | 404 | 204 | 404 | 401 | 403 | 404 |
+| `GET /subscriptions` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 200 | 404 |
+| `PUT /subscriptions/{kind}/{project}` | 204 | 204 | 204 | 204 | 403 | 403 | 401 | 403 | 404 |
+| `DELETE /subscriptions/{kind}/{project}` | 204 | 204 | 204 | 204 | 403 | 403 | 401 | 403 | 404 |
 | `GET /issues/{issue}/presence` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
 | `POST /issues/{issue}/presence` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 403 | 404 |
 | `DELETE /issues/{issue}/presence` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 403 | 404 |
@@ -159,6 +165,7 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `GET /notifications/unread-count` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 200 | 404 |
 | `POST /notifications/read-all` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 403 | 404 |
 | `POST /notifications/archive-read` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 403 | 404 |
+| `POST /notifications/bulk` | 200* | 200* | 200 | 200* | 200* | 200* | 401 | 403 | 404 |
 | `GET /notification-preferences` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 200 | 404 |
 | `PUT /notification-preferences` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 403 | 404 |
 | `GET /notifications/{notif}` | 404 | 404 | 200 | 404 | 404 | 404 | 401 | 200 | 404 |

@@ -138,6 +138,7 @@ export class Fx {
 }
 
 export const subst = (s: string, t: T) => s.replace(/\{([A-Za-z0-9]+)\}/g, (_, k) => {
+  if (k === 'kind') return 'project'; // entity kind of /subscriptions/{kind}/{id}
   if (t[k] === undefined) throw new Error(`unknown token {${k}} in ${s}`);
   return t[k]!;
 });
