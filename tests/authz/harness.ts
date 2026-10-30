@@ -120,7 +120,16 @@ export class Fx {
         }); break;
       }
       case 'team': {
-        t.team = (await must(call(A, 'POST', `${P}/teams`, { name: 'fx' + rnd(), key: letters() }), 'team')).id;
+        // Team keys are unique per workspace: a random 4-letter key can collide with a team left by an earlier cell or run (409).
+        // Retry with a fresh key so the fixture is idempotent.
+        let made: { id: string } | null = null;
+        for (let attempt = 0; attempt < 8 && !made; attempt++) {
+          const r = await call(A, 'POST', `${P}/teams`, { name: 'fx' + rnd(), key: letters() });
+          if (r.status === 409) continue;
+          made = await must(Promise.resolve(r), 'team');
+        }
+        if (!made) throw new Error('fixture team: 409 on 8 distinct keys');
+        t.team = made.id;
         await must(call(A, 'POST', `${P}/teams/${t.team}/members/${W.M1.id}`, {}), 'team member', [200, 201, 204]);
         break;
       }
