@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { USERS, STATUSES, STATUS_LABEL, PRIORITY_LABEL, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
-import { Picker, type PickOption } from '@/components/Picker';
+import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
 import { ConfirmDialog, type MenuEntry } from '@/components/ui';
@@ -55,7 +55,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [others, setOthers] = useState<DetailIssue[]>(all.filter((i) => i.id !== initial.id));
   const [title, setTitle] = useState(initial.title);
   const viewers = usePresence(slug, initial.id, viewer?.userId, api);
-  const [pick, setPick] = useState<{ kind: PickKind; rect: DOMRect | null; relType?: Relation['type'] } | null>(null);
+  const [pick, setPick] = useState<{ kind: PickKind; el: HTMLElement | null; relType?: Relation['type'] } | null>(null);
   const [relations, setRelations] = useState<Relation[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -63,6 +63,8 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [toast, setToast] = useState<string | null>(null);
   const [subBusy, setSubBusy] = useState(false);
   const relBtn = useRef<HTMLButtonElement>(null);
+  const pickAnchor = useRef<HTMLElement | null>(null);
+  const lastPick = useRef(pick);
   const [linkForm, setLinkForm] = useState<{ url: string; title: string } | null>(null);
   const [relMenu, setRelMenu] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -165,7 +167,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   }
   const saveDesc = (md: string) => { if (md !== issue.description) void update({ description: md }, 'updated the description'); };
 
-  function options(kind: PickKind): PickOption[] {
+  function options(kind: PickKind): ComboOption[] {
     switch (kind) {
       case 'status': return STATUSES.map((s) => ({ id: s, label: STATUS_LABEL[s], checked: issue.status === s, lead: <StatusIcon status={s} /> }));
       case 'priority': return PRIORITY_LABEL.map((l, p) => ({ id: String(p), label: l, checked: issue.priority === p, lead: <PriorityIcon priority={p as Issue['priority']} /> }));
@@ -295,8 +297,12 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   ].sort((a, b) => a.ts - b.ts);
   const pr = progress(children);
   const due = dueState(issue.due_date, today);
-  const pickTitle: Record<PickKind, string> = { status: 'Change status', priority: 'Set priority', assignee: 'Assign to', labels: 'Change labels', project: 'Move to project', cycle: 'Move to cycle', parent: 'Set parent issue', relation: `Add relation: ${pick?.relType ? REL_LABEL[pick.relType] : ''}` };
-  const open = (kind: PickKind) => (e: React.MouseEvent<HTMLButtonElement>) => setPick({ kind, rect: e.currentTarget.getBoundingClientRect() });
+  // The Combobox stays mounted so it can animate out; it keeps the last kind while closed.
+  if (pick) lastPick.current = pick;
+  const shown = pick ?? lastPick.current ?? { kind: 'status' as PickKind, el: null };
+  const pickTitle: Record<PickKind, string> = { status: 'Change status', priority: 'Set priority', assignee: 'Assign to', labels: 'Change labels', project: 'Move to project', cycle: 'Move to cycle', parent: 'Set parent issue', relation: `Add relation: ${lastPick.current?.relType ? REL_LABEL[lastPick.current.relType] : ''}` };
+  pickAnchor.current = pick?.el ?? null;
+  const open = (kind: PickKind) => (e: React.MouseEvent<HTMLButtonElement>) => setPick({ kind, el: e.currentTarget });
   const assignee = who(issue.assignee_id);
   const project = meta.projects.find((p) => p.id === issue.project_id);
   const cycle = meta.cycles.find((c) => c.id === issue.cycle_id);
@@ -320,7 +326,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     ...(readOnly ? [] : [
       { type: 'separator' } as const,
       { id: 'subscribe', label: subscribed ? 'Unsubscribe' : 'Subscribe', icon: mi('M8 2.5a3.5 3.5 0 0 0-3.5 3.5c0 3-1.5 4-1.5 4h10s-1.5-1-1.5-4A3.5 3.5 0 0 0 8 2.5ZM6.8 12.5a1.3 1.3 0 0 0 2.4 0'), onSelect: () => void toggleSubscribe() },
-      { id: 'move', label: 'Move to project…', icon: mi('M2.5 4.5h3.2l1.3 1.5h6.5v6.5h-11zM8 8.2h3M9.8 7l1.2 1.2L9.8 9.4'), onSelect: () => { const r = moreRef.current?.getBoundingClientRect() ?? null; setPick({ kind: 'project', rect: r }); } },
+      { id: 'move', label: 'Move to project…', icon: mi('M2.5 4.5h3.2l1.3 1.5h6.5v6.5h-11zM8 8.2h3M9.8 7l1.2 1.2L9.8 9.4'), onSelect: () => { setPick({ kind: 'project', el: moreRef.current }); } },
       { id: 'copy', label: 'Make a copy', icon: mi('M5.5 5.5h7v7h-7zM3.5 10.5v-8h8'), disabled: busy, onSelect: () => void makeCopy() },
       { id: 'archive', label: issue.archived_at ? 'Unarchive' : 'Archive', icon: mi('M2.5 3.5h11v3h-11zM3.5 6.5v6h9v-6M6.5 9h3'), onSelect: () => void lifecycle(issue.archived_at ? 'unarchive' : 'archive') },
       { type: 'separator' } as const,
@@ -357,7 +363,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
 
         <section className='idp-sec' aria-labelledby='h-rel'>
           <h2 id='h-rel'>Relations
-            {!readOnly && <span className='rel-add'><button ref={relBtn} className='sec-add' aria-label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}>+</button>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button role='menuitem' key={t} onClick={(e) => { setRelMenu(false); setPick({ kind: 'relation', relType: t, rect: e.currentTarget.getBoundingClientRect() }); }}>{REL_LABEL[t]}…</button>)}</div>}</span>}
+            {!readOnly && <span className='rel-add'><button ref={relBtn} className='sec-add' aria-label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}>+</button>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button role='menuitem' key={t} onClick={() => { setRelMenu(false); setPick({ kind: 'relation', relType: t, el: relBtn.current }); }}>{REL_LABEL[t]}…</button>)}</div>}</span>}
           </h2>
           {REL_ORDER.map((t) => { const rs = relations.filter((r) => r.type === t); if (!rs.length) return null; return (
             <div key={t} className='rel-group'><div className='rel-type' id={`rg-${t}`}>{REL_LABEL[t]}</div>
@@ -417,7 +423,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           </dl>
         </section>
       </aside>
-      {pick && <Picker title={pickTitle[pick.kind]} multi={pick.kind === 'labels'} anchor={pick.rect} options={options(pick.kind)} onPick={(id) => void onPick(id)} onClose={() => setPick(null)} />}
+      <Combobox open={!!pick} anchorRef={pickAnchor} onClose={() => setPick(null)} label={pickTitle[shown.kind]} multi={shown.kind === 'labels'} options={options(shown.kind)} onPick={(id) => void onPick(id)} />
       <ConfirmDialog open={confirmDelete} title={`Delete ${ident}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void lifecycle('delete'); }}>
         <p>{issue.title}</p><p>The issue moves to the trash. You can restore it from there.</p>
       </ConfirmDialog>

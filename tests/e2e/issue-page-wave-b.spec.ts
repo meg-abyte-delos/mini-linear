@@ -275,3 +275,46 @@ test('axe: rich description, open menu and delete dialog have no wcag2a/aa viola
   await expect(page.getByRole('alertdialog')).toBeVisible();
   await axe('dialog');
 });
+
+// Property pickers run on the Combobox primitive (anchored Popover, focus returns to the trigger).
+test('pickers: priority by keyboard (type, Enter) saves and returns focus to the trigger; Esc closes without a change', async ({ page }) => {
+  const a = await mk(page, `wb combo prio ${stamp}`);
+  await open(page, a.identifier);
+  const side = page.getByRole('complementary', { name: 'Properties' });
+  const trigger = side.getByRole('button', { name: /No priority|Urgent|High|Medium|Low/ }).first();
+  await trigger.click();
+  const dlg = page.getByRole('dialog', { name: 'Set priority' });
+  await expect(dlg).toBeVisible();
+  await expect(dlg.getByRole('combobox')).toBeFocused();
+  const box = await dlg.boundingBox(); const tb = await trigger.boundingBox();
+  expect(Math.abs(box!.y - (tb!.y + tb!.height))).toBeLessThan(24); // anchored under the trigger, not a floating scrim
+  await page.keyboard.press('Escape');
+  await expect(dlg).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'));
+  await page.keyboard.type('urg'); await page.keyboard.press('Enter');
+  expect((await saved).status()).toBe(200);
+  await expect(dlg).toBeHidden();
+  await expect(trigger).toBeFocused();
+  expect(((await (await page.request.get(`/api/v1/w/demo/issues/${a.id}`)).json()) as { priority: number }).priority).toBe(1);
+});
+
+test('pickers: labels stay open on pick (multi), Esc closes, axe clean', async ({ page }) => {
+  const a = await mk(page, `wb combo labels ${stamp}`);
+  await open(page, a.identifier);
+  await page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: /Add label/ }).click();
+  const dlg = page.getByRole('dialog', { name: 'Change labels' });
+  await expect(dlg).toBeVisible();
+  const opts = dlg.getByRole('option');
+  test.skip((await opts.count()) < 1, 'demo workspace has no labels');
+  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'));
+  await opts.first().click();
+  expect((await saved).status()).toBe(200);
+  await expect(dlg).toBeVisible();
+  await expect(opts.first()).toHaveAttribute('aria-selected', 'true');
+  const axe = await new AxeBuilder({ page }).include('[role=dialog]').analyze();
+  expect(axe.violations).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(dlg).toBeHidden();
+});
