@@ -74,13 +74,13 @@ test('description editor is WYSIWYG and safe: no tabs, no script/raw html, unsaf
 test('comments: mention autocomplete, reply thread, reactions', async ({ page }) => {
   await ready(page);
   const box = page.getByRole('combobox', { name: 'Leave a comment' });
-  await box.click(); await box.pressSequentially('hey @ma');
-  await expect(page.getByRole('listbox', { name: 'Mention a teammate' })).toContainText('Mate');
+  await box.click(); await box.pressSequentially('hey @ada'); // mate@example.test is 'Ada Kernel' (members carry display_name)
+  await expect(page.getByRole('listbox', { name: 'Mention a teammate' })).toContainText('Ada Kernel');
   await page.keyboard.press('Enter');
-  await expect(box).toHaveValue('hey @mate ');
+  await expect(box).toHaveValue('hey @ada ');
   await page.getByRole('button', { name: 'Comment', exact: true }).click();
   const c = page.getByRole('article', { name: /Comment by/ }).first();
-  await expect(c.locator('.mention')).toHaveText('@mate');
+  await expect(c.locator('.mention')).toHaveText('@ada');
   await c.getByRole('button', { name: /React 👍/ }).click();
   await expect(c.getByRole('button', { name: 'React 👍, 1' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Reply', exact: true }).click();

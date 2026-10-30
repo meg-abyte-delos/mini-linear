@@ -50,3 +50,10 @@ describe('nl-command on API people', () => {
     expect(await fetchNlPeople('demo', f)).toEqual({ users: [], me: null });
   });
 });
+
+describe('member display names', () => {
+  it('uses display_name for other members, falls back to the email local part', () => {
+    const ps = toNlPeople([{ user_id: ME, email: 'a@x.io', display_name: null }, { user_id: ADA, email: 'jonas@x.io', display_name: 'Jonas Weber' }, { user_id: '0192f1a0-0000-7000-8000-000000000005', email: 'kim.lee@x.io', display_name: '  ' }], { id: ME });
+    expect(ps.users.map((u) => u.name)).toEqual(['A', 'Jonas Weber', 'Kim Lee']);
+  });
+});

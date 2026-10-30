@@ -5,9 +5,10 @@ import { nameFromEmail } from '../../src/lib/nl-people';
 test('A assigns a real member, persists, and the picker lists members only', async ({ page }) => {
   const teams = await (await page.request.get('/api/v1/w/demo/teams')).json();
   const me = (await (await page.request.get('/api/v1/me')).json()) as { id: string };
-  const members = ((await (await page.request.get('/api/v1/w/demo/members?limit=100')).json()) as { items: { user_id: string; email: string }[] }).items;
+  const members = ((await (await page.request.get('/api/v1/w/demo/members?limit=100')).json()) as { items: { user_id: string; email: string; display_name?: string | null }[] }).items;
   const other = members.find((m) => m.user_id !== me.id)!;
   expect(other).toBeTruthy();
+  const otherName = other.display_name || nameFromEmail(other.email);
   const title = `Assignee picker ${Date.now()}`;
   const created = await page.request.post('/api/v1/w/demo/issues', { data: { team_id: teams.items[0].id, title } });
   expect(created.status()).toBe(201);
@@ -20,13 +21,13 @@ test('A assigns a real member, persists, and the picker lists members only', asy
   const dlg = page.getByRole('dialog', { name: 'Set assignee' });
   await expect(dlg).toBeVisible();
   await expect(dlg).not.toContainText('Tess Tester');
-  await page.keyboard.type(nameFromEmail(other.email).toLowerCase());
+  await page.keyboard.type(otherName.toLowerCase());
   const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'));
   await page.keyboard.press('Enter');
   expect((await saved).ok()).toBe(true);
   const got = (await (await page.request.get(`/api/v1/w/demo/issues/${it.id}`)).json()) as { assignee_id: string | null };
   expect(got.assignee_id).toBe(other.user_id);
-  await expect(row).toContainText(nameFromEmail(other.email).split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase());
+  await expect(row).toContainText(otherName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase());
   // Unassigned clears it.
   await row.focus();
   await page.keyboard.press('a');

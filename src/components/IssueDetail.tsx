@@ -1,16 +1,17 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { USERS, STATUSES, STATUS_LABEL, PRIORITY_LABEL, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
 import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
 import { useIssueRealtime } from '@/lib/detail/use-issue-realtime';
-import { ConfirmDialog, type MenuEntry } from '@/components/ui';
+import { ConfirmDialog, Tooltip, type MenuEntry } from '@/components/ui';
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
+import { statusOf } from '@/lib/detail/activity-status';
 import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
 import { activeMention, insertMention, suggest, type MentionUser } from '@/lib/detail/mentions';
 import { safeHref } from '@/lib/detail/markdown';
@@ -96,7 +97,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const issueRef = useRef(issue); issueRef.current = issue;
   const [gone, setGone] = useState(false);
   const [rtOffline, setRtOffline] = useState(false);
-  useIssueRealtime(slug, api, initial.id, version, {
+  useIssueRealtime(slug, !!api, initial.id, version, {
     onSelf: (row) => {
       const cur = issueRef.current;
       version.current = row.version;
@@ -410,7 +411,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           <h2 id='h-act'>Activity</h2>
           <ol className='feed' aria-label='Activity'>
             {timeline.map((t) => t.kind === 'event'
-              ? <li key={t.at.id} className='ev'>{(() => { const u = who(t.at.actor_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='dot' aria-hidden='true' />; })()}<span className='who'>{who(t.at.actor_id)?.name ?? 'Someone'}</span> {t.at.summary ?? t.at.action} <time dateTime={t.at.created_at}>{fmtTime(t.at.created_at)}</time></li>
+              ? <ActivityEvent key={t.at.id} at={t.at} actor={who(t.at.actor_id)} />
               : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={(x) => (client ? !!viewer?.userId && x.author_id === viewer.userId : x.author_id === ME)} canDelete={(x) => (client ? !!viewer?.userId && (x.author_id === viewer.userId || viewer.role === 'owner' || viewer.role === 'admin') : x.author_id === ME)} readOnly={readOnly} /></li>)}
           </ol>
           {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} />}
@@ -445,7 +446,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         <section className='side-group' aria-labelledby='sg-git'>
           <h3 id='sg-git' className='side-h'>Git</h3>
           <dl>
-          <dt>Branch</dt><dd><button className='branch-btn' onClick={() => void copyBranch()} title={`${branch} (click to copy)`} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code></button></dd>
+          <dt>Branch</dt><dd><Tooltip label={branch}><button className='branch-btn' onClick={() => void copyBranch()} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code><span className='branch-copy'><PropIcon name='copy' /></span></button></Tooltip></dd>
           </dl>
         </section>
       </aside>
@@ -455,6 +456,16 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
       </ConfirmDialog>
       {gone ? <div className='toast' role='alert'>This issue was deleted elsewhere. <Link href='/'>Back to issues</Link></div> : toast ? <div className='toast' role='status'>{toast}</div> : rtOffline ? <div className='toast' role='status'>Offline. Reconnecting…</div> : null}
     </div>
+  );
+}
+
+function ActivityEvent({ at, actor }: { at: ActivityItem; actor: Person | undefined }) {
+  const st = statusOf(at);
+  return (
+    <li className='ev'>
+      <span className='ev-lead' aria-hidden='true'>{actor ? <Avatar initials={actor.initials} hue={actor.hue} /> : <span className='dot' />}</span>
+      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action} <time dateTime={at.created_at}>{fmtTime(at.created_at)}</time></span>
+    </li>
   );
 }
 
@@ -490,7 +501,7 @@ function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLa
   const at = activeMention(text, caret);
   const list = at ? suggest(mentionUsers(people), at.query) : [];
   const idx = Math.min(sel, Math.max(list.length - 1, 0));
-  const listId = useMemo(() => lid('ml'), []);
+  const listId = useId(); // stable across SSR and hydration (a Date.now() id made aria-controls mismatch)
   function choose(u: MentionUser) {
     if (!at) return;
     const r = insertMention(text, at, u);
@@ -501,7 +512,7 @@ function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLa
   return (
     <div className='composer'>
       <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}… (@ to mention, ⌘↵ to send)`} rows={3} value={text}
-        role='combobox' aria-expanded={list.length > 0} aria-controls={listId} aria-autocomplete='list' aria-activedescendant={list[idx] ? `${listId}-${list[idx].id}` : undefined}
+        role='combobox' aria-expanded={list.length > 0} aria-controls={list.length > 0 ? listId : undefined} aria-autocomplete='list' aria-activedescendant={list[idx] ? `${listId}-${list[idx].id}` : undefined}
         onChange={(e) => { setText(e.target.value); setCaret(e.target.selectionStart); setSel(0); }}
         onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
         onKeyDown={(e) => {

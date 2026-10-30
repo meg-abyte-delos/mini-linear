@@ -20,6 +20,12 @@ export type IssueRealtimeHandlers = {
   onState?: (s: ConnState) => void;
 };
 
+/** True only when GET /issues/:id answers 404. Network errors, 5xx and 403 are not deletions. */
+export async function isGone(slug: string, issueId: string, f: typeof fetch = fetch): Promise<boolean> {
+  try { return (await f(`/api/v1/w/${encodeURIComponent(slug)}/issues/${encodeURIComponent(issueId)}`, { credentials: 'same-origin' })).status === 404; }
+  catch { return false; }
+}
+
 export function useIssueRealtime(slug: string, enabled: boolean, issueId: string, version: MutableRefObject<number>, h: IssueRealtimeHandlers) {
   const hr = useRef(h); hr.current = h;
   useEffect(() => {
@@ -32,7 +38,8 @@ export function useIssueRealtime(slug: string, enabled: boolean, issueId: string
       resync: async () => {
         const rows = await fetchAllIssues(slug);
         for (const r of rows) { if (r.id === issueId) { if (r.version > version.current) hr.current.onSelf(r); } else hr.current.onOther(r); }
-        if (!rows.some((r) => r.id === issueId)) hr.current.onSelfGone();
+        // The list is capped and can fail or truncate, so absence proves nothing: only a confirmed 404 on the issue itself means it is gone.
+        if (!rows.some((r) => r.id === issueId) && (await isGone(slug, issueId))) hr.current.onSelfGone();
       },
       onActivity: () => hr.current.onActivity(),
       onState: (s) => hr.current.onState?.(s),
