@@ -75,7 +75,7 @@ test.describe('inbox', () => {
   test('visual: inbox', async ({ page }) => {
     await resetInbox();
     await ready(page, `/?view=inbox&${TODAY}`, () => expect(page.getByRole('option').first()).toBeVisible());
-    // Relative times and the absolute When value depend on seed time and timezone: masked, the rest is pixel-compared.
-    await check(page, 'inbox', [page.locator('.ntime'), page.locator("dt:has-text('When') + dd")]);
+    // Relative times (row, detail header) and the absolute When value depend on seed time and timezone: masked, the rest is pixel-compared.
+    await check(page, 'inbox', [page.locator('.ntime'), page.locator('.idp-event span[title]'), page.locator("dt:has-text('When') + dd")]);
   });
 });

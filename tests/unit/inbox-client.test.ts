@@ -86,7 +86,8 @@ describe('shortWhen', () => {
 describe('whoLabel', () => {
   it('says Due soon for system notifications and tolerates a missing kind', () => {
     expect(whoLabel(notif('a', 'i', '2026-10-30T08:00:00Z', null, { type: 'due_soon', actor: null, actor_id: null, kind: 'system' }))).toBe('Due soon');
-    expect(whoLabel(notif('a', 'i', '2026-10-30T08:00:00Z', null))).toBe('sam commented');
+    expect(whoLabel(notif('a', 'i', '2026-10-30T08:00:00Z', null))).toBe('Sam commented');
+    expect(whoLabel(notif('a', 'i', '2026-10-30T08:00:00Z', null, { type: 'status_change', actor: { id: 'u2', email: 'priya@example.com', display_name: 'Priya Nair' } }))).toBe('Priya Nair changed status');
     expect(whoLabel(notif('a', 'i', '2026-10-30T08:00:00Z', null, { actor: null, actor_id: null }))).toBe('Someone commented');
   });
 });
