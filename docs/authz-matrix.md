@@ -157,6 +157,10 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `PATCH /views/{view}` | 404 | 404 | 200 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /views/{view}` | 404 | 404 | 204 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `GET /search` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 200 | 404 |
+| `GET /search/recents` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 200 | 404 |
+| `POST /search/recents` | 201 | 201 | 201 | 201 | 201 | 201 | 401 | 403 | 404 |
+| `DELETE /search/recents` | 204 | 204 | 204 | 204 | 204 | 204 | 401 | 403 | 404 |
+| `DELETE /search/recents/{recent}` | 204 | 204 | 204 | 204 | 204 | 204 | 401 | 403 | 404 |
 | `GET /sync` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 200 | 404 |
 | `GET /events` | 200 | 200 | 200 | 200 | 200 | 200 | 401 | 200 | 404 |
 | `POST /presence` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 403 | 404 |
