@@ -66,7 +66,14 @@ export const deleteLabel = (req: Request, slug: string, rawId: string) => withWo
   const id = parseId(rawId), want = ifMatchVersion(req), before = await getLabel(ctx, id);
   await assertScopeAdmin(ctx, before.team_id as string | null);
   if (Number(before.version) !== want) throw stale(before);
-  await ctx.tx`delete from labels where id = ${id}`; // issue_labels rows cascade
+  // issue_labels rows cascade: record the label removal on each affected issue's feed first.
+  const tagged = await ctx.tx<Row[]>`select i.id, coalesce((select array_agg(label_id order by label_id) from issue_labels where issue_id = i.id), '{}') as label_ids
+    from issues i where i.id in (select issue_id from issue_labels where label_id = ${id}) and i.deleted_at is null`;
+  for (const t of tagged) {
+    const b = t.label_ids as string[];
+    await audit(ctx, "issue", t.id as string, "update", { label_ids: { before: b, after: b.filter((x) => x !== id) } });
+  }
+  await ctx.tx`delete from labels where id = ${id}`;
   await audit(ctx, "label", id, "delete", diffOf(before, null, LABEL_F));
   return new Response(null, { status: 204 });
 });
@@ -116,7 +123,9 @@ export const deleteCycle = (req: Request, slug: string, rawId: string) => withWo
   requireRole(ctx, "admin");
   const id = parseId(rawId), want = ifMatchVersion(req), before = await getCycle(ctx, id);
   if (Number(before.version) !== want) throw stale(before);
-  await ctx.tx`delete from cycles where id = ${id}`; // issues.cycle_id -> NULL
+  const inCycle = await ctx.tx<Row[]>`select id from issues where cycle_id = ${id} and deleted_at is null`; // issues.cycle_id -> NULL below
+  for (const m of inCycle) await audit(ctx, "issue", m.id as string, "update", { cycle_id: { before: id, after: null } });
+  await ctx.tx`delete from cycles where id = ${id}`;
   await audit(ctx, "cycle", id, "delete", diffOf(before, null, CYCLE_F));
   return new Response(null, { status: 204 });
 });

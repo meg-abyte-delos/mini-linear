@@ -209,7 +209,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
   const after = await load(ctx, id);
   const diff = diffOf(before, after, FIELDS);
   if (b.label_ids && JSON.stringify(before.label_ids) !== JSON.stringify(after.label_ids)) diff.label_ids = { before: before.label_ids, after: after.label_ids };
-  await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff });
+  if (Object.keys(diff).length) await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff }); // a no-op PATCH leaves no empty event in the feed
   await emit(ctx, { kind: "issue_updated", issueId: id, before: { assignee_id: before.assignee_id, status: before.status }, after: { assignee_id: after.assignee_id, status: after.status } });
   return out(ctx, slug, after);
 });
@@ -321,5 +321,5 @@ async function bulkPatchOne(ctx: Ctx, id: string, p: z.infer<typeof bulkPatch>) 
   const after = await load(ctx, id);
   const diff = diffOf(before, after, FIELDS);
   if (JSON.stringify(before.label_ids) !== JSON.stringify(after.label_ids)) diff.label_ids = { before: before.label_ids, after: after.label_ids };
-  await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff: { ...diff, bulk: { before: null, after: true } } });
+  if (Object.keys(diff).length) await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff: { ...diff, bulk: { before: null, after: true } } });
 }
