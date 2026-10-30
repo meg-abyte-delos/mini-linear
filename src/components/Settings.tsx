@@ -3,9 +3,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as S from '@/lib/settings-client';
 import { httpInboxClient, NOTIF_TYPES, TYPE_LABEL, type PrefMap, type NotifType } from '@/lib/inbox-client';
 import { nameFromEmail } from '@/lib/nl-people';
-import { ConfirmDialog, UserAvatar } from '@/components/ui';
+import { ConfirmDialog, Select, UserAvatar } from '@/components/ui';
 import { SettingsShell } from '@/components/SettingsShell';
 
+const TEAM_ROLES = [{ id: 'admin', label: 'Admin' }, { id: 'member', label: 'Member' }, { id: 'guest', label: 'Guest (read-only)' }];
 const isAdmin = (r?: string) => r === 'owner' || r === 'admin';
 
 function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slug: string; team: S.Team; members: S.Member[]; canAdmin: boolean; onChanged: (msg: string) => void; onDelete: () => void }) {
@@ -28,10 +29,8 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
             <tr key={r.user_id}>
               <td><span className='set-person'><UserAvatar userId={r.user_id} name={nameFromEmail(r.email)} size='md' /><span className='set-person-text'>{r.email}</span></span></td>
               <td>
-                <select className='set-select' aria-label={`Team role for ${r.email}`} value={r.role} disabled={!canAdmin}
-                  onChange={(e) => run(S.setTeamRole(slug, team.id, r.user_id, e.target.value as S.TeamRole))}>
-                  <option value='admin'>Admin</option><option value='member'>Member</option><option value='guest'>Guest (read-only)</option>
-                </select>
+                <Select className='set-select' label={`Team role for ${r.email}`} value={r.role} disabled={!canAdmin} options={TEAM_ROLES}
+                  onChange={(id) => run(S.setTeamRole(slug, team.id, r.user_id, id as S.TeamRole))} />
               </td>
               <td className='set-end'>{canAdmin && <button type='button' className='set-btn' data-variant='ghost' data-tone='danger' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
             </tr>
@@ -40,9 +39,8 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
       </table>
       {canAdmin && outside.length > 0 && (
         <form className='set-inline' onSubmit={(e) => { e.preventDefault(); if (!add) return; const m = members.find((x) => x.user_id === add); void run(S.addTeamMember(slug, team.id, add, m?.role === 'guest' ? 'guest' : 'member')); setAdd(''); }}>
-          <label className='set-inline-label'>Add member <select className='set-select' value={add} onChange={(e) => setAdd(e.target.value)}>
-            <option value=''>Choose…</option>{outside.map((m) => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}
-          </select></label>
+          <span className='set-inline-label'>Add member</span>
+          <Select className='set-select' searchable label='Add member' value={add} placeholder='Choose…' options={outside.map((m) => ({ id: m.user_id, label: m.email }))} onChange={setAdd} />
           <button type='submit' className='set-btn' disabled={!add}>Add</button>
         </form>
       )}

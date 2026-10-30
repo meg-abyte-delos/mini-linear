@@ -100,3 +100,8 @@
 .es.es-compact { padding:calc(var(--sp-4) * 1.5) var(--sp-4); flex:0 0 auto; }
 .es.es-compact .es-glyph { width:40px; height:40px; margin-bottom:var(--sp-3); }
 .es kbd { font-size:var(--fs-xs); color:var(--muted-strong); }
+
+/* Select: button trigger for Menu/Combobox, replaces native <select> (pair with .set-select for the field look) */
+.select-btn { display:inline-flex; align-items:center; justify-content:space-between; gap:var(--sp-2); text-align:left; cursor:pointer; }
+.select-btn:disabled { cursor:not-allowed; }
+.select-val[data-empty] { color:var(--dim); }
