@@ -8,7 +8,7 @@ import { useCssVars } from '@/lib/ui/use-css-vars';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
 import { PropIcon } from '@/components/PropIcons';
-import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
+import { Avatar, Icon, type IconName, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { ProgressRing } from '@/components/ProgressRing';
 import { subIssueStats } from '@/lib/sub-issues';
@@ -105,17 +105,20 @@ function paletteGroup(id: string): string {
   if (id === 'search-all') return 'Search';
   if (NAV_IDS.has(id)) return 'Navigation';
   if (id.startsWith('filter-') || id === 'clear-filters') return 'Filters';
+  if (id === 'help') return 'Help';
   return 'Issue actions';
 }
+// One icon per action (Linear), never a shared fallback.
+const PALETTE_ICON: Record<string, IconName> = {
+  list: 'list', 'go-project': 'folder', board: 'board', cycles: 'cycle', projects: 'folder', create: 'plus', 'search-all': 'search', 'clear-filters': 'x',
+  help: 'help', 'toggle-select': 'checkSquare', 'select-all': 'checkSquare', 'clear-select': 'x', status: 'cycle', 'set-status': 'issues', delete: 'trash',
+  'set-priority': 'flag', 'set-assignee': 'user', 'assign-me': 'user', 'set-label': 'tag', 'copy-id': 'copy', open: 'external',
+};
 function paletteIcon(id: string) {
-  if (id === 'list' || id === 'go-project') return <Icon name='list' />;
-  if (id === 'board') return <Icon name='board' />;
-  if (id === 'cycles') return <Icon name='cycle' />;
-  if (id === 'projects') return <Icon name='team' />;
-  if (id === 'create') return <Icon name='plus' />;
-  if (id === 'search-all' || id.startsWith('filter-')) return <Icon name='search' />;
+  if (id.startsWith('move-')) { const st = id.slice(5); if ((STATUSES as readonly string[]).includes(st)) return <StatusIcon status={st as Status} />; }
   if (id.startsWith('hit-')) return <Icon name='issues' />;
-  return <Icon name='inbox' />;
+  if (id.startsWith('filter-')) return <Icon name='filter' />;
+  return <Icon name={PALETTE_ICON[id] ?? 'arrowRight'} />;
 }
 
 // Cmd+K: highlight the typed term inside an issue title (case-insensitive, first match), like Linear.
@@ -647,19 +650,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const sideTeams: Team[] = teamList.length ? teamList : [{ id: api?.teamId ?? 'team', name: teamName, key: '' }];
   const hint = (id: string) => { const d = SHORTCUTS.find((x) => x.id === id); return d ? formatKeys(d.keys).replace(' then ', ' ') : undefined; };
   const commands: Cmd[] = [
-    { id: 'help', label: 'Keyboard shortcuts', hint: '?', run: () => setHelp(true) },
+    ...(!readOnly ? [{ id: 'create', label: 'Create issue', hint: hint('create'), run: create }] : []),
     { id: 'toggle-select', label: 'Select / unselect issue', hint: hint('toggle-select'), run: () => toggleSelect(currentIdRef.current) },
-    { id: 'clear-select', label: 'Clear selection', run: () => setMulti([]) },
-    { id: 'list', label: 'Go to issues', hint: hint('go-issues'), run: () => setView('list') },
-    { id: 'board', label: 'Go to board view', hint: hint('go-views'), run: () => setView('board') },
-    { id: 'cycles', label: 'Go to cycles', run: () => setView('cycles') },
-    { id: 'projects', label: 'Go to projects', hint: hint('go-projects'), run: () => setView('projects') },
-    { id: 'go-project', label: 'Go to project…', run: () => setTimeout(() => setProjPick(null), 0) },
-    { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
-    ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => { if (view === 'cycles' || view === 'projects') setView('list'); setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0); } })),
+    { id: 'select-all', label: 'Select all issues', hint: '⌘A', run: selectAll },
+    ...(multi.length > 0 ? [{ id: 'clear-select', label: 'Clear selection', run: () => setMulti([]) }] : []),
     { id: 'status', label: multi.length > 1 ? `Cycle status of ${multi.length} selected` : 'Cycle status of selected issue', run: cycleStatus },
     { id: 'set-status', label: 'Set status…', hint: 'S', run: () => setTimeout(() => openPick('status'), 0) },
-    { id: 'select-all', label: 'Select all issues', hint: '⌘A', run: selectAll },
     { id: 'delete', label: multi.length > 1 ? `Delete ${multi.length} selected issues…` : 'Delete selected issue…', hint: '#', run: () => setTimeout(askDelete, 0) },
     ...STATUSES.map((st) => ({ id: `move-${st}`, label: multi.length > 1 ? `Move ${multi.length} selected to ${STATUS_LABEL[st]}` : `Move to ${STATUS_LABEL[st]}`, run: () => setStatusBulk(st) })),
     { id: 'set-priority', label: 'Set priority…', hint: 'P', run: () => setTimeout(() => openPick('priority'), 0) },
@@ -668,8 +664,15 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'assign-me', label: 'Assign to me', run: assignToMe },
     { id: 'copy-id', label: 'Copy issue id', run: copyId },
     { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
+    { id: 'list', label: 'Go to issues', hint: hint('go-issues'), run: () => setView('list') },
+    { id: 'board', label: 'Go to board view', hint: hint('go-views'), run: () => setView('board') },
+    { id: 'cycles', label: 'Go to cycles', run: () => setView('cycles') },
+    { id: 'projects', label: 'Go to projects', hint: hint('go-projects'), run: () => setView('projects') },
+    { id: 'go-project', label: 'Go to project…', run: () => setTimeout(() => setProjPick(null), 0) },
+    { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
+    ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => { if (view === 'cycles' || view === 'projects') setView('list'); setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0); } })),
+    { id: 'help', label: 'Keyboard shortcuts', hint: '?', run: () => setHelp(true) },
   ];
-  if (!readOnly) commands.splice(3, 0, { id: 'create', label: 'Create issue', hint: hint('create'), run: create });
   // Cmd+K search: top 8 hits from GET /search (API mode) or a local match (mock mode), debounced, stale responses dropped.
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searchState, setSearchState] = useState<'idle' | 'loading' | 'error'>('idle'); // server search state, API mode

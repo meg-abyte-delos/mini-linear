@@ -109,11 +109,11 @@ test('sub-issues, relations, attachments', async ({ page }) => {
   expect(ax.violations.map((v) => `${v.id} x${v.nodes.length}`)).toEqual([]);
   await page.getByRole('button', { name: 'Add link' }).click();
   await page.getByLabel('Link URL').fill('javascript:alert(1)');
-  await page.getByRole('button', { name: 'Attach' }).click();
+  await page.getByRole('button', { name: 'Attach', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('valid http');
   await page.getByLabel('Link URL').fill('https://github.com/meg-abyte-delos/mini-linear/pull/1');
   await page.getByLabel('Link title').fill('PR #1');
-  await page.getByRole('button', { name: 'Attach' }).click();
+  await page.getByRole('button', { name: 'Attach', exact: true }).click();
   await expect(page.getByRole('link', { name: 'PR #1' })).toHaveAttribute('href', /github.com/);
 });
 

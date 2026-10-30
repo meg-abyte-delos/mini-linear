@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useCssVars } from '@/lib/ui/use-css-vars';
 import { USERS, STATUSES, STATUS_LABEL, PRIORITY_LABEL, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
-import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
+import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
 import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
@@ -432,7 +432,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
               ? <ActivityEvent key={t.at.id} at={t.at} actor={who(t.at.actor_id)} />
               : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={(x) => (client ? !!viewer?.userId && x.author_id === viewer.userId : x.author_id === ME)} canDelete={(x) => (client ? !!viewer?.userId && (x.author_id === viewer.userId || viewer.role === 'owner' || viewer.role === 'admin') : x.author_id === ME)} readOnly={readOnly} /></li>)}
           </ol>
-          {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} />}
+          {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} onAttach={() => { setLinkForm((f) => f ?? { url: '', title: '' }); setTimeout(() => document.getElementById('att-url')?.focus(), 0); }} />}
         </section>
       </main>
 
@@ -516,7 +516,8 @@ function SubBarFill({ pct }: { pct: number }) {
   return <span ref={ref} />;
 }
 
-function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLabel }: { label: string; onSubmit: (b: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean; initial?: string; submitLabel?: string }) {
+function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = '', submitLabel }: { onAttach?: (() => void); label: string; onSubmit: (b: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean; initial?: string; submitLabel?: string }) {
+  const inline = !onCancel && !!onAttach;
   const people = useContext(PeopleCtx);
   const [text, setText] = useState(initial);
   const [caret, setCaret] = useState(initial.length);
@@ -536,8 +537,8 @@ function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLa
   }
   async function submit() { const b = text.trim(); if (!b) return; if (await onSubmit(b)) { if (!initial) { setText(''); setCaret(0); } } }
   return (
-    <div className='composer'>
-      <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}… (@ to mention, ⌘↵ to send)`} rows={3} value={text}
+    <div className={inline ? 'composer composer-inline' : 'composer'}>
+      <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}…`} rows={3} value={text}
         role='combobox' aria-expanded={list.length > 0} aria-controls={list.length > 0 ? listId : undefined} aria-autocomplete='list' aria-activedescendant={list[idx] ? `${listId}-${list[idx].id}` : undefined}
         onChange={(e) => { setText(e.target.value); setCaret(e.target.selectionStart); setSel(0); }}
         onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
@@ -552,7 +553,8 @@ function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLa
           if (e.key === 'Escape' && onCancel) onCancel();
         }} />
       {list.length > 0 && <ul id={listId} role='listbox' aria-label='Mention a teammate' className='mention-list'>{list.map((u, k) => <li key={u.id} id={`${listId}-${u.id}`} role='option' aria-selected={k === idx} onMouseDown={(e) => { e.preventDefault(); choose(u); }}>{u.name} <span className='dim'>@{u.handle}</span></li>)}</ul>}
-      <div className='composer-actions'>{onCancel && <button className='btn' data-variant='ghost' onClick={onCancel}>Cancel</button>}<button className='btn' data-variant='primary' disabled={!text.trim()} onClick={() => void submit()}>{submitLabel ?? (label === 'Reply' ? 'Reply' : 'Comment')}</button></div>
+      {inline ? <div className='composer-tools'><button type='button' className='composer-ic' aria-label='Attach link' title='Attach link' onClick={onAttach}><Icon name='attach' size={16} /></button><button type='button' className='composer-ic composer-send' aria-label='Comment' title='Comment' disabled={!text.trim()} onClick={() => void submit()}><Icon name='send' size={16} /></button></div>
+        : <div className='composer-actions'>{onCancel && <button className='btn' data-variant='ghost' onClick={onCancel}>Cancel</button>}<button className='btn' data-variant='primary' disabled={!text.trim()} onClick={() => void submit()}>{submitLabel ?? (label === 'Reply' ? 'Reply' : 'Comment')}</button></div>}
     </div>
   );
 }
