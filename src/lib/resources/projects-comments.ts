@@ -97,7 +97,9 @@ export const deleteProject = (req: Request, slug: string, rawId: string) => with
   requireRole(ctx, "admin");
   const id = parseId(rawId), want = ifMatchVersion(req), before = await getProject(ctx, id);
   if (Number(before.version) !== want) throw stale(before);
-  await ctx.tx`delete from projects where id = ${id}`; // issues.project_id -> NULL
+  const inProject = await ctx.tx<Row[]>`select id from issues where project_id = ${id} and deleted_at is null`; // issues.project_id -> NULL below
+  for (const m of inProject) await audit(ctx, "issue", m.id as string, "update", { project_id: { before: id, after: null } });
+  await ctx.tx`delete from projects where id = ${id}`;
   await audit(ctx, "project", id, "delete", diffOf(before, null, PROJECT_F));
   return new Response(null, { status: 204 });
 });

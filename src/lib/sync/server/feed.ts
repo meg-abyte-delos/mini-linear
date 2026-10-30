@@ -86,12 +86,31 @@ const viewers = async (ctx: Ctx, id: string) => {
   // Guests get a count only: other users' ids (internal members) are not theirs to see. They still see themselves.
   return ctx.role === 'guest' ? { viewers: rows.filter((r) => r.user_id === ctx.userId), count: rows.length } : { viewers: rows, count: rows.length };
 };
-/** POST = heartbeat (I am viewing), DELETE = leave, GET = who is viewing now. */
-export const presence = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  const id = parseId(rawId);
+async function touch(ctx: Ctx, method: string, id: string) {
   await assertIssueVisible(ctx, id);
-  if (req.method === 'POST') await ctx.tx`insert into issue_presence (workspace_id, issue_id, user_id) values (${ctx.workspaceId}, ${id}, ${ctx.userId})
+  if (method === 'POST') await ctx.tx`insert into issue_presence (workspace_id, issue_id, user_id) values (${ctx.workspaceId}, ${id}, ${ctx.userId})
     on conflict (issue_id, user_id) do update set seen_at = now()`;
-  if (req.method === 'DELETE') await ctx.tx`delete from issue_presence where issue_id = ${id} and user_id = ${ctx.userId}`;
+  if (method === 'DELETE') await ctx.tx`delete from issue_presence where issue_id = ${id} and user_id = ${ctx.userId}`;
   return Response.json(await viewers(ctx, id), { headers: { 'cache-control': 'no-store' } });
+}
+/** POST = heartbeat (I am viewing), DELETE = leave, GET = who is viewing now. */
+export const presence = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, (ctx) => touch(ctx, req.method, parseId(rawId)));
+/** POST/DELETE /api/v1/w/:slug/presence {issue_id}: same as the per-issue route, id in the body. */
+export const presenceBody = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  const b = z.object({ issue_id: z.string().max(64) }).safeParse(await req.json().catch(() => null));
+  if (!b.success) throw new ApiError('validation_failed', 'issue_id required');
+  return touch(ctx, req.method, parseId(b.data.issue_id));
 });
+
+export type PresenceSnapshot = { issue_id: string; viewers: string[]; count: number };
+/** Fresh viewers of every issue the caller can see, one entry per issue. Guests get themselves and a count only. */
+export async function readPresence(ctx: Ctx): Promise<PresenceSnapshot[]> {
+  const vis = ctx.role === 'guest'
+    ? ctx.tx`exists (select 1 from issue_shares s join issues i on i.id = s.issue_id where s.issue_id = p.issue_id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null and i.deleted_at is null)`
+    : ctx.tx`exists (select 1 from issues i where i.id = p.issue_id and i.deleted_at is null and ${teamVisible(ctx, 'i.team_id')})`;
+  const rows = await ctx.tx<{ issue_id: string; user_id: string }[]>`select p.issue_id, p.user_id from issue_presence p
+    where p.seen_at > now() - make_interval(secs => ${PRESENCE_TTL_S}) and ${vis} order by p.issue_id, p.user_id`; // stable order: no event every poll when nothing changed
+  const m = new Map<string, string[]>();
+  for (const r of rows) m.set(r.issue_id, [...(m.get(r.issue_id) ?? []), r.user_id]);
+  return [...m].map(([issue_id, ids]) => ({ issue_id, viewers: ctx.role === 'guest' ? ids.filter((u) => u === ctx.userId) : ids, count: ids.length }));
+}
