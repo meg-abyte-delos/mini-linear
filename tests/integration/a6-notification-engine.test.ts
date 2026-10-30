@@ -222,4 +222,27 @@ if (process.env.CI && !haveDb) throw new Error('CI=true but DB urls unset: integ
     expect(r2.created).toBe(0); // idempotent
     expect((await types(seed.a.member, i.id)).filter((t) => t === 'due_soon').length).toBe(1);
   });
+  it('due-soon cron: an unread due_soon with an OLD date is updated when the date changes, and other candidates still run', async () => {
+    process.env.CRON_SECRET = 's3cret';
+    const call = () => dueSoon(new Request('http://x/api/internal/notifications/due-soon', { method: 'POST', headers: { 'x-cron-secret': 's3cret' } }));
+    as(seed.a.admin);
+    const d1 = new Date(Date.now() + 86400000).toISOString().slice(0, 10), d0 = new Date().toISOString().slice(0, 10);
+    const poisoned = await mk({ assignee_id: seed.a.member, due_date: d1 }), other = await mk({ assignee_id: seed.a.member, due_date: d1 });
+    await call();
+    expect((await inbox(seed.a.member)).find((x) => x.issue_id === poisoned.id && x.type === 'due_soon')!.meta).toEqual({ due_date: d1 });
+    await patch(poisoned, { due_date: d0 });
+    const r = await call();
+    expect(r.status).toBe(200);
+    const rows = (await inbox(seed.a.member)).filter((x) => x.issue_id === poisoned.id && x.type === 'due_soon');
+    expect(rows.length).toBe(1);
+    expect(rows[0]!.meta).toEqual({ due_date: d0 });
+    expect(((await r.json()) as { failed: number }).failed).toBe(0);
+    expect((await types(seed.a.member, other.id)).filter((t) => t === 'due_soon').length).toBe(1);
+  });
+  it('sync_publish_ws cannot write another workspace (tenant WITH CHECK on sync_seq and sync_events)', async () => {
+    const attempt = () => withWorkspace(app, seed.a.id, (tx) => tx`select sync_publish_ws(${seed.b.id}::uuid, ${seed.a.admin}::uuid, 'project', ${randomUUID()}::uuid, null, 'update', 1, null, null)`, seed.a.admin);
+    await expect(attempt()).rejects.toThrow(/row-level security/);
+    const leaked = await owner`select 1 from sync_events where workspace_id = ${seed.b.id} and entity = 'project'`;
+    expect(leaked.length).toBe(0);
+  });
 });

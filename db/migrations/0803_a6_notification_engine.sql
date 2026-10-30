@@ -168,7 +168,8 @@ GRANT EXECUTE ON FUNCTION notify(uuid, uuid, notification_type, uuid, uuid, json
 CREATE FUNCTION cron_due_soon_candidates() RETURNS TABLE (workspace_id uuid, issue_id uuid, assignee_id uuid, due_date date)
 LANGUAGE sql SECURITY DEFINER STABLE SET search_path = pg_catalog, public AS $$
   SELECT i.workspace_id, i.id, i.assignee_id, i.due_date FROM public.issues i
-  WHERE i.deleted_at IS NULL AND i.assignee_id IS NOT NULL AND i.status NOT IN ('done','canceled') AND i.due_date BETWEEN current_date AND current_date + 1 $$;
+  WHERE i.deleted_at IS NULL AND i.assignee_id IS NOT NULL AND i.status NOT IN ('done','canceled') AND i.due_date BETWEEN current_date AND current_date + 1
+  ORDER BY i.due_date, i.id LIMIT 5000 $$; -- bounded per run; current_date follows the DB session time zone, not the assignee
 DO $do$ DECLARE had boolean := has_schema_privilege('definer', 'public', 'CREATE'); BEGIN
   IF NOT had THEN GRANT CREATE ON SCHEMA public TO definer; END IF;
   ALTER FUNCTION cron_due_soon_candidates() OWNER TO definer;

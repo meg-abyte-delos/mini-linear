@@ -85,15 +85,17 @@ export const notificationAction = (req: Request, slug: string, rawId: string, ac
   return Response.json(await load(ctx, id));
 });
 
-/** Bulk: mark every visible active notification read. */
+/** At most BULK_CAP rows per read-all / archive-read call (one sync event each); clients repeat while `updated` equals it. */
+const BULK_CAP = 500;
+/** Bulk: mark visible active notifications read (newest BULK_CAP per call). */
 export const readAll = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  const r = await ctx.tx<Touched[]>`update notifications n set read_at = now() where n.read_at is null and ${ACTIVE(ctx)} and ${issueVisibleSql(ctx)} returning n.id, n.issue_id, n.coalesced_count`;
+  const r = await ctx.tx<Touched[]>`update notifications n set read_at = now() where n.id in (select n.id from notifications n where n.read_at is null and ${ACTIVE(ctx)} and ${issueVisibleSql(ctx)} order by n.id desc limit ${BULK_CAP}) returning n.id, n.issue_id, n.coalesced_count`;
   await touched(ctx, r);
   return Response.json({ updated: r.length });
 });
 /** Bulk: archive every already-read, non-archived notification. */
 export const archiveRead = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  const r = await ctx.tx<Touched[]>`update notifications n set archived_at = now() where n.read_at is not null and n.archived_at is null and ${issueVisibleSql(ctx)} returning n.id, n.issue_id, n.coalesced_count`;
+  const r = await ctx.tx<Touched[]>`update notifications n set archived_at = now() where n.id in (select n.id from notifications n where n.read_at is not null and n.archived_at is null and ${issueVisibleSql(ctx)} order by n.id desc limit ${BULK_CAP}) returning n.id, n.issue_id, n.coalesced_count`;
   await touched(ctx, r);
   return Response.json({ updated: r.length });
 });

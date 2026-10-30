@@ -1,3 +1,7 @@
+-- The owner is subject to FORCE RLS: lift it for the cleanup deletes below (no workspace context here), restored at the end.
+ALTER TABLE sync_events NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE notifications NO FORCE ROW LEVEL SECURITY;
+ALTER TABLE notification_preferences NO FORCE ROW LEVEL SECURITY;
 -- 0803 down. Enum labels reply/sub_issue/relation cannot be dropped (Postgres limit; up uses IF NOT EXISTS): they stay, unused.
 DROP FUNCTION IF EXISTS cron_due_soon_candidates();
 -- Postgres cannot drop enum labels, and notify() depends on the type: the labels reply/sub_issue/relation stay (unused, harmless;
@@ -66,5 +70,8 @@ ALTER TABLE sync_events DROP COLUMN IF EXISTS user_id, DROP COLUMN IF EXISTS sco
 ALTER TABLE sync_events DROP CONSTRAINT IF EXISTS sync_events_entity_check;
 ALTER TABLE sync_events ADD CONSTRAINT sync_events_entity_check CHECK (entity IN ('issue','comment'));
 ALTER TABLE sync_events ALTER COLUMN issue_id SET NOT NULL;
-REVOKE INSERT ON sync_seq, sync_events FROM definer;
+REVOKE INSERT ON sync_seq, sync_events FROM definer; -- only the INSERT grants are new (the rest comes from 0008 and 0000); entity_subscriptions grants go with the table
 
+ALTER TABLE sync_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE notifications FORCE ROW LEVEL SECURITY;
+ALTER TABLE notification_preferences FORCE ROW LEVEL SECURITY;

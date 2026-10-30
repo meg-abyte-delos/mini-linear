@@ -18,7 +18,7 @@ export async function dueSoon(req: Request): Promise<Response> {
     if (!given || !timingSafeEqual(digest(given), digest(secret))) throw new ApiError('unauthenticated');
     const sql = db();
     const cands = await sql<Cand[]>`select workspace_id, issue_id, assignee_id, due_date::text as due_date from cron_due_soon_candidates()`;
-    let created = 0;
+    let created = 0, failed = 0;
     for (const c of cands) {
       const ok = await sql.begin(async (tx) => {
         await tx`select set_config('app.workspace_id', ${c.workspace_id}, true)`;
@@ -35,15 +35,18 @@ export async function dueSoon(req: Request): Promise<Response> {
         if (off.length) return false;
         const dup = await tx`select 1 from notifications where user_id = ${c.assignee_id} and issue_id = ${c.issue_id} and type = 'due_soon' and meta ->> 'due_date' = ${c.due_date}`;
         if (dup.length) return false;
-        const id = uuidv7();
-        await tx`insert into notifications (id, workspace_id, user_id, actor_id, type, issue_id, meta)
-          values (${id}, ${c.workspace_id}, ${c.assignee_id}, null, 'due_soon', ${c.issue_id}, ${tx.json({ due_date: c.due_date })})`;
-        await tx`select sync_publish('notification', ${id}::uuid, ${c.issue_id}::uuid, 'create', 1, ${c.assignee_id}::uuid, null)`;
+        // An UNREAD due_soon for the same issue (e.g. with an older due date) is the coalescing key: update it instead of violating notifications_coalesce_uq.
+        const [row] = await tx<{ id: string; ins: boolean }[]>`insert into notifications (id, workspace_id, user_id, actor_id, type, issue_id, meta)
+          values (${uuidv7()}, ${c.workspace_id}, ${c.assignee_id}, null, 'due_soon', ${c.issue_id}, ${tx.json({ due_date: c.due_date })})
+          on conflict (workspace_id, user_id, issue_id, type) where read_at is null and archived_at is null and type not in ('mention','assigned')
+          do update set meta = excluded.meta, last_event_at = now()
+          returning id, (xmax = 0) as ins`;
+        await tx`select sync_publish('notification', ${row!.id}::uuid, ${c.issue_id}::uuid, ${row!.ins ? 'create' : 'update'}, 1, ${c.assignee_id}::uuid, null)`;
         return true;
-      });
+      }).catch((e) => { failed++; console.error('due-soon candidate failed', c.workspace_id, c.issue_id, (e as Error).message); return false; }); // one bad candidate never fails the run
       if (ok) created++;
     }
-    return Response.json({ candidates: cands.length, created });
+    return Response.json({ candidates: cands.length, created, failed });
   } catch (e) {
     return errorResponse(e);
   }
