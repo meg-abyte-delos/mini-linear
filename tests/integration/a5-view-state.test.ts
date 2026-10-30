@@ -107,6 +107,15 @@ if (process.env.CI && !haveDb) throw new Error('CI=true but DB urls unset: integ
     }
   });
 
+  it('favorite with malformed or oversized body is 400/422, never 500', async () => {
+    const v = await mkView(seed.a.owner, 'badbody');
+    const raw = (b: string) => S.putFavorite(new Request('http://x/api', { method: 'PUT', body: b, headers: { 'x-u': seed.a.owner, 'content-type': 'application/json' } }), slug(), v.id);
+    expect((await raw('{')).status).toBe(400);
+    expect((await raw('not json')).status).toBe(400);
+    expect((await raw('x'.repeat(5000))).status).toBe(422);
+    expect((await raw('')).status).toBe(200);
+  });
+
   it('favourites: order, idempotent, hidden when view becomes invisible, cap 50, cascade', async () => {
     const f = (u: string, id: string, body?: unknown) => call(S.putFavorite as Fn, u, 'PUT', body, null, '', slug(), id);
     const a = await mkView(seed.a.admin, 'A', { shared: true }), b = await mkView(seed.a.admin, 'B', { shared: true });

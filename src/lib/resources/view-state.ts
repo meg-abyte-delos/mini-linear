@@ -7,6 +7,8 @@ import { SEL, visible, getView, viewFilters, viewDisplay } from './views';
 
 // A5: per-user persisted list state (filters/display per scope) and per-user favourite views. Personal, never audited.
 // RLS adds a RESTRICTIVE own_rows policy (app.user_id): even admins cannot read another user's rows.
+// Orphans: state rows for a deleted team/project/cycle scope are harmless (never returned: scope visibility is checked first, 404;
+// list-all returns them but clients ignore unknown scopes) and cascade with the user/workspace. view:<id> rows are purged on view delete.
 const SCOPE = /^(all|my-issues|(team|project|cycle|view):[0-9a-f-]{36})$/;
 const scopeSchema = z.string().max(64).regex(SCOPE).refine((s) => !s.includes(':') || uuidSchema.safeParse(s.split(':')[1]).success, 'bad id');
 const FILTERS_MAX = 32768, DISPLAY_MAX = 8192, FAV_MAX = 50;
@@ -96,7 +98,11 @@ export const listFavorites = (req: Request, slug: string) => withWorkspaceCtx(re
 
 export const putFavorite = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, 'member');
-  const id = parseId(rawId), raw = await req.text(), b = favBody.parse(raw.trim() ? JSON.parse(raw) : {});
+  const id = parseId(rawId), raw = await req.text();
+  if (raw.length > 1024) throw bad('body too large');
+  let parsed: unknown = {};
+  if (raw.trim()) { try { parsed = JSON.parse(raw); } catch { throw new ApiError('bad_request', 'body must be JSON'); } }
+  const b = favBody.parse(parsed);
   await getView(ctx, id);
   await ctx.tx`select pg_advisory_xact_lock(hashtextextended(${ctx.workspaceId + ':' + ctx.userId}, 0))`; // serialises the cap check per user
   const ex = await ctx.tx<{ position: number }[]>`select position from view_favorites where user_id = ${ctx.userId} and view_id = ${id}`;
