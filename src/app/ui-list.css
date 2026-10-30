@@ -94,3 +94,13 @@
 
 /* Sub-issue roll-up (list rows and board cards): ProgressRing + done/total. */
 .sub-prog { display:inline-flex; align-items:center; gap:var(--sp-1); flex:none; color:var(--muted); font-size:var(--fs-sm, 12px); font-variant-numeric:tabular-nums; }
+
+/* D4 follow-up (review 898d87d): fixed columns. Labels share one left edge, the project has its own column and look, one date format. */
+.row .labels { width:var(--list-labels-w); flex:none; margin-left:0; justify-content:flex-start; overflow:hidden; margin-right:0; }
+.row .labels .chip { flex:none; }
+.row .proj-col { width:var(--list-proj-w); flex:none; display:flex; min-width:0; margin-right:var(--sp-2, 8px); }
+.row .proj-col .chip.proj { display:inline-flex; align-items:center; gap:5px; max-width:100%; height:20px; padding:0 6px; border:1px solid var(--pill-line); border-radius:var(--r-sm, 4px); background:none; font-size:var(--fs-sm); font-weight:var(--fw-regular); color:var(--muted-strong); }
+.row .proj-col .chip.proj::before { content:none; }
+.row .proj-col .prop-ic { flex:none; width:12px; height:12px; color:var(--lb-project); }
+.row .proj-col .proj-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.row .date { width:var(--list-date-w); text-align:right; }
