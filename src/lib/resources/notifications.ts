@@ -4,8 +4,9 @@ import { ApiError } from '../http/errors';
 import { decodeCursor, page } from '../http/cursor';
 import { listQuery, parseId, parseJson, parseQuery } from '../http/validate';
 import { teamVisible, type Row } from './common';
+import { emitSync } from '../sync/emit';
 
-const TYPES = ['assigned', 'mention', 'comment', 'status_change', 'due_soon'] as const;
+const TYPES = ['assigned', 'mention', 'comment', 'status_change', 'due_soon', 'reply', 'sub_issue', 'relation'] as const;
 const SCOPE = 'notifications';
 const DAY = 86_400_000;
 
@@ -18,7 +19,7 @@ const issueVisibleSql = (ctx: Ctx) => {
 // Active = not archived and not currently snoozed.
 const ACTIVE = (ctx: Ctx) => ctx.tx`n.archived_at is null and (n.snoozed_until is null or n.snoozed_until <= now())`;
 
-const SEL = (ctx: Ctx) => ctx.tx`select n.id, n.type, n.issue_id, n.comment_id, n.actor_id, n.read_at, n.archived_at, n.snoozed_until, n.created_at,
+const SEL = (ctx: Ctx) => ctx.tx`select n.id, n.type, n.issue_id, n.comment_id, n.actor_id, n.read_at, n.archived_at, n.snoozed_until, n.created_at, n.coalesced_count, n.last_event_at, n.meta,
   (select jsonb_build_object('id', i.id, 'number', i.number, 'title', i.title, 'status', i.status, 'team_id', i.team_id, 'identifier', tm.key || '-' || i.number)
      from issues i join teams tm on tm.id = i.team_id where i.id = n.issue_id) as issue,
   (select jsonb_build_object('id', u.id, 'email', u.email) from users u where u.id = n.actor_id) as actor
@@ -27,7 +28,7 @@ const SEL = (ctx: Ctx) => ctx.tx`select n.id, n.type, n.issue_id, n.comment_id, 
 const bool = z.enum(['true', 'false']).transform((v) => v === 'true');
 const listSchema = listQuery.extend({ unread: bool.optional(), archived: bool.optional(), snoozed: bool.optional(), type: z.enum(TYPES).optional() });
 
-async function unreadCount(ctx: Ctx): Promise<number> {
+export async function unreadCount(ctx: Ctx): Promise<number> {
   const [r] = await ctx.tx<{ c: number }[]>`select count(*)::int as c from notifications n where n.read_at is null and ${ACTIVE(ctx)} and ${issueVisibleSql(ctx)}`;
   return r!.c;
 }
@@ -60,6 +61,10 @@ export const deleteNotification = (req: Request, slug: string, rawId: string) =>
   return new Response(null, { status: 204 });
 });
 
+type Touched = { id: string; issue_id: string; coalesced_count: number };
+/** State changes (read, archive, snooze...) reach the user other tabs as a per-user notification update event. */
+const touched = async (ctx: Ctx, rows: Touched[]) => { for (const r of rows) await emitSync(ctx, { entity: 'notification', id: r.id, op: 'update', version: r.coalesced_count, issueId: r.issue_id, userId: ctx.userId }); };
+
 const snoozeBody = z.object({ until: z.string().datetime({ offset: true }) });
 export type NotificationAction = 'read' | 'unread' | 'archive' | 'unarchive' | 'snooze';
 export const notificationAction = (req: Request, slug: string, rawId: string, action: NotificationAction) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -76,18 +81,23 @@ export const notificationAction = (req: Request, slug: string, rawId: string, ac
       await t`update notifications set snoozed_until = ${new Date(at).toISOString()}::timestamptz where id = ${id}`; break;
     }
   }
+  await touched(ctx, [{ id, issue_id: n.issue_id as string, coalesced_count: Number(n.coalesced_count) }]);
   return Response.json(await load(ctx, id));
 });
 
-/** Bulk: mark every visible active notification read. */
+/** At most BULK_CAP rows per read-all / archive-read call (one sync event each); clients repeat while `updated` equals it. */
+const BULK_CAP = 500;
+/** Bulk: mark visible active notifications read (newest BULK_CAP per call). */
 export const readAll = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  const r = await ctx.tx`update notifications n set read_at = now() where n.read_at is null and ${ACTIVE(ctx)} and ${issueVisibleSql(ctx)}`;
-  return Response.json({ updated: r.count });
+  const r = await ctx.tx<Touched[]>`update notifications n set read_at = now() where n.id in (select n.id from notifications n where n.read_at is null and ${ACTIVE(ctx)} and ${issueVisibleSql(ctx)} order by n.id desc limit ${BULK_CAP}) returning n.id, n.issue_id, n.coalesced_count`;
+  await touched(ctx, r);
+  return Response.json({ updated: r.length });
 });
 /** Bulk: archive every already-read, non-archived notification. */
 export const archiveRead = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  const r = await ctx.tx`update notifications n set archived_at = now() where n.read_at is not null and n.archived_at is null and ${issueVisibleSql(ctx)}`;
-  return Response.json({ updated: r.count });
+  const r = await ctx.tx<Touched[]>`update notifications n set archived_at = now() where n.id in (select n.id from notifications n where n.read_at is not null and n.archived_at is null and ${issueVisibleSql(ctx)} order by n.id desc limit ${BULK_CAP}) returning n.id, n.issue_id, n.coalesced_count`;
+  await touched(ctx, r);
+  return Response.json({ updated: r.length });
 });
 
 // ---- Per-type preferences (in_app / email). Missing row = defaults (in_app true, email false). ----
@@ -108,4 +118,16 @@ export const putPreferences = (req: Request, slug: string) => withWorkspaceCtx(r
       on conflict (workspace_id, user_id, type) do update set in_app = excluded.in_app, email = excluded.email`;
   }
   return Response.json(await loadPrefs(ctx));
+});
+
+/** POST /notifications/bulk {ids (1..100), action}: per-id results; unknown, foreign and hidden ids report not_found without failing the batch. */
+const bulkBody = z.object({ ids: z.array(z.string().uuid()).min(1).max(100), action: z.enum(['read', 'unread', 'archive', 'unarchive']) }).strict();
+export const bulkNotifications = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  const b = await parseJson(req, bulkBody), t = ctx.tx, ids = [...new Set(b.ids)];
+  const set = b.action === 'read' ? t`read_at = coalesce(n.read_at, now())` : b.action === 'unread' ? t`read_at = null`
+    : b.action === 'archive' ? t`archived_at = coalesce(n.archived_at, now()), read_at = coalesce(n.read_at, now())` : t`archived_at = null`;
+  const rows = await t<Touched[]>`update notifications n set ${set} where n.id in ${t(ids)} and ${issueVisibleSql(ctx)} returning n.id, n.issue_id, n.coalesced_count`;
+  await touched(ctx, rows);
+  const ok = new Set(rows.map((r) => r.id));
+  return Response.json({ updated: rows.length, results: b.ids.map((id) => ({ id, status: ok.has(id) ? 'ok' : 'not_found' })), unread_count: await unreadCount(ctx) });
 });

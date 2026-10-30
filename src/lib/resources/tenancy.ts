@@ -76,7 +76,7 @@ const lastOwner = async (tx: Parameters<Parameters<typeof withWorkspaceCtx>[2]>[
 export const listMembers = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const q = parseQuery(req, listQuery), c = afterId(ctx, "members", q);
-  const rows = await ctx.tx<Row[]>`select m.id, m.user_id, u.email, m.role, m.created_at from memberships m join users u on u.id = m.user_id
+  const rows = await ctx.tx<Row[]>`select m.id, m.user_id, u.email, u.display_name, m.role, m.created_at from memberships m join users u on u.id = m.user_id
     where ${c ? ctx.tx`m.id > ${c}::uuid` : ctx.tx`true`} order by m.id limit ${q.limit + 1}`;
   return listPage(ctx, "members", q, rows);
 });

@@ -183,7 +183,7 @@ export const createComment = (req: Request, slug: string, rawIssue: string) => w
   const row = await getComment(ctx, id);
   await audit(ctx, "comment", id, "create", { ...diffOf(null, row, COMMENT_F), issue_id: { before: null, after: issueId },
     ...(mentioned.length ? { mention_ids: { before: [], after: mentioned } } : {}) });
-  await emit(ctx, { kind: "comment_created", issueId, commentId: id, mentioned });
+  await emit(ctx, { kind: "comment_created", issueId, commentId: id, mentioned, parentCommentId: parent });
   return out(row, 201);
 });
 export const getCommentH = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => out(await getComment(ctx, parseId(rawId))));
