@@ -12,6 +12,8 @@ WITH d AS (SELECT id, row_number() OVER (PARTITION BY workspace_id,user_id,issue
 UPDATE notifications n SET coalesced_count = d.c FROM d WHERE n.id = d.id AND d.rn = 1 AND d.c > 1;
 DELETE FROM notifications n USING (SELECT id FROM (SELECT id, row_number() OVER (PARTITION BY workspace_id,user_id,issue_id,type ORDER BY last_event_at DESC, created_at DESC, id DESC) rn FROM notifications WHERE read_at IS NULL AND archived_at IS NULL AND type NOT IN ('mention','assigned')) x WHERE rn > 1) d WHERE n.id = d.id;
 CREATE UNIQUE INDEX notifications_coalesce_uq ON notifications (workspace_id, user_id, issue_id, type) WHERE read_at IS NULL AND archived_at IS NULL AND type NOT IN ('mention','assigned');
+-- supports the NOT EXISTS in cron_due_soon_candidates (due_soon already sent for this issue/date)
+CREATE INDEX notifications_due_soon_idx ON notifications (workspace_id, issue_id, user_id) WHERE type = 'due_soon';
 CREATE TABLE entity_subscriptions (
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,

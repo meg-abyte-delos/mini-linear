@@ -8,6 +8,7 @@ DROP FUNCTION IF EXISTS cron_due_soon_candidates();
 -- up uses IF NOT EXISTS so up/down/up works). Everything else is reverted and the rows using them are deleted.
 DROP TABLE IF EXISTS entity_subscriptions;
 DROP INDEX IF EXISTS notifications_coalesce_uq;
+DROP INDEX IF EXISTS notifications_due_soon_idx;
 DROP FUNCTION IF EXISTS entity_subscribers(text, uuid);
 REVOKE SELECT, UPDATE ON notifications FROM definer;
 CREATE OR REPLACE FUNCTION notify(p_id uuid, p_recipient uuid, p_type notification_type, p_issue uuid, p_comment uuid)
