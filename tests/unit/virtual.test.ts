@@ -34,6 +34,8 @@ describe('variable heights', () => {
     expect(cardHeight(0)).toBe(CARD_H);
     expect(cardHeight(2)).toBe(CARD_H);
     expect(cardHeight(3)).toBeGreaterThan(CARD_H);
+    expect(cardHeight(0, 20)).toBe(CARD_H);
+    expect(cardHeight(0, 60)).toBeGreaterThan(CARD_H);
   });
   it('window pads add up to the total', () => {
     const hs = Array.from({ length: 500 }, (_, k) => cardHeight(k % 5));

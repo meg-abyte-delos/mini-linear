@@ -84,3 +84,14 @@
 
 .idp-rows li:has(.row-link){margin:0 -8px}.rel-type{padding:0}
 .add-row{width:calc(100% + 16px);margin:0 -8px}.inline-add{min-height:32px;align-items:center}.inline-add input{height:32px;box-sizing:border-box}
+
+/* D9 residue: avatars in the activity feed, one "+" affordance for Sub-issues / Relations / Attachments, composer kept in view */
+.feed .ev{display:flex;align-items:center;gap:8px;padding-left:0;min-height:24px}
+.feed .ev .av{width:16px;height:16px;font-size:9px}
+.feed .ev .dot{position:static;flex:none;margin:0 5px}
+.feed .ev time{margin-left:0}
+.cmt header{display:flex;align-items:center;gap:8px}
+.cmt header .av{width:20px;height:20px}
+.cmt header time{margin-left:0}
+.cmt-actions{margin-left:auto;float:none}
+.idp-sec[aria-labelledby=h-act]>.composer{position:sticky;bottom:0;z-index:5;margin-top:var(--sp-3);padding:var(--sp-2) 0 var(--sp-3);background:var(--bg)}

@@ -23,8 +23,8 @@ const SCREENS: Screen[] = [
   { name: 'search', bare: true, url: '/search?q=cron', ready: (p) => expect(p.getByRole('list', { name: /results/i }).getByRole('listitem').first()).toBeVisible() },
   { name: 'members', bare: true, url: '/w/demo/members', ready: (p) => expect(p.getByRole('heading', { level: 1 })).toBeVisible() },
   { name: 'workspace-settings', bare: true, url: '/w/demo/settings', ready: (p) => expect(p.getByRole('heading', { level: 1 })).toBeVisible() },
-  { name: 'login', known: 'auth link uses --accent #5e6ad2 as text on #0f1011 (4.05:1, needs >= 4.5)', url: '/login', anon: true, ready: (p) => expect(p.locator('form')).toBeVisible() },
-  { name: 'signup', known: 'auth link uses --accent #5e6ad2 as text on #0f1011 (4.05:1, needs >= 4.5)', url: '/signup', anon: true, ready: (p) => expect(p.locator('form')).toBeVisible() },
+  { name: 'login', url: '/login', anon: true, ready: (p) => expect(p.locator('form')).toBeVisible() },
+  { name: 'signup', url: '/signup', anon: true, ready: (p) => expect(p.locator('form')).toBeVisible() },
 ];
 
 for (const scheme of ['dark'] as const) {

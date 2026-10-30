@@ -7,7 +7,7 @@
 .board .col-head { height: 36px; min-height: 36px; display: flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 0; }
 .board .col-head h2 { flex: 1; min-width: 0; height: 36px; padding: 0 var(--sp-2); gap: var(--sp-2); font-size: var(--fs-base); font-weight: 500; background: none; border: 0; }
 .board .col-head h2 .count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
-.board .col-act { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity .12s ease, background-color .12s ease; }
+.board .col-act { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
 .board .col:hover .col-act, .board .col-act:focus-visible { opacity: 1; }
 .board .col-act:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); }
 .board .col-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -22,7 +22,7 @@
   background: var(--raised);
   border: 1px solid color-mix(in srgb, var(--fg) 6%, transparent);
   box-shadow: 0 1px 2px color-mix(in srgb, #000 25%, transparent);
-  transition: border-color .12s ease, background-color .12s ease;
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 .board .card:hover { border-color: color-mix(in srgb, var(--fg) 14%, transparent); background: color-mix(in srgb, var(--fg) 3%, var(--raised)); }
 .board .card[aria-selected=true] { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--sel); }
@@ -44,7 +44,7 @@
 [data-theme='dark'] .board .card, .board .card { box-shadow: 0 1px 1px color-mix(in srgb, #000 20%, transparent); }
 .board .card-title { color: color-mix(in srgb, var(--fg) 88%, var(--bg)); }
 .board .card-prio[data-none] { border-color: transparent; color: var(--muted); }
-.board .card { position: relative; transition: border-color .12s ease, background-color .12s ease, opacity .12s ease; }
+.board .card { position: relative; transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
 
 /* Drag source stays in place as a quiet slot (the browser drag image is the moving copy). */
 .board .card.dragging { transform: none; opacity: 1; background: transparent; border: 1px dashed color-mix(in srgb, var(--fg) 16%, transparent); box-shadow: none; }
@@ -55,6 +55,47 @@
 .board .card.over { box-shadow: 0 1px 1px color-mix(in srgb, #000 20%, transparent); }
 
 /* Column hovered while dragging: soft accent tint, no dashed outline. */
-.board .col.over-zone { outline: 0; background: color-mix(in srgb, var(--accent) 6%, transparent); transition: background-color .12s ease; }
+.board .col.over-zone { outline: 0; background: color-mix(in srgb, var(--accent) 6%, transparent); transition: background-color var(--dur-fast) var(--ease-out); }
 
-@media (prefers-reduced-motion: reduce) { .board .card, .board .col, .board .col-act { transition: none; } }
+/* I6 motion: drop line grows in, dragged slot settles, drop zone tint fades; all on tokens. */
+.board .card.over::before { animation: drop-line-in var(--dur-fast) var(--ease-out); transform-origin: left center; }
+.board .card.dragging { transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.board .card.dragging > * { transition: opacity var(--dur-fast) var(--ease-out); }
+.board .col { transition: background-color var(--dur-fast) var(--ease-out); }
+@keyframes drop-line-in { from { opacity: 0; transform: scaleX(.6); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .board .card, .board .col, .board .col-act, .board .card.dragging > * { transition: none; } .board .card.over::before { animation: none; } }
+
+/* Wave D3: the board scrolls horizontally at 1280 (Done/Canceled reachable): thin visible scrollbar + edge fades driven by scroll position. */
+.board { overflow-x: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--fg) 26%, transparent) transparent; scroll-padding-inline: var(--sp-3); }
+.board::-webkit-scrollbar { height: 8px; }
+.board::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 26%, transparent); border-radius: 4px; }
+.board::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--fg) 28%, transparent); }
+.board .col { flex: 0 0 auto; }
+@supports (animation-timeline: scroll(x)) {
+  @property --fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
+  @property --fade-r { syntax: '<length>'; inherits: false; initial-value: 32px; }
+  .board {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+    animation: board-fade linear both; animation-timeline: scroll(self x);
+  }
+  @keyframes board-fade { 0% { --fade-l: 0px; --fade-r: 32px; } 8% { --fade-l: 32px; } 92% { --fade-r: 32px; } 100% { --fade-l: 32px; --fade-r: 0px; } }
+}
+
+/* Header actions (··· then +) only on column hover / keyboard focus, like Linear. */
+.board .col-head:focus-within .col-act { opacity: 1; }
+.board .col-act[aria-expanded=true] { opacity: 1; background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); }
+
+/* Collapsed column: a narrow strip with the header only. */
+.board .col.folded { width: 44px; }
+.board .col.folded .col-scroll, .board .col.folded .col-act:not([aria-haspopup]) { display: none; }
+.board .col.folded .col-head { flex-direction: column; height: auto; align-items: center; padding: var(--sp-1) 0; }
+.board .col.folded .col-head h2 { writing-mode: vertical-rl; height: auto; padding: var(--sp-2) 0; }
+
+/* Titles: up to 2 lines then ellipsis (virtual.ts adds TITLE_LINE_H for long titles). */
+.board .card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; white-space: normal; text-overflow: ellipsis; overflow-wrap: anywhere; }
+
+/* Label chips: colored dot + name, as in the list and in Linear. */
+.board .card .chip { gap: 5px; border: 1px solid var(--pill-line, var(--line)); background: none; color: var(--muted); }
+.board .card .chip.lb1::before, .board .card .chip.lb2::before, .board .card .chip.lb3::before { content: ''; width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.board .card .chip.lb1::before { background: var(--lb-red); } .board .card .chip.lb2::before { background: var(--lb-purple); } .board .card .chip.lb3::before { background: var(--lb-blue); }

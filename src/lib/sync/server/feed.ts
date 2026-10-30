@@ -5,8 +5,10 @@ import { withWorkspaceCtx, type Ctx } from '../../http/ctx';
 import { ApiError } from '../../http/errors';
 import { parseId } from '../../http/validate';
 import { teamVisible } from '../../resources/common';
+import { unreadCount } from '../../resources/notifications';
+import type { SyncEntity } from '../emit';
 
-export type FeedEvent = { id: string; entity: 'issue' | 'comment'; entity_id: string; issue_id: string; op: 'create' | 'update' | 'delete'; version: number };
+export type FeedEvent = { id: string; entity: SyncEntity; entity_id: string; issue_id: string | null; op: 'create' | 'update' | 'delete'; version: number; scope?: string; unread_count?: number };
 export type FeedPage = { events: FeedEvent[]; cursor: string; resync: boolean };
 export const FEED_LIMIT = 500;
 
@@ -43,9 +45,11 @@ export function openId(ws: string, user: string, v: string | null | undefined): 
 
 /** Same visibility as GET /issues/:id: guest via active share, member via team, admin+ all. Deleted issues still
  * emit their delete event (payload is ids only). */
-const visible = (ctx: Ctx) => ctx.role === 'guest'
-  ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = e.issue_id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)`
-  : ctx.tx`exists (select 1 from issues i where i.id = e.issue_id and ${teamVisible(ctx, 'i.team_id')})`;
+const visible = (ctx: Ctx) => ctx.tx`(case when e.user_id is not null then e.user_id = ${ctx.userId}
+  when e.issue_id is null then ${ctx.role === 'guest' ? ctx.tx`false` : ctx.tx`true`}
+  else ${ctx.role === 'guest'
+    ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = e.issue_id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)`
+    : ctx.tx`exists (select 1 from issues i where i.id = e.issue_id and ${teamVisible(ctx, 'i.team_id')})`} end)`;
 
 /** `cursor` is the sealed token the client got last time (or null/undefined = start now). A token that is not ours, ahead of the head or older than the pruned mark => resync with a fresh cursor. */
 export async function readFeed(ctx: Ctx, cursor: string | null | undefined): Promise<FeedPage> {
@@ -57,11 +61,14 @@ export async function readFeed(ctx: Ctx, cursor: string | null | undefined): Pro
   // No cursor: start at the head (no historical replay). Unknown / ahead of head / pruned cursor: explicit resync.
   if (!forged && after === null) return { events: [], cursor: seal(head), resync: false };
   if (forged || after! > head || after! < pruned) return { events: [], cursor: seal(head), resync: true };
-  const rows = await ctx.tx<{ id: string; entity: FeedEvent['entity']; entity_id: string; issue_id: string; op: FeedEvent['op']; version: number }[]>`select e.id::text as id, e.entity, e.entity_id, e.issue_id, e.op, e.version from sync_events e
+  const rows = await ctx.tx<{ id: string; entity: FeedEvent['entity']; entity_id: string; issue_id: string | null; op: FeedEvent['op']; version: number; scope: string | null }[]>`select e.id::text as id, e.entity, e.entity_id, e.issue_id, e.op, e.version, e.scope from sync_events e
     where e.id > ${after!.toString()}::bigint and ${visible(ctx)} order by e.id limit ${FEED_LIMIT}`;
   // Advance past invisible events too (to the last scanned id), so a client never re-reads them: the cursor is sealed, so this reveals nothing.
   const scanned = rows.length === FEED_LIMIT ? BigInt(rows[rows.length - 1]!.id) : head;
-  return { events: rows.map((r) => ({ ...r, id: seal(BigInt(r.id)) })), cursor: seal(scanned), resync: false };
+  // Notification events carry the recipient's current unread count (clients update the badge without refetching).
+  const unread = rows.some((r) => r.entity === 'notification') ? await unreadCount(ctx) : 0;
+  const events = rows.map(({ scope, ...r }) => ({ ...r, ...(scope ? { scope } : {}), ...(r.entity === 'notification' ? { unread_count: unread } : {}), id: seal(BigInt(r.id)) }));
+  return { events, cursor: seal(scanned), resync: false };
 }
 
 const q = z.object({ after: z.string().max(64).optional() });
