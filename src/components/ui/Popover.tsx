@@ -36,9 +36,6 @@ export function Popover({ open, anchorRef, onClose, label, side = 'bottom', alig
   useEffect(() => {
     if (!open || !mounted) return;
     returnTo.current = (document.activeElement as HTMLElement | null) ?? anchorRef.current;
-    const el = ref.current;
-    if (el && initialFocus === 'first') (el.querySelector<HTMLElement>('input,[role=menuitem]:not([aria-disabled=true]),button') ?? el).focus();
-    else if (el && initialFocus === 'container') el.focus();
     const down = (e: MouseEvent) => { const t = e.target as Node; if (!ref.current?.contains(t) && !anchorRef.current?.contains(t)) closeRef.current(); };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); closeRef.current(); } };
     document.addEventListener('mousedown', down);
@@ -48,7 +45,17 @@ export function Popover({ open, anchorRef, onClose, label, side = 'bottom', alig
       document.removeEventListener('keydown', key, true);
       (returnTo.current ?? anchorRef.current)?.focus?.();
     };
-  }, [open, mounted, anchorRef, initialFocus]);
+  }, [open, mounted, anchorRef]);
+
+  // Focus only once the surface is placed: while it is still visibility:hidden the browser refuses to focus into it.
+  const placed = pos !== null;
+  useEffect(() => {
+    if (!open || !mounted || !placed) return;
+    const el = ref.current;
+    if (el && initialFocus === 'first') (el.querySelector<HTMLElement>('input,[role=menuitem]:not([aria-disabled=true]),button') ?? el).focus();
+    else if (el && initialFocus === 'container') el.focus();
+  }, [open, mounted, placed, initialFocus]);
+  useEffect(() => { if (!mounted) setPos(null); }, [mounted]); // next open is placed afresh
 
   if (!mounted || typeof document === 'undefined') return null;
   return createPortal(
