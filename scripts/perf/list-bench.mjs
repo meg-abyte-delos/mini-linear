@@ -26,7 +26,7 @@ async function setup() {
   const DB = "ml_perf_bench", OWNER_PW = "ci_only", APP_PW = "ci_only_app";
   // Safety: --setup drops/creates a database and creates roles with throwaway passwords. Local clusters only.
   const su = new URL(sup); const host = su.hostname;
-  const local = host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]" || host === "" || host.startsWith("/") || su.searchParams.has("host");
+  const local = host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]" || host === "" || host.startsWith("/") || (su.searchParams.has("host") && su.searchParams.get("host").startsWith("/"));
   if (!local && process.env.PERF_ALLOW_REMOTE !== "1") throw new Error(`--setup refused: PGSUPER_URL host "${host}" is not local (set PERF_ALLOW_REMOTE=1 only for a throwaway cluster)`);
   // Never alter pre-existing roles: their passwords are not ours to reset.
   const pre = await one(sup, (c) => c.query("select rolname from pg_roles where rolname in ('owner','app_user')"));
@@ -43,7 +43,9 @@ async function setup() {
     created.roles = true;
     await c.query(`CREATE DATABASE ${DB} OWNER owner`);
   });
-  const owner = `postgres://owner:${OWNER_PW}@${new URL(sup).host}/${DB}`;
+  // keeps ?host=<socket dir>
+  const as = (user, pw) => { const u = new URL(sup); u.username = user; u.password = pw; u.pathname = `/${DB}`; return u.toString(); };
+  const owner = as("owner", OWNER_PW);
   await one(withDb(sup, DB), (c) => c.query(fs.readFileSync(path.join(root, "db/bootstrap-roles.sql"), "utf8").replace(':"owner"', '"owner"')));
   await one(owner, async (c) => {
     await c.query(fs.readFileSync(path.join(root, "db/roles/001_app_user.sql"), "utf8"));
@@ -58,7 +60,7 @@ async function setup() {
     .join("\n").replaceAll(":'ws'", `'${ws}'`).replaceAll(":'slug'", "'perf'").replaceAll(":issues", String(ISSUES));
   const t0 = Date.now(); await one(owner, (c) => c.query(sql));
   console.log(`seeded ${ISSUES} issues in ${((Date.now() - t0) / 1000).toFixed(1)}s, workspace ${ws}`);
-  return { app: `postgres://app_user:${APP_PW}@${new URL(sup).host}/${DB}`, ws, drop };
+  return { app: as("app_user", APP_PW), ws, drop };
   } catch (e) { await drop().catch(() => {}); throw e; } // no half-built scratch DB or roles left behind
 }
 
