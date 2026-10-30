@@ -16,7 +16,9 @@ export type Row = {
 const IF1 = { 'if-match': '1' };
 let cyc = 0;
 export const nextCycle = () => { const d = new Date(Date.UTC(2060, 0, 1) + cyc++ * 20 * 86400000); const e = new Date(d.getTime() + 13 * 86400000); return { start_date: d.toISOString().slice(0, 10), end_date: e.toISOString().slice(0, 10) }; };
-export const letters = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+let ltr = Math.floor(Math.random() * 26 ** 4);
+/** 4-letter team key: sequential from a random start (wraps), so one process never repeats a key. */
+export const letters = () => { let n = ltr++ % 26 ** 4; let k = ''; for (let i = 0; i < 4; i++) { k = String.fromCharCode(65 + (n % 26)) + k; n = Math.floor(n / 26); } return k; };
 const r = (m: Method, path: string, policy: PolicyName | Six, ok: number, o: Partial<Row> = {}): Row => ({ m, path, policy, ok, ...o });
 
 export const ROWS: Row[] = [
@@ -55,6 +57,7 @@ export const ROWS: Row[] = [
   r('PATCH', '/teams/{team}', 'teamAdmin', 200, { needs: ['team'], body: () => ({ name: 'Renamed' }) }),
   r('DELETE', '/teams/{team}', 'adminOnly', 204, { needs: ['team'] }),
   r('GET', '/teams/{team}/members', 'teamPublic', 200, { needs: ['team'] }),
+  r('GET', '/teams/{team}/estimate-scale', 'teamRoleRead', 200, { needs: ['team'] }),
   r('POST', '/teams/{team}/members/{target}', 'teamAdmin', 201, { needs: ['team', 'target'], body: () => ({}) }),
   r('PATCH', '/teams/{team}/members/{memberId}', 'teamAdmin', 200, { needs: ['team'], body: () => ({ role: 'admin' }) }),
   r('DELETE', '/teams/{team}/members/{target}', 'teamAdmin', 204, { needs: ['team', 'target'] }),
@@ -85,6 +88,7 @@ export const ROWS: Row[] = [
   r('POST', '/issues/{issue}/unarchive', 'issueWrite', 200, { needs: ['issue'] }),
   r('POST', '/issues/{trashed}/restore', 'issueWrite', 200, { needs: ['trashed'] }),
   r('GET', '/issues/{issue}/children', 'issueRead', 200, { needs: ['issue'] }),
+  r('GET', '/issues/{issue}/sub-issues', 'issueRead', 200, { needs: ['issue'] }),
   r('GET', '/issues/{issue}/attachments', 'issueRead', 200, { needs: ['issue'] }),
   r('POST', '/issues/{issue}/attachments', 'issueWrite', 201, { needs: ['issue'], body: () => ({ url: 'https://example.com/doc' }) }),
   r('DELETE', '/issues/{issue}/attachments/{attachment}', 'authorOrAdmin', 204, { needs: ['issue', 'attachment'] }),
