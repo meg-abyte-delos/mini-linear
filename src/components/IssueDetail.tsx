@@ -96,7 +96,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const issueRef = useRef(issue); issueRef.current = issue;
   const [gone, setGone] = useState(false);
   const [rtOffline, setRtOffline] = useState(false);
-  useIssueRealtime(slug, api, initial.id, version, {
+  useIssueRealtime(slug, !!api, initial.id, version, {
     onSelf: (row) => {
       const cur = issueRef.current;
       version.current = row.version;

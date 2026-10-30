@@ -1,13 +1,16 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui';
+import { Markdown } from '@/components/Markdown';
+import { PRIORITY_LABEL, STATUS_LABEL, type Issue } from '@/lib/issues';
 import { TABS, TYPE_LABEL, relTime, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
 
 /**
- * Inbox. Tabs All/Unread/Archived/Snoozed, bulk read/archive on checked rows, detail panel on the right.
+ * Inbox. Two panes: notification list on the left, preview of the selected notification's issue on the right (no List/Board toggle).
+ * Tabs All/Unread/Archived/Snoozed, bulk read/archive on checked rows.
  * Keys: j/k move, x check, e archive, u toggle read, s snooze menu (1-3 pick a preset), h snooze until tomorrow, Enter open issue, Esc closes menus.
  */
-export function Inbox({ client, onUnread, onOpenIssue, refreshKey = 0 }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; refreshKey?: number }) {
+export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; refreshKey?: number }) {
   const [tab, setTab] = useState<InboxTab>('all');
   const [items, setItems] = useState<Notif[] | null>(null);
   const [err, setErr] = useState(false);
@@ -30,6 +33,7 @@ export function Inbox({ client, onUnread, onOpenIssue, refreshKey = 0 }: { clien
   const unread = list.filter((n) => !n.read_at).length;
   const presets = useMemo(() => snoozePresets(), [snoozeOpen]);
   const sel = list[cur] as Notif | undefined;
+  const selIssue = sel?.issue ? getIssue?.(sel.issue_id) : undefined;
   // Targets of an action: the checked rows, else the focused row.
   const targets = (): Notif[] => (checked.size > 0 ? list.filter((n) => checked.has(n.id)) : sel ? [sel] : []);
 
@@ -133,6 +137,12 @@ export function Inbox({ client, onUnread, onOpenIssue, refreshKey = 0 }: { clien
             <dt>When</dt><dd>{new Date(sel.created_at).toLocaleString()}</dd>
             {sel.snoozed_until && <><dt>Snoozed until</dt><dd>{new Date(sel.snoozed_until).toLocaleString()}</dd></>}
           </dl>
+          {selIssue && (
+            <section className='inbox-preview' aria-label='Issue preview'>
+              <p className='inbox-preview-meta'>{PRIORITY_LABEL[selIssue.priority]} · {STATUS_LABEL[selIssue.status]}</p>
+              <Markdown source={selIssue.description} />
+            </section>
+          )}
           <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
             <button aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
             <button aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>

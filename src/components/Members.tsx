@@ -5,7 +5,6 @@ import { nameFromEmail } from '@/lib/nl-people';
 import { ConfirmDialog, Menu, Popover, UserAvatar, type MenuEntry } from '@/components/ui';
 import { SettingsShell } from '@/components/SettingsShell';
 
-const ROLES: S.WorkspaceRole[] = ['admin', 'member', 'guest'];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const isAdmin = (r?: string) => r === 'owner' || r === 'admin';
 const dateFmt = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
@@ -23,7 +22,7 @@ function RowMenu({ label, entries }: { label: string; entries: MenuEntry[] }) {
   );
 }
 
-function InvitePopover({ open, anchorRef, onClose, canInviteAdmin, onSend }: { open: boolean; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void; canInviteAdmin: boolean; onSend: (email: string, role: 'admin' | 'member' | 'guest') => Promise<string | null> }) {
+function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: boolean; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void; roles: S.AssignableRole[]; onSend: (email: string, role: 'admin' | 'member' | 'guest') => Promise<string | null> }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member' | 'guest'>('member');
   const [err, setErr] = useState<string | null>(null);
@@ -42,7 +41,7 @@ function InvitePopover({ open, anchorRef, onClose, canInviteAdmin, onSend }: { o
         <label className='set-field'><span className='set-label'>Email</span><input className='set-input' type='email' required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com' /></label>
         <label className='set-field'><span className='set-label'>Role</span>
           <select className='set-select' value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'member' | 'guest')}>
-            {ROLES.filter((r) => r !== 'admin' || canInviteAdmin).map((r) => <option key={r} value={r}>{cap(r)}</option>)}
+            {roles.map((r) => <option key={r} value={r}>{cap(r)}</option>)}
           </select>
         </label>
         {err && <p role='alert' className='set-error'>{err}</p>}
@@ -112,7 +111,7 @@ export function Members({ slug }: { slug: string }) {
   return (
     <SettingsShell slug={slug} current='members' header={header}>
       <div data-testid='members-page'>
-        {msg && <p role='status' className='toast' onClick={() => setMsg(null)}>{msg}</p>}
+        {msg && <p role='status' className='toast'>{msg} <button type='button' className='set-btn' data-variant='ghost' onClick={() => setMsg(null)}>Dismiss</button></p>}
         <div className='set-toolbar'>
           <input type='search' className='set-input set-search' aria-label='Search members' placeholder='Search by name or email' value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
@@ -125,7 +124,7 @@ export function Members({ slug }: { slug: string }) {
                 const name = nameFromEmail(m.email);
                 const self = m.user_id === meId;
                 const entries: MenuEntry[] = [
-                  ...ROLES.map((r) => ({ id: `role-${r}`, label: `Make ${r}`, disabled: m.role === r, onSelect: () => void act(S.setMemberRole(slug, m.user_id, r), `${name} is now ${r}`) })),
+                  ...S.assignableRoles(role).map((r) => ({ id: `role-${r}`, label: `Make ${r}`, disabled: m.role === r, onSelect: () => void act(S.setMemberRole(slug, m.user_id, r), `${name} is now ${r}`) })),
                   { type: 'separator' as const },
                   { id: 'remove', label: 'Remove from workspace', destructive: true, onSelect: () => setRemoving(m) },
                 ];
@@ -135,7 +134,7 @@ export function Members({ slug }: { slug: string }) {
                     <td className='set-muted'>{m.email}</td>
                     <td><span className='set-role' data-role={m.role}>{m.role}</span></td>
                     <td><span className='set-state'>Active</span></td>
-                    <td className='set-end'>{admin && !self && <RowMenu label={`Actions for ${name}`} entries={entries} />}</td>
+                    <td className='set-end'>{admin && !self && S.canManageMember(role, m.role) && <RowMenu label={`Actions for ${name}`} entries={entries} />}</td>
                   </tr>
                 );
               })}
@@ -167,7 +166,7 @@ export function Members({ slug }: { slug: string }) {
             </div>
           </section>
         )}
-        <InvitePopover open={inviteOpen} anchorRef={inviteBtn} onClose={() => setInviteOpen(false)} canInviteAdmin={role === 'owner'} onSend={send} />
+        <InvitePopover open={inviteOpen} anchorRef={inviteBtn} onClose={() => setInviteOpen(false)} roles={S.assignableRoles(role)} onSend={send} />
         <ConfirmDialog open={!!removing} destructive busy={busy} title={`Remove ${removing ? nameFromEmail(removing.email) : 'member'}?`} confirmLabel='Remove' onConfirm={() => void confirmRemove()} onCancel={() => setRemoving(null)}>
           {removing?.email} loses access to this workspace and is removed from all of its teams.
         </ConfirmDialog>
