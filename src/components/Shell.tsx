@@ -6,6 +6,7 @@ import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
+import { PropIcon } from '@/components/PropIcons';
 import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -736,7 +737,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       {shown('status') && <StatusIcon status={i.status} />}
       <span className='title'>{i.title}</span>
       {subBadge(i)}
-      <span className='labels'>{shown('labels') && i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{shown('project') && (() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
+      {shown('labels') && <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</span>}
+      {shown('project') && <span className='proj-col'>{(() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj' title={pj.name}><PropIcon name='project' /><span className='proj-name'>{pj.name}</span></span> : null; })()}</span>}
       {shown('created') && <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>}
       {shown('assignee') && assignee(i)}
     </div>
