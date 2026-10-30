@@ -101,6 +101,11 @@ test('bulk: priority picker applies to all selected', async ({ page }) => {
 async function newIssue(page: Page) {
   const n = await page.locator('[role=option]').count();
   await page.keyboard.press('c');
+  const d = page.getByRole('dialog', { name: 'New issue' });
+  await expect(d).toBeVisible();
+  await d.getByRole('textbox', { name: 'Issue title' }).fill('Shortcut spec ' + Date.now());
+  await page.keyboard.press('Control+Enter');
+  await expect(d).toBeHidden();
   await expect(page.locator('[role=option]')).toHaveCount(n + 1);
 }
 
