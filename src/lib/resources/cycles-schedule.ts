@@ -16,7 +16,7 @@ const settingsBody = z.object({
 const DEFAULTS = { enabled: false, duration_days: 14, cooldown_days: 0, start_weekday: 1, upcoming_count: 2, auto_rollover: true };
 
 async function loadSettings(ctx: Ctx, teamId: string): Promise<Row> {
-  await assertTeamVisible(ctx, teamId);
+  await assertTeamVisible(ctx, teamId).catch(() => { throw new ApiError("not_found"); }); // path id
   const t = await ctx.tx`select 1 from teams where id = ${teamId}`;
   if (!t.length) throw new ApiError("not_found");
   const r = await ctx.tx<Row[]>`select team_id, enabled, duration_days, cooldown_days, start_weekday, upcoming_count, auto_rollover, version from team_cycle_settings where team_id = ${teamId}`;
