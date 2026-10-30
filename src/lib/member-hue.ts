@@ -1,5 +1,5 @@
-// Stable avatar colour for API members (no hue column): the same 8-slot hash UserAvatar uses, as a class
-// suffix (.av.c0..c7), so a member keeps one colour everywhere and the palette is not 5 shades of blue.
+// Stable avatar colour for API members (no hue column): the same 13-slot hash UserAvatar uses, as a class
+// suffix (.av.c0..c12), so a member keeps one colour everywhere and the palette is not 5 shades of blue.
 import { avatarSlot, initialsOf as initialsFromName } from '@/lib/ui/avatar';
 
 export type Hue = string;

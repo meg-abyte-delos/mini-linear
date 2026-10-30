@@ -27,6 +27,10 @@ describe('menu navigation', () => {
 });
 
 describe('avatar', () => {
+  it('gives the 8 demo seed users 8 distinct avatar slots', () => {
+    const seed = [2, 7, 8, 9, 81, 82, 83, 84].map((n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`);
+    expect(new Set(seed.map(avatarSlot)).size).toBe(seed.length);
+  });
   it('is stable and in range', () => {
     expect(avatarSlot('user-1')).toBe(avatarSlot('user-1'));
     for (const id of ['a', 'b', 'c', 'user-42', '']) expect(avatarSlot(id)).toBeLessThan(AVATAR_SLOTS);
