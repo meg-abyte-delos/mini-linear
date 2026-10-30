@@ -53,7 +53,7 @@ test('journey: create, assign, put in a cycle, complete, and it all survives a r
 
   await pickFromPanel(page, 'Status', 'Change status', /^In Progress/i);
   expect((await get(page, it.id)).status).toBe('in_progress');
-  await pickFromPanel(page, /Assignee|Unassigned|No assignee/i, 'Assign to', new RegExp(esc(other.display_name || nameFromEmail(other.email)), 'i'));
+  await pickFromPanel(page, 'Assignee', 'Assign to', new RegExp(esc(other.display_name || nameFromEmail(other.email)), 'i'));
   expect((await get(page, it.id)).assignee_id).toBe(other.user_id);
   await pickFromPanel(page, 'Cycle', 'Move to cycle', new RegExp(esc(cyc.name)));
   expect((await get(page, it.id)).cycle_id).toBe(cyc.id);
