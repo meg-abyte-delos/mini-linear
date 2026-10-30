@@ -12,7 +12,7 @@ import { INBOX_STATE } from './global-setup';
 test.describe.configure({ mode: 'serial' });
 test.beforeAll(({}, testInfo) => {
   // Guard: writing baselines outside a fresh DB (CI, or pnpm test:visual:update) bakes local data into the PNGs.
-  if (testInfo.config.updateSnapshots !== 'none' && process.env.E2E_ISOLATED !== '1' && !process.env.CI) {
+  if (['all', 'changed'].includes(testInfo.config.updateSnapshots) && process.env.E2E_ISOLATED !== '1' && !process.env.CI) {
     throw new Error('Refusing to update visual baselines on a non-isolated DB. Run: pnpm test:visual:update');
   }
 });
