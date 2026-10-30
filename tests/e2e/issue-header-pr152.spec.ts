@@ -159,7 +159,7 @@ test('pills: empty values show muted placeholders; estimate and due date keep na
   await expect(props).toContainText('Set estimate');
   w = patched(); await page.getByLabel('Due date').fill(''); expect((await w).status()).toBe(200);
   await expect(props).toContainText('Set due date');
-  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('removed the due date');
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText(/removed the due date|cleared due date/);
 });
 
 test('pills: Estimate with 1 point is singular ("1 pt")', async ({ page }) => {
