@@ -1,0 +1,41 @@
+/* Review 21:00 (main 63ea6ad): issue page density, activity timeline, board cards, light list hairlines. Imported last. */
+:root { --fg-tertiary:#7d828b; }
+[data-theme='light'] { --fg-tertiary:#6f737b; }
+@media (prefers-color-scheme: light) { html:not([data-theme]) { --fg-tertiary:#6f737b; } }
+
+/* Activity: actor, action, " · 2d" in tertiary; vertical timeline rail between avatars. */
+.feed .ev { position:relative; min-height:28px; }
+.feed .ev .ev-text { color:var(--muted); }
+.feed .ev .ev-sep, .feed .ev .ev-age { color:var(--fg-tertiary); margin-left:0; }
+.feed .ev .ev-age { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.feed .ev .ev-lead { position:relative; z-index:1; background:var(--bg); width:16px; height:20px; }
+.feed > .ev:not(:last-child)::before { content:''; position:absolute; left:7.5px; top:20px; bottom:-8px; width:1px; background:var(--line); }
+
+/* Sub-issues / Relations / Attachments: 32px compact header rows, 13/500 label, + next to the label on hover. */
+.idp-sec:is([aria-labelledby=h-sub],[aria-labelledby=h-rel],[aria-labelledby=h-att]) { padding:0; }
+.idp-sec:is([aria-labelledby=h-sub],[aria-labelledby=h-rel],[aria-labelledby=h-att]) > h2 { height:32px; margin:0; gap:6px; font-size:var(--fs-sm); font-weight:500; color:var(--muted-strong); }
+.idp-sec:is([aria-labelledby=h-sub],[aria-labelledby=h-rel],[aria-labelledby=h-att]) > :last-child:not(h2) { margin-bottom:var(--sp-2); }
+.idp-sec h2 .sec-add, .idp-sec h2 .rel-add { margin-left:0; }
+.idp-sec h2 .sec-add { width:20px; height:20px; opacity:0; transition:opacity var(--dur-fast) var(--ease-out); }
+.idp-sec:hover h2 .sec-add, .idp-sec h2 .sec-add:focus-visible, .idp-sec h2 .sec-add[aria-expanded=true] { opacity:1; }
+@media (hover:none) { .idp-sec h2 .sec-add { opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .idp-sec h2 .sec-add { transition:none; } }
+
+/* Properties placeholders read as placeholders, not values. */
+.idp-side .prop-empty { color:var(--fg-tertiary); }
+
+/* Comment button disabled: accent at 50%, white text (not a grey-on-indigo smear). */
+.idp .composer-actions .primary:disabled, .idp .composer-actions .primary:disabled:hover { opacity:.5; background:var(--accent); border-color:var(--accent); color:#fff; cursor:default; }
+
+/* Board: card one step above the canvas with a real 1px border. */
+.board .card:not(#_) { background:var(--raised); border-color:color-mix(in srgb, var(--fg) 10%, var(--raised)); }
+[data-theme='light'] .board .card:not(#_) { border-color:var(--line); }
+.board .card:not(#_):hover { border-color:color-mix(in srgb, var(--fg) 16%, var(--line)); }
+
+/* Light list: hairlines and pill outlines visible on white, pills lightly tinted. */
+[data-theme='light'] .row { --pill-line:var(--line); }
+[data-theme='light'] .row :is(.labels .chip, .proj-col .chip.proj) { background:color-mix(in srgb, var(--fg) 3%, transparent); }
+[data-theme='light'] .group h2 { border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+
+/* Rex nit #288: Members cells keep ellipsis but focus rings draw inside the clip. */
+.set-table td :focus-visible { outline-offset:-2px; }
