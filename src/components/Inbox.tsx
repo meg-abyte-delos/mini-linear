@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
-import { StatusIcon } from '@/components/icons';
+import { PriorityIcon, StatusIcon } from '@/components/icons';
 import { PRIORITY_LABEL, STATUS_LABEL, type Issue, type Status } from '@/lib/issues';
 import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
 
@@ -11,7 +11,10 @@ import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type I
  * Tabs All/Unread/Archived/Snoozed, bulk read/archive on checked rows.
  * Keys: j/k move, x check, e archive, u toggle read, s snooze menu (1-3 pick a preset), h snooze until tomorrow, Enter open issue, Esc closes menus.
  */
-export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; refreshKey?: number }) {
+/** Optional name lookups so the detail pane can show properties like Linear's issue sidebar. */
+export interface InboxLookup { person: (id: string | null) => string | undefined; label: (id: string) => { name: string; hue: string } | undefined; project: (id: string | null) => string | undefined }
+
+export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, refreshKey = 0 }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; lookup?: InboxLookup; refreshKey?: number }) {
   const [tab, setTab] = useState<InboxTab>('all');
   const [items, setItems] = useState<Notif[] | null>(null);
   const [err, setErr] = useState(false);
@@ -134,24 +137,35 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
       </div>
       {sel && (
         <aside className='inbox-detail' aria-label='Notification detail'>
-          <h2 title={sel.issue ? `${sel.issue.identifier} ${sel.issue.title}` : undefined}>{sel.issue ? `${sel.issue.identifier} ${sel.issue.title}` : 'Issue deleted'}</h2>
-          <dl>
-            <dt>Event</dt><dd>{whoLabel(sel)}</dd>
-            {sel.issue && <><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></>}
-            <dt>When</dt><dd title={new Date(sel.created_at).toLocaleString()}>{shortWhen(sel.created_at)}</dd>
-            {sel.snoozed_until && <><dt>Snoozed until</dt><dd>{shortWhen(sel.snoozed_until)}</dd></>}
-          </dl>
-          {selIssue && (
-            <section className='inbox-preview' aria-label='Issue preview'>
-              <p className='inbox-preview-meta'>{PRIORITY_LABEL[selIssue.priority]} · {STATUS_LABEL[selIssue.status]}</p>
-              <Markdown source={selIssue.description} />
-            </section>
-          )}
-          <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
-            {sel.issue && <button className='btn' data-variant='primary' onClick={() => open(sel)}>Open issue</button>}
-            <button className='btn' data-variant='ghost' aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
-            <button className='btn' data-variant='ghost' aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>
-            <button className='btn' data-variant='ghost' aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</button>
+          <div className='idp-bar'>
+            <span className='idp-id'>{sel.issue?.identifier ?? 'Deleted'}</span>
+            <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
+              {sel.issue && <button className='btn' onClick={() => open(sel)}>Open issue</button>}
+              <button className='btn' data-variant='ghost' aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</button>
+              <button className='btn' data-variant='ghost' aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>
+              <button className='btn' data-variant='ghost' aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
+            </div>
+          </div>
+          <div className='idp-body'>
+            <article className='idp-main'>
+              <h2 title={sel.issue ? `${sel.issue.identifier} ${sel.issue.title}` : undefined}>{sel.issue ? sel.issue.title : 'Issue deleted'}</h2>
+              <p className='idp-event'>{whoLabel(sel)} <span aria-hidden='true'>·</span> <span title={new Date(sel.created_at).toLocaleString()}>{relTime(sel.created_at)}</span></p>
+              {selIssue && (
+                <section className='inbox-preview' aria-label='Issue preview'>
+                  {selIssue.description.trim() ? <Markdown source={selIssue.description} /> : <p className='md-empty'>No description.</p>}
+                </section>
+              )}
+            </article>
+            <dl className='idp-props' aria-label='Properties'>
+              {sel.issue && <><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></>}
+              {selIssue && <><dt>Priority</dt><dd><span className='idp-val'><PriorityIcon priority={selIssue.priority} />{PRIORITY_LABEL[selIssue.priority]}</span></dd></>}
+              {selIssue && lookup && <><dt>Assignee</dt><dd>{lookup.person(selIssue.assignee_id) ?? 'Unassigned'}</dd></>}
+              {selIssue && lookup && selIssue.label_ids.length > 0 && <><dt>Labels</dt><dd className='idp-labels'>{selIssue.label_ids.map((l) => { const lb = lookup.label(l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</dd></>}
+              {selIssue && lookup && <><dt>Project</dt><dd>{lookup.project(selIssue.project_id) ?? 'No project'}</dd></>}
+              <dt>Event</dt><dd>{whoLabel(sel)}</dd>
+              <dt>When</dt><dd title={new Date(sel.created_at).toLocaleString()}>{shortWhen(sel.created_at)}</dd>
+              {sel.snoozed_until && <><dt>Snoozed until</dt><dd>{shortWhen(sel.snoozed_until)}</dd></>}
+            </dl>
           </div>
         </aside>
       )}

@@ -120,6 +120,41 @@ test('the board column + button opens the modal preset to that status', async ({
   await expect(page.locator('[data-testid=col-done]').getByText('Preset done').first()).toBeVisible();
 });
 
+test('the list group header + shows on hover and opens the modal preset to that status', async ({ page }) => {
+  const head = page.locator('section.group h2').filter({ hasText: 'Backlog' }).first();
+  const add = head.getByRole('button', { name: 'Add issue to Backlog' });
+  await expect(add).toHaveCSS('opacity', '0');
+  await head.hover();
+  await expect(add).toHaveCSS('opacity', '1');
+  await add.click();
+  await expect(modal(page).getByRole('button', { name: 'Backlog' })).toBeVisible();
+});
+
+test('board column header: hover reveals + and ···; Hide column removes it and Show restores it', async ({ page }) => {
+  await page.getByRole('button', { name: /board/i }).click();
+  const col = page.locator('section.col', { has: page.locator('#c-backlog') });
+  await col.locator('.col-head').hover();
+  await expect(col.getByRole('button', { name: 'Add issue to Backlog' })).toHaveCSS('opacity', '1');
+  await expect(col.getByRole('button', { name: 'Backlog column options' })).toHaveCSS('opacity', '1');
+  await col.getByRole('button', { name: 'Backlog column options' }).click();
+  await page.getByRole('menuitem', { name: 'Hide column' }).click();
+  await expect(page.locator('#c-backlog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show Backlog column' }).click();
+  await expect(page.locator('#c-backlog')).toHaveCount(1);
+});
+
+test('board scrolls horizontally with right padding after the last column', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.getByRole('button', { name: /board/i }).click();
+  const b = page.locator('.board');
+  await b.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+  const gap = await page.evaluate(() => {
+    const board = document.querySelector('.board')!; const cols = board.querySelectorAll('section.col');
+    return board.getBoundingClientRect().right - cols[cols.length - 1]!.getBoundingClientRect().right;
+  });
+  expect(gap).toBeGreaterThanOrEqual(12);
+});
+
 test('reduced motion: the modal appears and disappears without a lingering node', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.keyboard.press('c');

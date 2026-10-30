@@ -50,7 +50,7 @@ const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'P
 type PickKind = 'priority' | 'assignee' | 'label' | BulkKind;
 interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit; disabled?: boolean }
 
-function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object; onAdd?: (s: Status) => void }) {
+function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd, onHide }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object; onAdd?: (s: Status) => void; onHide?: (s: Status) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState(0);
   const [vh, setVh] = useState(800);
@@ -76,6 +76,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }
   const entries: MenuEntry[] = [
     ...(onAdd ? [{ id: 'add', label: 'Add issue', onSelect: () => onAdd(status) }] : []),
     { id: 'fold', label: folded ? 'Expand column' : 'Collapse column', onSelect: () => setFolded((f) => !f) },
+    ...(onHide ? [{ id: 'hide', label: 'Hide column', onSelect: () => onHide(status) }] : []),
   ];
   const listRef = useRef<HTMLDivElement>(null);
   useCssVars(listRef, { '--pad-top': `${w.padTop}px`, '--pad-bottom': `${w.padBottom}px` });
@@ -194,6 +195,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     };
     chains.current.set(id, (chains.current.get(id) ?? Promise.resolve()).then(run, run));
   }
+  const [hiddenCols, setHiddenCols] = useState<Status[]>([]);
   const [filters, setFiltersState] = useState<Filters>(initialFilters);
   const [projPick, setProjPick] = useState<DOMRect | null | false>(false);
   const [filterPick, setFilterPick] = useState<{ kind: FilterKey; rect: DOMRect | null } | null>(null);
@@ -767,6 +769,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }, []);
 
   const who = (id: string | null) => findPerson(people, id);
+  const inboxLookup = { person: (id: string | null) => who(id)?.name, label: (id: string) => LABELS.find((x) => x.id === id), project: (id: string | null) => (id ? PROJECTS.find((x) => x.id === id)?.name : undefined) };
   const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av-wrap' title='Unassigned'><UnassignedIcon /></span>; };
   const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
@@ -892,7 +895,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <EmptyState icon='issues' title='No issues yet' hint='Issues track the work your team is doing. Create one to get started.'
             action={!readOnly && <button className='btn' data-variant='primary' onClick={() => create()}>Create issue <kbd>C</kbd></button>} />
         ) : view === 'inbox' ? (
-          <Inbox client={inboxClient} refreshKey={rtTick} getIssue={getIssue} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
+          <Inbox client={inboxClient} refreshKey={rtTick} getIssue={getIssue} lookup={inboxLookup} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
           <ProjectDetail refreshKey={rtTick} slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
             issues={allIssues.filter((i) => i.project_id === detailId).map((i) => ({ id: i.id, identifier: i.identifier ?? i.id, title: i.title, done: i.status === 'done' || i.status === 'canceled' }))}
@@ -923,9 +926,20 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         ) : (
           <div className='board'>
-            {STATUSES.map((s) => (
-              <Column key={s} status={s} items={issues.filter((i) => i.status === s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} onAdd={readOnly ? undefined : create} />
+            {STATUSES.filter((s) => !hiddenCols.includes(s)).map((s) => (
+              <Column key={s} status={s} items={issues.filter((i) => i.status === s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} onAdd={readOnly ? undefined : create} onHide={(st) => setHiddenCols((h) => [...h, st])} />
             ))}
+            {hiddenCols.length > 0 && (
+              <aside className='board-hidden' aria-label='Hidden columns'>
+                <h3>Hidden columns</h3>
+                {hiddenCols.map((s) => (
+                  <button key={s} type='button' className='board-hidden-row' aria-label={`Show ${STATUS_LABEL[s]} column`} onClick={() => setHiddenCols((h) => h.filter((x) => x !== s))}>
+                    <StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span>
+                  </button>
+                ))}
+              </aside>
+            )}
+            <div className='board-end' aria-hidden='true' />
           </div>
         )}
       </main>
