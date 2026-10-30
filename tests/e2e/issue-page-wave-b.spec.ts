@@ -5,11 +5,14 @@ import AxeBuilder from '@axe-core/playwright';
 // full "..." menu, delete confirm dialog. API mode, demo session. Creates its own issues (shared DB).
 const stamp = Date.now().toString(36);
 let teamId: string;
+const created: string[] = []; // every issue this file makes (copies too): deleted in afterAll so the shared DB stays clean
 
 async function mk(page: Page, title: string, extra: Record<string, unknown> = {}) {
   const r = await page.request.post('/api/v1/w/demo/issues', { data: { team_id: teamId, title, ...extra } });
   expect(r.status()).toBe(201);
-  return (await r.json()) as { identifier: string; id: string };
+  const j = (await r.json()) as { identifier: string; id: string };
+  created.push(j.id);
+  return j;
 }
 const open = async (page: Page, ident: string) => { await page.goto(`/w/demo/issue/${ident}`); await page.waitForSelector('html[data-ready]'); await expect(page.getByLabel('Title', { exact: true })).toBeVisible(); };
 const more = (page: Page) => page.getByRole('toolbar', { name: 'Issue actions' }).getByRole('button', { name: 'More actions' });
@@ -20,6 +23,10 @@ const blurSave = async (page: Page) => {
   await page.getByLabel('Title', { exact: true }).click();
   expect((await saved).status()).toBe(200);
 };
+
+test.afterAll(async ({ request }) => {
+  for (const id of created) await request.delete('/api/v1/w/demo/issues/' + id).catch(() => undefined);
+});
 
 test.beforeAll(async ({ request }) => { teamId = (await (await request.get('/api/v1/w/demo/teams')).json()).items[0].id; });
 
@@ -84,6 +91,44 @@ test('description: clicking the checkbox gutter toggles a task and saves it', as
   expect((await saved).status()).toBe(200);
   await expect(li).toHaveAttribute('data-done', '1');
   expect(await desc(page, a.id)).toBe('- [x] one\n- [x] two');
+});
+
+test('description: focus + blur without an edit sends no PATCH and keeps the stored markdown', async ({ page }) => {
+  const raw = 'a\nb\n\n#### h\n\n* x\n  * nested';
+  const a = await mk(page, `wb nodirty ${stamp}`, { description: raw });
+  await open(page, a.identifier);
+  const patches: string[] = [];
+  page.on('request', (r) => { if (r.method() === 'PATCH' && r.url().includes('/issues/')) patches.push(r.url()); });
+  await editor(page).click();
+  await expect(editor(page)).toBeFocused();
+  await page.getByLabel('Title', { exact: true }).click();
+  await page.waitForTimeout(600);
+  expect(patches).toEqual([]);
+  expect(await desc(page, a.id)).toBe(raw);
+  await expect(page.getByText('updated the description')).toHaveCount(0);
+});
+
+test('description: a real edit still saves on blur', async ({ page }) => {
+  const a = await mk(page, `wb dirty ${stamp}`, { description: 'a\nb' });
+  await open(page, a.identifier);
+  await editor(page).click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type(' more');
+  await blurSave(page);
+  expect(await desc(page, a.id)).toContain('more');
+});
+
+test('toolbar: arrow keys move between the buttons, Home and End jump', async ({ page }) => {
+  const a = await mk(page, `wb bar ${stamp}`);
+  await open(page, a.identifier);
+  const bar = page.getByRole('toolbar', { name: 'Description formatting' });
+  await bar.getByRole('button', { name: 'Bold' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(bar.getByRole('button', { name: 'Italic' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(bar.getByRole('button', { name: 'Code block' })).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(bar.getByRole('button', { name: 'Bold' })).toBeFocused();
 });
 
 test('description: toolbar applies formatting, link form accepts http(s) only, Esc closes it', async ({ page }) => {
@@ -164,7 +209,9 @@ test('menu: Move to project opens the project picker and moves the issue', async
 test('menu: Make a copy creates "Copy of ..." with the same fields and opens it', async ({ page }) => {
   const a = await mk(page, `wb dup ${stamp}`, { description: 'carry **me**', priority: 2, estimate: 3 });
   await open(page, a.identifier);
+  const made = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/issues'));
   await more(page).click(); await page.getByRole('menuitem', { name: 'Make a copy' }).click();
+  created.push(((await (await made).json()) as { id: string }).id);
   await expect(page).toHaveURL(new RegExp(`/issue/(?!${a.identifier}$)[A-Z0-9]+-\\d+$`));
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue(`Copy of wb dup ${stamp}`);

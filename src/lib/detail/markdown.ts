@@ -67,11 +67,13 @@ export function parseMarkdown(src: string): Block[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
     let m: RegExpMatchArray | null;
-    if (/^```/.test(line)) {
+    const fenceOpen = line.match(/^(`{3,})/);
+    if (fenceOpen) {
+      const flen = fenceOpen[1]?.length ?? 3;
       endPara();
       const body: string[] = [];
       i++;
-      while (i < lines.length && !/^```/.test(lines[i] ?? '')) body.push(lines[i++] ?? '');
+      while (i < lines.length && !(((lines[i] ?? '').match(/^(`+)\s*$/)?.[1] ?? '').length >= flen)) body.push(lines[i++] ?? '');
       out.push({ t: 'pre', v: body.join('\n') });
       continue;
     }

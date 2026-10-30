@@ -22,7 +22,7 @@ export function inlineToMarkdown(nodes: Inline[]): string {
   return nodes.map((n) => {
     switch (n.t) {
       case 'text': return escapeText(n.v);
-      case 'code': return n.v ? `\`${n.v.replace(/`/g, '')}\`` : '';
+      case 'code': return n.v.includes('`') ? escapeText(n.v) : n.v ? `\`${n.v.replace(/`/g, '')}\`` : '';
       case 'strong': return wrap(inlineToMarkdown(n.c), '**');
       case 'em': return wrap(inlineToMarkdown(n.c), '_');
       case 'del': return wrap(inlineToMarkdown(n.c), '~~');
@@ -31,10 +31,18 @@ export function inlineToMarkdown(nodes: Inline[]): string {
         const href = safeHref(n.href);
         if (href && /^https?:/i.test(href) && n.c.length === 1 && n.c[0]?.t === 'text' && n.c[0].v === href) return href; // autolink: keep it bare
         const text = inlineToMarkdown(n.c);
-        return href ? `[${text || href}](${href.replace(/ /g, '%20')})` : text;
+        return href ? `[${text || href}](${linkDest(href)})` : text;
       }
     }
   }).join('');
+}
+
+/** Link destination: spaces and unbalanced parentheses are percent-encoded so the link reads back (the parser accepts balanced pairs only). */
+function linkDest(href: string): string {
+  const h = href.replace(/ /g, '%20');
+  let d = 0, ok = true;
+  for (const c of h) { if (c === '(') d++; else if (c === ')') { d--; if (d < 0) ok = false; } }
+  return ok && d === 0 ? h : h.replace(/[()]/g, (c) => (c === '(' ? '%28' : '%29'));
 }
 
 // A paragraph whose text would read as another block (heading, list, quote, fence, rule) gets its first character escaped.
@@ -51,7 +59,7 @@ export function blocksToMarkdown(blocks: Block[]): string {
       case 'ul': { const l = b.items.map((it) => inlineToMarkdown(it).trim()).filter(Boolean).map((t) => `- ${t}`); if (l.length) out.push(l.join('\n')); break; }
       case 'ol': { const l = b.items.map((it) => inlineToMarkdown(it).trim()).filter(Boolean).map((t, k) => `${k + 1}. ${t}`); if (l.length) out.push(l.join('\n')); break; }
       case 'task': { const l = b.items.map((it) => ({ d: it.done, t: inlineToMarkdown(it.c).trim() })).filter((it) => it.t).map((it) => `- [${it.d ? 'x' : ' '}] ${it.t}`); if (l.length) out.push(l.join('\n')); break; }
-      case 'pre': out.push('```\n' + b.v.replace(/\n+$/, '') + '\n```'); break;
+      case 'pre': { const body = b.v.replace(/\n+$/, ''); const run = Math.max(2, ...Array.from(body.matchAll(/^`{3,}/gm), (m) => m[0].length)); const fence = '`'.repeat(run + 1); out.push(fence + '\n' + body + '\n' + fence); break; } // longer fence: a body line of three backticks cannot close the block
       case 'hr': out.push('---'); break;
     }
   }

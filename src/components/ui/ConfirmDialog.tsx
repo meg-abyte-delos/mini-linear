@@ -18,6 +18,10 @@ export function ConfirmDialog({ open, title, children, confirmLabel, cancelLabel
     if (!open || !mounted) return;
     const opener = document.activeElement as HTMLElement | null;
     cancelRef.current?.focus();
+    // aria-modal alone does not keep Tab or screen readers out of the page: everything else is inert while the dialog is open.
+    const scrim = ref.current?.parentElement;
+    const others = Array.from(document.body.children).filter((n): n is HTMLElement => n instanceof HTMLElement && n !== scrim && !n.hasAttribute('inert'));
+    others.forEach((n) => n.setAttribute('inert', ''));
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); cancelFn.current(); return; }
       if (e.key !== 'Tab') return;
@@ -28,7 +32,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel, cancelLabel
       else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); first.focus(); }
     };
     document.addEventListener('keydown', key, true);
-    return () => { document.removeEventListener('keydown', key, true); opener?.focus?.(); };
+    return () => { document.removeEventListener('keydown', key, true); others.forEach((n) => n.removeAttribute('inert')); opener?.focus?.(); };
   }, [open, mounted]);
 
   if (!mounted || typeof document === 'undefined') return null;

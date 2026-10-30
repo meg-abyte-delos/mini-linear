@@ -44,3 +44,19 @@ describe('blocksToMarkdown', () => {
     expect(blocksToMarkdown([])).toBe('');
   });
 });
+describe('review nits (#205)', () => {
+  it('uses a longer fence when the code body has a fence line, and reads it back', () => {
+    const md = blocksToMarkdown([{ t: 'pre', v: 'a\n```\nb' }]);
+    expect(md).toBe('````\na\n```\nb\n````');
+    expect(parseMarkdown(md)).toEqual([{ t: 'pre', v: 'a\n```\nb' }]);
+  });
+  it('does not strip backticks out of inline code: it is written as escaped text instead', () => {
+    expect(inlineToMarkdown([{ t: 'code', v: 'a`b' }])).toBe('a\\`b');
+    expect(inlineToMarkdown([{ t: 'code', v: 'ab' }])).toBe('`ab`');
+  });
+  it('percent-encodes unbalanced parentheses in a link target so it round-trips', () => {
+    const md = inlineToMarkdown([{ t: 'link', href: 'https://x.test/a)b', c: [{ t: 'text', v: 'l' }] }]);
+    expect(md).toBe('[l](https://x.test/a%29b)');
+    expect(inlineToMarkdown([{ t: 'link', href: 'https://x.test/a_(b)', c: [{ t: 'text', v: 'l' }] }])).toBe('[l](https://x.test/a_(b))');
+  });
+});

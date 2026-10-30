@@ -43,6 +43,7 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
   const ref = useRef<HTMLDivElement>(null);
   const last = useRef(value);
   const saved = useRef<Range | null>(null);
+  const dirty = useRef(false); // set by every user edit: focus + blur without an edit must not write back a normalised description
   const [link, setLink] = useState<string | null>(null);
   const [active, setActive] = useState<{ bold: boolean; italic: boolean }>({ bold: false, italic: false });
 
@@ -70,12 +71,12 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
   useEffect(() => {
     const root = ref.current; if (!root) return;
     try { document.execCommand('defaultParagraphSeparator', false, 'p'); document.execCommand('styleWithCSS', false, 'false'); } catch { /* unsupported */ }
-    renderMarkdown(root, value); last.current = value; syncEmpty();
+    renderMarkdown(root, value); last.current = value; dirty.current = false; syncEmpty();
   }, []); // initial render only; later value changes are handled by the effect below
   useEffect(() => {
     const root = ref.current; if (!root || value === last.current) return;
     if (root.contains(document.activeElement)) return; // never overwrite what the user is typing
-    renderMarkdown(root, value); last.current = value; syncEmpty();
+    renderMarkdown(root, value); last.current = value; dirty.current = false; syncEmpty();
   }, [value]);
   useEffect(() => {
     const onSel = () => {
@@ -88,18 +89,18 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
     return () => document.removeEventListener('selectionchange', onSel);
   }, []);
 
-  const commit = () => { const md = read(); if (md !== last.current) { last.current = md; onCommit(md); } };
+  const commit = () => { if (!dirty.current) return; dirty.current = false; const md = read(); if (md !== last.current) { last.current = md; onCommit(md); } };
   const restore = () => { const s = window.getSelection(); if (s && saved.current) { s.removeAllRanges(); s.addRange(saved.current); } };
-  const exec = (cmd: string, arg?: string) => { ref.current?.focus(); restore(); document.execCommand(cmd, false, arg); syncEmpty(); };
+  const exec = (cmd: string, arg?: string) => { dirty.current = true; ref.current?.focus(); restore(); document.execCommand(cmd, false, arg); syncEmpty(); };
 
   const toggleBlock = (tag: 'h2' | 'blockquote' | 'pre') => {
-    ref.current?.focus(); restore();
+    dirty.current = true; ref.current?.focus(); restore();
     const b = blockOf(ref.current as HTMLElement, window.getSelection()?.anchorNode ?? null);
     document.execCommand('formatBlock', false, b?.tagName.toLowerCase() === tag ? 'p' : tag);
     syncEmpty();
   };
   const toggleTasks = () => {
-    ref.current?.focus(); restore();
+    dirty.current = true; ref.current?.focus(); restore();
     const b = blockOf(ref.current as HTMLElement, window.getSelection()?.anchorNode ?? null);
     if (!(b?.tagName === 'UL')) document.execCommand('insertUnorderedList');
     const ul = blockOf(ref.current as HTMLElement, window.getSelection()?.anchorNode ?? null);
@@ -108,7 +109,7 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
     else { ul.dataset.tasks = '1'; ul.querySelectorAll('li').forEach((li) => { li.dataset.done = li.dataset.done ?? '0'; }); }
   };
   const toggleCode = () => {
-    ref.current?.focus(); restore();
+    dirty.current = true; ref.current?.focus(); restore();
     const s = window.getSelection(); if (!s || !s.rangeCount) return;
     const r = s.getRangeAt(0);
     const inCode = (r.commonAncestorContainer.nodeType === 1 ? (r.commonAncestorContainer as Element) : r.commonAncestorContainer.parentElement)?.closest('code');
@@ -123,6 +124,7 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
     ref.current?.focus(); restore();
     const s = window.getSelection(); if (!s || !s.rangeCount) return;
     const r = s.getRangeAt(0);
+    dirty.current = true;
     const a = document.createElement('a'); a.setAttribute('href', href);
     if (r.collapsed) a.textContent = href; else a.append(r.extractContents());
     r.insertNode(a); caretIn(a, true);
@@ -131,6 +133,7 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
 
   const onInput = (e: React.FormEvent<HTMLDivElement>) => {
     const root = ref.current; if (!root) return;
+    dirty.current = true;
     ensureBlock();
     const ne = e.nativeEvent as InputEvent;
     const sel = window.getSelection();
@@ -157,6 +160,7 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
     const root = ref.current; if (!root) return;
     const sel = window.getSelection();
     const b = sel?.anchorNode ? blockOf(root, sel.anchorNode) : null;
+    if (['Enter', 'Backspace', 'Delete'].includes(e.key) || ((e.metaKey || e.ctrlKey) && e.key === 'e')) dirty.current = true; // handlers below edit the DOM without an input event
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commit(); return; }
     if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); document.execCommand('insertParagraph'); return; } // no hard breaks in the stored subset
     if (e.key === 'Enter' && b && (b.tagName === 'PRE')) {
@@ -186,6 +190,7 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
 
   const onPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
+    dirty.current = true;
     const t = e.clipboardData.getData('text/plain').replace(/\r\n?/g, '\n');
     if (!t) return;
     if (!t.includes('\n')) { document.execCommand('insertText', false, t); return; }
@@ -200,6 +205,16 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
     const lastNode = nodes[nodes.length - 1]; if (lastNode) caretIn(lastNode, true);
   };
 
+  // Toolbar keyboard: arrows/Home/End move between buttons (WAI-ARIA toolbar); only the first button is a tab stop.
+  const onBarKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key) || (e.target as HTMLElement).tagName === 'INPUT') return;
+    const bs = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button.re-btn'));
+    const k = bs.indexOf(e.target as HTMLButtonElement); if (k < 0) return;
+    e.preventDefault();
+    const n = e.key === 'Home' ? 0 : e.key === 'End' ? bs.length - 1 : (k + (e.key === 'ArrowRight' ? 1 : -1) + bs.length) % bs.length;
+    bs[n]?.focus();
+  };
+
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const li = (e.target as HTMLElement).closest?.('li');
     const ul = li?.parentElement;
@@ -207,18 +222,19 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
     const box = li.getBoundingClientRect();
     if (e.clientX - box.left > 24 || e.clientX < box.left) return; // only the checkbox gutter toggles
     li.dataset.done = li.dataset.done === '1' ? '0' : '1';
+    dirty.current = true;
     commit();
   };
 
   // A plain render helper, not a component: a component defined here would remount (and drop tooltip state) on every render.
   const btn = (name: string, tip: string, on: () => void, icon: ReactNode, opts: { shortcut?: string[]; pressed?: boolean } = {}) => (
-    <Tooltip label={tip} shortcut={opts.shortcut}><button type='button' className='re-btn' aria-label={name} aria-pressed={opts.pressed} onMouseDown={(e) => e.preventDefault()} onClick={on}>{icon}</button></Tooltip>
+    <Tooltip label={tip} shortcut={opts.shortcut}><button type='button' className='re-btn' tabIndex={name === 'Bold' ? 0 : -1} aria-label={name} aria-pressed={opts.pressed} onMouseDown={(e) => e.preventDefault()} onClick={on}>{icon}</button></Tooltip>
   );
 
   return (
     <div className='re' data-readonly={readOnly || undefined} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) commit(); }}>
       {!readOnly && (
-        <div className='re-bar' role='toolbar' aria-label='Description formatting' onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault(); }}>
+        <div className='re-bar' role='toolbar' aria-label='Description formatting' onKeyDown={onBarKey} onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault(); }}>
           {btn('Bold', 'Bold', () => exec('bold'), ICON.bold, { shortcut: ['⌘', 'B'], pressed: active.bold })}
           {btn('Italic', 'Italic', () => exec('italic'), ICON.italic, { shortcut: ['⌘', 'I'], pressed: active.italic })}
           {btn('Strikethrough', 'Strikethrough', () => exec('strikeThrough'), ICON.strike, { shortcut: ['⌘', '⇧', 'S'] })}

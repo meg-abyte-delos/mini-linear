@@ -120,6 +120,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     const on = !subscribed;
     const r = client ? await client.subscribe(issue.id, on) : null;
     if (r && !r.ok && !r.unsupported) { setToast(`Could not ${on ? 'subscribe to' : 'unsubscribe from'} ${ident}`); return; }
+    if (r && !r.ok && r.unsupported) { setToast('Subscriptions are not available here'); return; } // nothing was saved: no success toast
     setSubscribed(on);
     setToast(on ? `Subscribed to ${ident}` : `Unsubscribed from ${ident}`);
   }
