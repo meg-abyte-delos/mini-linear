@@ -13,11 +13,13 @@ interface Props {
   align?: Align;
   role?: 'dialog' | 'menu' | 'listbox';
   initialFocus?: 'first' | 'container' | 'none';
+  /** At least as wide as the anchor (value pickers), so the surface lines up with its trigger. */
+  matchWidth?: boolean;
   children: ReactNode;
 }
 
 // Anchored, portalled surface: flips/clamps to the viewport, Esc and outside-press close, focus returns to the trigger.
-export function Popover({ open, anchorRef, onClose, label, side = 'bottom', align = 'start', role = 'dialog', initialFocus = 'first', children }: Props) {
+export function Popover({ open, anchorRef, onClose, label, side = 'bottom', align = 'start', role = 'dialog', initialFocus = 'first', matchWidth = false, children }: Props) {
   const { mounted, state } = useExitMount(open);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; side: Side } | null>(null);
@@ -30,8 +32,9 @@ export function Popover({ open, anchorRef, onClose, label, side = 'bottom', alig
     const a = anchorRef.current, el = ref.current;
     if (!a || !el) return;
     const r = a.getBoundingClientRect();
+    if (matchWidth) el.style.setProperty('--pop-min-w', `${Math.round(r.width)}px`); else el.style.removeProperty('--pop-min-w');
     setPos(place({ top: r.top, left: r.left, width: r.width, height: r.height }, { width: el.offsetWidth, height: el.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }, side, align));
-  }, [open, mounted, anchorRef, side, align]);
+  }, [open, mounted, anchorRef, side, align, matchWidth]);
 
   useEffect(() => {
     if (!open || !mounted) return;
