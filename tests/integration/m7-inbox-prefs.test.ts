@@ -13,10 +13,10 @@ if (process.env.CI && !haveDb) throw new Error('CI=true but DB urls unset: integ
   beforeAll(async () => { seed = await seedTwoWorkspaces(owner); setSessionResolver(async () => current); });
   afterAll(async () => { await db().end(); await owner.end(); await app.end(); });
 
-  it('returns defaults for all 5 types', async () => {
+  it('returns defaults for all 8 types', async () => {
     current = seed.a.member;
     const p = (await get()).preferences;
-    expect(Object.keys(p).sort()).toEqual(['assigned', 'comment', 'due_soon', 'mention', 'status_change']);
+    expect(Object.keys(p).sort()).toEqual(['assigned', 'comment', 'due_soon', 'mention', 'relation', 'reply', 'status_change', 'sub_issue']);
     expect(p.comment).toEqual({ in_app: true, email: false });
   });
   it('partial PUT upserts and keeps the other flag; stays per user', async () => {

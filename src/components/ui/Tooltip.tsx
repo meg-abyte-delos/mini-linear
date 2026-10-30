@@ -1,5 +1,5 @@
 'use client';
-import { cloneElement, useId, useRef, useState, type ReactElement, type Ref } from 'react';
+import { cloneElement, useId, useLayoutEffect, useRef, useState, type ReactElement, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 import { Kbd } from './Kbd';
 import { useExitMount } from './useExitMount';
@@ -20,7 +20,18 @@ export function Tooltip({ label, shortcut, delay = TOOLTIP_DELAY_MS, children }:
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const host = useRef<HTMLElement | null>(null);
+  const tip = useRef<HTMLDivElement | null>(null);
   const { mounted, state } = useExitMount(open);
+
+  // A long label wraps (max-width in CSS) and is nudged back inside the viewport once its real width is known.
+  useLayoutEffect(() => {
+    const el = tip.current;
+    if (!el || !pos) return;
+    el.style.left = `${pos.left}px`;
+    const r = el.getBoundingClientRect(), m = 8;
+    const dx = r.right > window.innerWidth - m ? window.innerWidth - m - r.right : r.left < m ? m - r.left : 0;
+    if (dx) el.style.left = `${pos.left + dx}px`;
+  }, [pos, mounted, label]);
 
   const show = (immediate: boolean) => {
     clearTimeout(timer.current);
@@ -48,8 +59,8 @@ export function Tooltip({ label, shortcut, delay = TOOLTIP_DELAY_MS, children }:
     <>
       {trigger}
       {mounted && pos && typeof document !== 'undefined' && createPortal(
-        <div id={id} role='tooltip' className='tip' data-state={state} style={{ top: pos.top, left: pos.left }}>
-          {label}{shortcut && <Kbd keys={shortcut} />}
+        <div ref={tip} id={id} role='tooltip' className='tip' data-state={state} style={{ top: pos.top, left: pos.left }}>
+          <span className='tip-label'>{label}</span>{shortcut && <Kbd keys={shortcut} />}
         </div>,
         document.body,
       )}

@@ -29,6 +29,8 @@ test.describe('anonymous', () => {
 
 test('visual: search results', async ({ page }) => {
   await page.goto('/search?q=cron&today=2026-10-27');
-  await expect(page.getByRole('list', { name: /results/i }).getByRole('listitem').first()).toBeVisible();
+  const first = page.getByRole('list', { name: /results/i }).getByRole('listitem').first();
+  await expect(first).toBeVisible();
+  await expect(first).toContainText(/cron/i); // real result, not an empty state or an unrelated first hit
   await shot(page, 'search');
 });
