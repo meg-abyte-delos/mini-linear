@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { settingsPatch, suggestKey, patchSettings, addTeamMember, SettingsError, removeTeamMember } from '../../src/lib/settings-client';
+import { settingsPatch, suggestKey, patchSettings, addTeamMember, SettingsError, removeTeamMember, assignableRoles, canManageMember } from '../../src/lib/settings-client';
 
 const res = (status: number, body?: unknown) => new Response(body === undefined ? null : JSON.stringify(body), { status });
 
@@ -60,5 +60,22 @@ describe('members + invites calls', () => {
     expect(matchesMember({ email: 'Mate@x.test' }, 'Mate', 'MAT')).toBe(true);
     expect(matchesMember({ email: 'a@x.test' }, 'Ada', 'zz')).toBe(false);
     expect(matchesMember({ email: 'a@x.test' }, 'Ada', '  ')).toBe(true);
+  });
+});
+
+describe('role rules (Members UI)', () => {
+  it('never offers owner, and admin only to an owner', () => {
+    expect(assignableRoles('owner')).toEqual(['admin', 'member', 'guest']);
+    expect(assignableRoles('admin')).toEqual(['member', 'guest']);
+    expect(assignableRoles('member')).toEqual([]);
+    for (const v of ['owner', 'admin', 'member', 'guest', undefined]) expect(assignableRoles(v)).not.toContain('owner');
+  });
+  it('owner rows are untouchable; admin peers only for an owner', () => {
+    expect(canManageMember('owner', 'owner')).toBe(false);
+    expect(canManageMember('admin', 'owner')).toBe(false);
+    expect(canManageMember('admin', 'admin')).toBe(false);
+    expect(canManageMember('owner', 'admin')).toBe(true);
+    expect(canManageMember('admin', 'member')).toBe(true);
+    expect(canManageMember('member', 'guest')).toBe(false);
   });
 });
