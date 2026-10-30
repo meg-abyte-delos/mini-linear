@@ -33,3 +33,4 @@
 /* Title is the row's accessible 'View issues' control (Linear: the whole row opens the cycle). */
 .cycles .cycle button.cy-title { width:auto; height:auto; opacity:1; display:inline; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cycles .cycle button.cy-title:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.cy-glyph circle:not(.cy-glyph-full) { fill:none; }

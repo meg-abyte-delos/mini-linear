@@ -79,3 +79,15 @@
 .inbox-bar button { border-color:transparent; background:transparent; color:var(--muted-strong); }
 .inbox-bar button:hover:not(:disabled) { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; }
 @media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }
+
+/* Two-level rows like Linear: title on top, status icon and ID with reason below, time at the right. */
+.nrow { height:auto; min-height:52px; padding-top:var(--sp-2); padding-bottom:var(--sp-2); }
+.nrow .nmain { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.nrow .ntitle { flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:20px; }
+.nrow .nsub { display:flex; align-items:center; gap:var(--sp-1); min-width:0; color:var(--muted); font-size:var(--fs-xs); line-height:16px; }
+.nrow .nsub .nstatus { flex:none; display:inline-grid; place-items:center; }
+.nrow .nsub .nstatus svg { width:12px; height:12px; }
+.nrow .nsub .nid { width:auto; flex:none; font-size:var(--fs-xs); }
+.nrow .nsub .nsep { flex:none; }
+.nrow .nsub .nwho { flex:0 1 auto; max-width:none; min-width:0; font-size:var(--fs-xs); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nrow .ntime { width:auto; min-width:32px; flex:none; align-self:flex-start; padding-top:2px; text-align:right; }

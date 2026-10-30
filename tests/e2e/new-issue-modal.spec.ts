@@ -135,3 +135,37 @@ test('axe: the open modal has no WCAG A/AA violations', async ({ page }) => {
   const r = await new AxeBuilder({ page }).include('.ni').withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(r.violations.map((v) => `${v.id} x${v.nodes.length}`)).toEqual([]);
 });
+
+test('formatting bar: hidden until a selection, then floats over the editor without moving the layout', async ({ page }) => {
+  await page.keyboard.press('c');
+  const m = modal(page);
+  await expect(m).toBeVisible();
+  const bar = m.getByRole('toolbar', { name: 'Description formatting' });
+  await expect(bar).toHaveCount(0);
+  const ed = m.getByRole('textbox', { name: 'Description' });
+  await ed.click();
+  await page.keyboard.type('hello world');
+  const h0 = (await m.boundingBox())?.height;
+  const y0 = (await m.locator('.ni-props').boundingBox())?.y;
+  await page.keyboard.press('Control+a');
+  await expect(bar).toBeVisible();
+  await expect(bar).toHaveAttribute('data-floating', 'true');
+  expect(await bar.evaluate((el) => getComputedStyle(el).position)).toBe('absolute');
+  expect((await m.boundingBox())?.height).toBe(h0);
+  expect((await m.locator('.ni-props').boundingBox())?.y).toBe(y0);
+  await page.keyboard.press('ArrowRight');
+  await expect(bar).toHaveCount(0);
+});
+
+test('a lone slash in the description opens the bar and stays in the text', async ({ page }) => {
+  await page.keyboard.press('c');
+  const m = modal(page);
+  const ed = m.getByRole('textbox', { name: 'Description' });
+  await ed.click();
+  await page.keyboard.type('/');
+  await expect(m.getByRole('toolbar', { name: 'Description formatting' })).toBeVisible();
+  await expect(ed).toHaveText('/');
+  await page.keyboard.type('x');
+  await expect(m.getByRole('toolbar', { name: 'Description formatting' })).toHaveCount(0);
+  await expect(ed).toHaveText('/x');
+});
