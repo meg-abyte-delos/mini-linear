@@ -93,6 +93,7 @@ export const patchProject = (req: Request, slug: string, rawId: string) => withW
   await audit(ctx, "project", id, "update", diffOf(before, rows[0]!, PROJECT_F));
   return out(rows[0]!);
 });
+// Note: like deleteCycle, issue versions are not bumped (issues.project_id is ON DELETE SET NULL); the change is recorded as activity per issue.
 export const deleteProject = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "admin");
   const id = parseId(rawId), want = ifMatchVersion(req), before = await getProject(ctx, id);
