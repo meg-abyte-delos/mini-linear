@@ -7,10 +7,10 @@ ALTER TABLE notifications
   ADD COLUMN last_event_at timestamptz NOT NULL DEFAULT now(),
   ADD COLUMN meta jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(meta) = 'object' AND pg_column_size(meta) <= 2048);
 -- Existing duplicates would block the unique index: keep the newest unread row per key, count the others into it.
-WITH d AS (SELECT id, row_number() OVER (PARTITION BY workspace_id,user_id,issue_id,type ORDER BY id DESC) rn, count(*) OVER (PARTITION BY workspace_id,user_id,issue_id,type) c
+WITH d AS (SELECT id, row_number() OVER (PARTITION BY workspace_id,user_id,issue_id,type ORDER BY last_event_at DESC, created_at DESC, id DESC) rn, count(*) OVER (PARTITION BY workspace_id,user_id,issue_id,type) c
   FROM notifications WHERE read_at IS NULL AND archived_at IS NULL AND type NOT IN ('mention','assigned'))
 UPDATE notifications n SET coalesced_count = d.c FROM d WHERE n.id = d.id AND d.rn = 1 AND d.c > 1;
-DELETE FROM notifications n USING (SELECT id FROM (SELECT id, row_number() OVER (PARTITION BY workspace_id,user_id,issue_id,type ORDER BY id DESC) rn FROM notifications WHERE read_at IS NULL AND archived_at IS NULL AND type NOT IN ('mention','assigned')) x WHERE rn > 1) d WHERE n.id = d.id;
+DELETE FROM notifications n USING (SELECT id FROM (SELECT id, row_number() OVER (PARTITION BY workspace_id,user_id,issue_id,type ORDER BY last_event_at DESC, created_at DESC, id DESC) rn FROM notifications WHERE read_at IS NULL AND archived_at IS NULL AND type NOT IN ('mention','assigned')) x WHERE rn > 1) d WHERE n.id = d.id;
 CREATE UNIQUE INDEX notifications_coalesce_uq ON notifications (workspace_id, user_id, issue_id, type) WHERE read_at IS NULL AND archived_at IS NULL AND type NOT IN ('mention','assigned');
 CREATE TABLE entity_subscriptions (
   workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -33,9 +33,13 @@ CREATE FUNCTION entity_subscribers(p_kind text, p_entity uuid) RETURNS SETOF uui
   SELECT s.user_id FROM public.entity_subscriptions s
   WHERE s.workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND s.kind = p_kind AND s.entity_id = p_entity
 $$;
-GRANT USAGE, CREATE ON SCHEMA public TO definer;
-ALTER FUNCTION entity_subscribers(text, uuid) OWNER TO definer;
-REVOKE CREATE ON SCHEMA public FROM definer;
+-- ALTER ... OWNER TO needs CREATE on the schema for the new owner. Grant it only if definer lacks it, and revoke only what we granted,
+-- so a prior grant is never silently removed. The function itself is created by the migration role.
+DO $do$ DECLARE had boolean := has_schema_privilege('definer', 'public', 'CREATE'); BEGIN
+  IF NOT had THEN GRANT CREATE ON SCHEMA public TO definer; END IF;
+  ALTER FUNCTION entity_subscribers(text, uuid) OWNER TO definer;
+  IF NOT had THEN REVOKE CREATE ON SCHEMA public FROM definer; END IF;
+END $do$;
 REVOKE ALL ON FUNCTION entity_subscribers(text, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION entity_subscribers(text, uuid) TO app_user;
 -- notify(): same signature and owner as 0700, new body = 0700 checks + coalescing upsert (mention/assigned keep plain insert).

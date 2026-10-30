@@ -3,7 +3,7 @@
 DROP TABLE IF EXISTS entity_subscriptions;
 DROP INDEX IF EXISTS notifications_coalesce_uq;
 DROP FUNCTION IF EXISTS entity_subscribers(text, uuid);
-REVOKE UPDATE ON notifications FROM definer;
+REVOKE SELECT, UPDATE ON notifications FROM definer;
 CREATE OR REPLACE FUNCTION notify(p_id uuid, p_recipient uuid, p_type notification_type, p_issue uuid, p_comment uuid)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE ws uuid := nullif(current_setting('app.workspace_id', true), '')::uuid;
