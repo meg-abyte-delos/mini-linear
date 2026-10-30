@@ -17,3 +17,35 @@
 .pd-health { font-size:var(--fs-xs); line-height:18px; padding:0 var(--sp-2); border-radius:9px; border-color:color-mix(in srgb, currentColor 40%, transparent); }
 .pd-issues button { color:var(--fg); cursor:pointer; }
 .pd-issues button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+/* D1: Projects as a Linear table. Fixed columns shared by header and rows, actions on hover only. */
+.pj-table { --pj-cols:minmax(220px,1fr) 112px 64px 152px 96px 64px 200px; }
+.pj-head, .cycles .project.pj-row { display:grid; grid-template-columns:var(--pj-cols); align-items:center; gap:var(--sp-3); padding:0 var(--sp-4) 0 var(--sp-4); }
+.pj-head { height:32px; border-bottom:1px solid var(--line-soft); color:var(--muted-strong); font-size:var(--fs-xs); font-weight:500; }
+.cycles .project.pj-row { min-height:40px; font-size:var(--fs-sm); color:var(--muted-strong); transition:background .12s; }
+.cycles .project.pj-row:hover, .cycles .project.pj-row:focus-within { background:var(--hover); }
+.cycles .project.pj-row > span { min-width:0; display:flex; align-items:center; gap:var(--sp-2); white-space:nowrap; }
+.cycles .project.pj-row .cy-name { font-weight:500; color:var(--fg); overflow:visible; }
+.cycles .project.pj-row .ring { margin:0; flex:none; }
+.pj-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--fg); }
+.cycles .project.pj-row button.pj-name { all:unset; cursor:pointer; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--fg); font-weight:500; }
+.cycles .project.pj-row button.pj-name:hover { text-decoration:underline; text-underline-offset:2px; }
+.cycles .project.pj-row button.pj-name:focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-radius:var(--r-sm); }
+.cycles .project.pj-row .pj-actions { margin-left:auto; opacity:0; transition:opacity .12s; }
+.cycles .project.pj-row:hover .pj-actions, .cycles .project.pj-row:focus-within .pj-actions { opacity:1; }
+.cycles .project.pj-row .pj-actions button { height:22px; padding:0 var(--sp-2); font-size:var(--fs-xs); }
+.pj-dot { width:8px; height:8px; border-radius:50%; flex:none; background:var(--dim); }
+.pj-health[data-health='on_track'] .pj-dot { background:var(--s-done); }
+.pj-health[data-health='at_risk'] .pj-dot { background:var(--warn); }
+.pj-health[data-health='off_track'] .pj-dot { background:var(--danger); }
+.pj-lead-t { overflow:hidden; text-overflow:ellipsis; }
+.pj-date, .pj-issues, .cycles .project.pj-row .cy-count { font-variant-numeric:tabular-nums; }
+.cycles .project.pj-row .pj-late { color:var(--danger); font-weight:500; }
+.pj-none { color:var(--muted-strong); }
+.pj-prog .pj-status { flex:none; width:78px; overflow:hidden; text-overflow:ellipsis; color:var(--muted-strong); }
+.pj-bar { flex:1; min-width:0; height:4px; }
+.pj-track { fill:var(--line); }
+.pj-fill { fill:var(--accent); }
+.pj-fill[data-done] { fill:var(--s-done); }
+.cycles .project.pj-row .cy-count { min-width:32px; text-align:right; justify-content:flex-end; }
+@media (max-width:900px) { .pj-table { --pj-cols:minmax(180px,1fr) 96px 120px 160px; } .pj-head > :nth-child(3), .pj-head > :nth-child(4), .pj-head > :nth-child(6), .pj-row > .pj-prio, .pj-row > .pj-lead, .pj-row > .pj-issues { display:none !important; } }
+@media (prefers-reduced-motion: reduce) { .cycles .project.pj-row, .cycles .project.pj-row .pj-actions { transition:none; } }
