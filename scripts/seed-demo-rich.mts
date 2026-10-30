@@ -90,8 +90,9 @@ try {
     const iid = issueId(r), created = issueCreatedAt(r), creator = uid[r.by], team = TEAMS[r.team].id;
     const assignee = r.who ? uid[r.who] : null;
     await c.query(`insert into issues (id, workspace_id, team_id, number, title, description, state_id, priority, sort_key, created_by, assignee_id, project_id, cycle_id, estimate, due_date, created_at, updated_at)
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) on conflict (id) do update set title = excluded.title, description = excluded.description, state_id = excluded.state_id, priority = excluded.priority,
-      assignee_id = excluded.assignee_id, project_id = excluded.project_id, cycle_id = excluded.cycle_id, estimate = excluded.estimate, due_date = excluded.due_date, created_at = excluded.created_at, updated_at = excluded.updated_at`,
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) on conflict (id) do update set title = excluded.title, description = excluded.description, state_id = excluded.state_id, priority = excluded.priority, sort_key = excluded.sort_key,
+      assignee_id = excluded.assignee_id, project_id = excluded.project_id, cycle_id = excluded.cycle_id, estimate = excluded.estimate, due_date = excluded.due_date, created_at = excluded.created_at, updated_at = excluded.updated_at
+      where (issues.title, issues.description, issues.state_id, issues.priority, issues.sort_key, issues.assignee_id, issues.project_id, issues.cycle_id, issues.estimate, issues.due_date, issues.created_at, issues.updated_at) is distinct from (excluded.title, excluded.description, excluded.state_id, excluded.priority, excluded.sort_key, excluded.assignee_id, excluded.project_id, excluded.cycle_id, excluded.estimate, excluded.due_date, excluded.created_at, excluded.updated_at)`,
       [iid, W, team, r.n, r.title, r.desc, stateId(r.team, r.state), r.prio, `a${String(r.key).padStart(3, '0')}`, creator, assignee, r.pj ? PJ[r.pj] : null, r.cy ? CY[r.cy] : null, r.est ?? null, r.due ?? null, created, atDay(r.day + r.age, 6)]);
     await c.query('delete from issue_labels where issue_id = $1 and label_id <> all($2::uuid[])', [iid, r.labels.map((l) => lab[l])]);
     for (const l of r.labels) await c.query('insert into issue_labels (workspace_id, issue_id, label_id) values ($1,$2,$3) on conflict do nothing', [W, iid, lab[l]]);
@@ -123,7 +124,8 @@ try {
     const issue = issueByKey('DEM', m.n), iid = issueId(issue), at = commentAt(m), body = render(m.body);
     const resolvedAt = m.resolved ? new Date(Date.parse(at) + 3600_000).toISOString() : null;
     await c.query(`insert into comments (id, workspace_id, issue_id, author_id, body, created_at, updated_at, parent_comment_id, resolved_at, resolved_by) values ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9)
-      on conflict (id) do update set body = excluded.body, author_id = excluded.author_id, issue_id = excluded.issue_id, created_at = excluded.created_at, updated_at = excluded.updated_at, parent_comment_id = excluded.parent_comment_id, resolved_at = excluded.resolved_at, resolved_by = excluded.resolved_by`,
+      on conflict (id) do update set body = excluded.body, author_id = excluded.author_id, issue_id = excluded.issue_id, created_at = excluded.created_at, updated_at = excluded.updated_at, parent_comment_id = excluded.parent_comment_id, resolved_at = excluded.resolved_at, resolved_by = excluded.resolved_by
+      where (comments.body, comments.author_id, comments.issue_id, comments.created_at, comments.updated_at, comments.parent_comment_id, comments.resolved_at, comments.resolved_by) is distinct from (excluded.body, excluded.author_id, excluded.issue_id, excluded.created_at, excluded.updated_at, excluded.parent_comment_id, excluded.resolved_at, excluded.resolved_by)`,
       [cid(m.k), W, iid, uid[m.by], body, at, m.re === undefined ? null : cid(m.re), resolvedAt, m.resolved ? uid.admin : null]);
     await c.query('delete from comment_mentions where comment_id = $1', [cid(m.k)]);
     for (const w of new Set(mentionsOf(m.body))) await c.query('insert into comment_mentions (workspace_id, comment_id, user_id, created_at) values ($1,$2,$3,$4) on conflict do nothing', [W, cid(m.k), uid[w], at]);
