@@ -48,7 +48,7 @@ const DEFAULTS = { on_pr_open: "in_progress", on_pr_review: "in_review", on_pr_m
 export const getTeamGithubSettings = (req: Request, slug: string, teamId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const id = parseId(teamId);
-  await assertTeamVisible(ctx, id);
+  await assertTeamVisible(ctx, id).catch(() => { throw new ApiError("not_found"); }); // a path id the caller cannot see is a 404, like every team subroute
   const t = await ctx.tx`select 1 from teams where id = ${id}`;
   if (!t[0]) throw new ApiError("not_found");
   const r = await ctx.tx<Row[]>`select on_pr_open, on_pr_review, on_pr_merge from github_team_settings where team_id = ${id}`;

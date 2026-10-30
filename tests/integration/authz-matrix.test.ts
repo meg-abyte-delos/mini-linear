@@ -377,7 +377,7 @@ describe.runIf(runIntegration)('API keys (docs/API.md)', () => {
     expect([403, 404]).toContain(await call(tm, 'GET', '/api/v1/w/w1/audit'));
   });
   // Open until Ada's route fix lands; then switch it.fails back to it.
-  it.fails('guest can only mint a read key: write/admin scope is 403 (spec decision 2026-10-30)', async () => {
+  it('guest can only mint a read key: write/admin scope is 403 (spec decision 2026-10-30)', async () => {
     for (const scope of ['write', 'admin']) {
       const r = await api(W.G1, 'POST', '/api/v1/w/w1/api-keys', { name: 'g-' + scope, scope });
       expect(r.status, `guest ${scope} key`).toBe(403);

@@ -27,6 +27,7 @@ export const listApiKeys = (req: Request, slug: string) => withWorkspaceCtx(req,
 export const createApiKey = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireSession(ctx);
   const b = await parseJson(req, keyBody), id = uuidv7(), k = newApiKey();
+  if (ctx.role === "guest" && b.scope !== "read") throw new ApiError("forbidden", "guests can only create read-scope API keys"); // Meg's spec rule 2026-10-30
   if (b.scope === "admin") requireRole(ctx, "admin"); // only admins can mint keys that keep admin powers
   const live = await ctx.tx`select count(*)::int n from api_keys where user_id = ${ctx.userId} and revoked_at is null`;
   if ((live[0]!.n as number) >= 25) throw new ApiError("conflict", "too many active API keys (max 25)");

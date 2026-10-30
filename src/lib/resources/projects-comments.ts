@@ -118,8 +118,9 @@ const commentBody = z.object({ body: z.string().min(1).max(100000), parent_comme
 const editBody = z.object({ body: z.string().min(1).max(100000) }).strict();
 const reactionBody = z.object({ emoji: z.string().min(1).max(64) }).strict();
 const issueVisible = async (ctx: Ctx, issueId: string) => {
+  // Same visibility as the issue itself (shared with a guest / in one of the caller's teams / admin+): a hidden issue hides its comments.
   const r = await ctx.tx`select 1 from issues i where i.id = ${issueId} and i.deleted_at is null and ${ctx.role === "guest"
-    ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = i.id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)` : ctx.tx`true`}`;
+    ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = i.id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)` : teamVisible(ctx, "i.team_id")}`;
   if (!r.length) throw new ApiError("not_found");
 };
 const CMSEL = (ctx: Ctx) => ctx.tx`select c.id, c.issue_id, c.parent_comment_id, c.author_id, c.body, c.version, c.created_at, c.updated_at,

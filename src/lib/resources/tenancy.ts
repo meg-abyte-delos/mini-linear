@@ -31,10 +31,11 @@ export const createWorkspace = (req: Request) => withUser(req, async (tx, userId
   return Response.json({ id, slug: b.slug, name: b.name, role: "owner" }, { status: 201 });
 });
 
-export const getWorkspace = (req: Request, slug: string) => withUser(req, async (tx, userId) => {
-  const r = await tx<Row[]>`select id, slug, name, role from list_my_workspaces(${userId}) where slug = ${slug}`;
-  if (!r[0]) throw new ApiError("not_found"); // non-member -> 404
-  return Response.json({ ...r[0], user_id: userId }); // user_id lets the UI show author-only actions
+export const getWorkspace = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  // withWorkspaceCtx: non-member -> 404, and an API key reads its own workspace like every other GET (parity with the app).
+  const r = await ctx.tx<Row[]>`select id, slug, name from list_my_workspaces(${ctx.userId}) where slug = ${slug}`;
+  if (!r[0]) throw new ApiError("not_found");
+  return Response.json({ ...r[0], role: ctx.role, user_id: ctx.userId }); // user_id lets the UI show author-only actions
 });
 
 /** Workspace settings (Area 9): any member reads; admins/owners update name, slug, logo_url ("" clears the logo). */
