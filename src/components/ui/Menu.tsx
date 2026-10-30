@@ -13,6 +13,8 @@ interface Props { open: boolean; anchorRef: RefObject<HTMLElement | null>; onClo
 export function Menu({ open, anchorRef, onClose, label, entries, align }: Props) {
   const items = entries.filter((e): e is MenuItem => e.type !== 'separator');
   const [active, setActive] = useState(() => firstEnabled(items));
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) { setWasOpen(open); if (open) setActive(firstEnabled(items)); } // fresh start on every open
   const typed = useRef({ s: '', t: 0 });
   const refs = useRef<(HTMLDivElement | null)[]>([]);
   const focusAt = (k: number) => { if (k >= 0) { setActive(k); refs.current[k]?.focus(); } };

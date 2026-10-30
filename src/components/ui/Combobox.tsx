@@ -8,11 +8,13 @@ export interface ComboOption { id: string; label: string; lead?: ReactNode; hint
 interface Props { open: boolean; anchorRef: RefObject<HTMLElement | null>; onClose: () => void; label: string; options: ComboOption[]; onPick: (id: string) => void; multi?: boolean; placeholder?: string; emptyText?: string }
 
 // ARIA 1.2 combobox picker: the input keeps DOM focus, aria-activedescendant tracks the highlighted option.
-// Single-select closes on pick; multi stays open. Esc closes (Popover); Tab is swallowed like Picker.
+// Single-select closes on pick; multi stays open. Esc closes (Popover); Tab is left alone so focus moves on.
 export function Combobox({ open, anchorRef, onClose, label, options, onPick, multi, placeholder, emptyText = 'No match' }: Props) {
   const uid = useId();
   const [q, setQ] = useState('');
   const [i, setI] = useState(0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) { setWasOpen(open); if (open) { setQ(''); setI(0); } } // fresh query and highlight on every open
   const results = fuzzyFilter(options, q, (o) => o.label);
   const active = Math.min(i, Math.max(results.length - 1, 0));
   const optId = (id: string) => uid + '-o-' + id;
@@ -30,7 +32,6 @@ export function Combobox({ open, anchorRef, onClose, label, options, onPick, mul
             else if (e.key === 'Home') { e.preventDefault(); setI(Math.max(firstEnabled(results), 0)); }
             else if (e.key === 'End') { e.preventDefault(); setI(Math.max(lastEnabled(results), 0)); }
             else if (e.key === 'Enter') { e.preventDefault(); const o = results[active]; if (o) pick(o); }
-            else if (e.key === 'Tab') e.preventDefault();
           }}
         />
         <ul id={uid + '-list'} role='listbox' aria-label={label} aria-multiselectable={multi || undefined} className='combo-list'>
