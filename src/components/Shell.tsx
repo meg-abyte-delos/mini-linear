@@ -8,6 +8,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
+import { ProgressRing } from '@/components/ProgressRing';
+import { subIssueStats } from '@/lib/sub-issues';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/sim-store';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
@@ -27,6 +29,7 @@ import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilters, type FilterKey, type Filters } from '@/lib/filters';
 import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
+import { listTeams } from '@/lib/settings-client';
 import { DisplayPick } from '@/components/DisplayPick';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
@@ -178,6 +181,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
+  const subStats = useMemo(() => subIssueStats(allIssues), [allIssues]);
+  const subBadge = (i: Issue) => { const st = subStats.get(i.id); return st ? <span className='sub-prog' data-testid={`sub-${i.identifier ?? i.id}`} title={`${st.done} of ${st.total} sub-issues done`}><ProgressRing pct={st.pct} size={14} showPct={false} label={`${st.done} of ${st.total} sub-issues done`} /><span>{st.done}/{st.total}</span></span> : null; };
   // Filters live in the URL: replaceState keeps other params (seed, state) and does not refetch.
   function setFilters(f: Filters) {
     setFiltersState(f);
@@ -492,6 +497,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     setMulti((m) => Array.from(new Set([...m, list[idx]!.id, list[n]!.id])));
     setSelId(list[n]!.id);
   }
+  // Sidebar team row shows the real team (e.g. "Demo"), not the workspace name again.
+  const [teamName, setTeamName] = useState('Team');
+  useEffect(() => {
+    if (!api) return;
+    let live = true;
+    void listTeams(api.slug).then((ts) => { const t = ts.find((x) => x.id === api.teamId) ?? ts[0]; if (live && t) setTeamName(t.name); }).catch(() => { /* keep fallback */ });
+    return () => { live = false; };
+  }, [api?.slug, api?.teamId]); // eslint-disable-line react-hooks/exhaustive-deps
   const hint = (id: string) => { const d = SHORTCUTS.find((x) => x.id === id); return d ? formatKeys(d.keys).replace(' then ', ' ') : undefined; };
   const commands: Cmd[] = [
     { id: 'help', label: 'Keyboard shortcuts', hint: '?', run: () => setHelp(true) },
@@ -648,6 +661,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       {shown('id') && <span className='id'>{i.identifier ?? i.id}</span>}
       {shown('status') && <StatusIcon status={i.status} />}
       <span className='title'>{i.title}</span>
+      {subBadge(i)}
       <span className='labels'>{shown('labels') && i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{shown('project') && (() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
       {shown('created') && <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>}
       {shown('assignee') && assignee(i)}
@@ -657,7 +671,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
-      <div className='card-meta'><span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
+      <div className='card-meta'>{subBadge(i)}<span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
   );
 
@@ -685,10 +699,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </nav>
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
-          <TeamSection name='Delos'>
-          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span></a>
+          <TeamSection name={teamName}>
+          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span>{hint('go-issues') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-issues')}</kbd>}</a>
           <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><SideIcon name='cycles' /><span>Cycles</span></a>
-          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span></a>
+          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span>{hint('go-projects') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-projects')}</kbd>}</a>
           </TeamSection>
         </nav>
       </aside>
@@ -755,7 +769,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : view === 'inbox' ? (
           <Inbox client={inboxClient} refreshKey={rtTick} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
-          <ProjectDetail slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
+          <ProjectDetail refreshKey={rtTick} slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
             issues={allIssues.filter((i) => i.project_id === detailId).map((i) => ({ id: i.id, identifier: i.identifier ?? i.id, title: i.title, done: i.status === 'done' || i.status === 'canceled' }))}
             leadName={who(PROJECTS.find((p) => p.id === detailId)?.lead_id ?? null)?.name ?? null}
             onOpenIssue={(id) => { setDetailId(null); setView('list'); setSelId(id); }} />

@@ -42,3 +42,32 @@ export function suggestKey(name: string) {
   k = k.toUpperCase().slice(0, 5);
   return k.length >= 2 ? k : (k + 'XX').slice(0, 2);
 }
+
+// ---- Workspace members + invites (Members page). The API has no POST /members: people join through invites.
+export type MemberRow = Member & { id?: string };
+export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'guest';
+export type Invite = { id: string; email: string; role: string; expires_at: string };
+/** All pages of GET /members (100 per call, capped at 20 pages). */
+export async function listAllMembers(slug: string, f: Fetch = fetch): Promise<MemberRow[]> {
+  const out: MemberRow[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < 20; i++) {
+    const j: { items?: MemberRow[]; next_cursor?: string | null } = await call(f, 'GET', `${base(slug)}/members?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+    out.push(...(j.items ?? []));
+    cursor = j.next_cursor ?? null;
+    if (!cursor) break;
+  }
+  return out;
+}
+export const setMemberRole = (slug: string, uid: string, role: WorkspaceRole, f: Fetch = fetch) => call<{ user_id: string; role: string }>(f, 'PATCH', `${base(slug)}/members/${uid}`, { role });
+export const removeMember = (slug: string, uid: string, f: Fetch = fetch) => call<void>(f, 'DELETE', `${base(slug)}/members/${uid}`);
+/** Admin-only on the API: other roles get 403. */
+export const listInvites = async (slug: string, f: Fetch = fetch) => (await call<{ items: Invite[] }>(f, 'GET', `${base(slug)}/invites?limit=100`)).items;
+export const createInvite = (slug: string, email: string, role: 'admin' | 'member' | 'guest', f: Fetch = fetch) => call<{ id: string; email: string; role: string }>(f, 'POST', `${base(slug)}/invites`, { email: email.trim().toLowerCase(), role });
+export const resendInvite = (slug: string, id: string, f: Fetch = fetch) => call<void>(f, 'POST', `${base(slug)}/invites/${id}/resend`);
+export const revokeInvite = (slug: string, id: string, f: Fetch = fetch) => call<void>(f, 'DELETE', `${base(slug)}/invites/${id}`);
+/** Case-insensitive match on name or email; an empty query keeps everyone. */
+export const matchesMember = (m: { email: string }, name: string, q: string) => {
+  const s = q.trim().toLowerCase();
+  return !s || name.toLowerCase().includes(s) || m.email.toLowerCase().includes(s);
+};
