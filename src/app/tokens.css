@@ -20,6 +20,7 @@
   --lh-tight:1.25; --lh-base:1.45;
   --tracking-id:-0.26px;
   --row-h:44px; --group-h:36px; --side-item-h:28px;
+  --row-gap:10px; --id-w:60px; --chip-h:22px;
   --shadow-pop:0 4px 24px rgb(0 0 0 / .4), 0 0 0 1px var(--line);
 }
 @media (prefers-reduced-motion: reduce) {
