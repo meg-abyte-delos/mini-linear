@@ -43,3 +43,16 @@
 [data-theme='light'] .palette li[aria-selected='true'] { background: rgb(0 0 0 / 0.05); }
 .palette { background: color-mix(in srgb, var(--bg-elevated, #1c1d1f) 97%, transparent); }
 .palette ul { scroll-padding: 30px 0 8px; }
+
+/* Wave C ⌘K: lower panel, calmer input, neutral hairline (no accent focus ring on the combobox), readable keycaps, status icons + match highlight on issue hits. */
+.overlay:has(> .palette) { padding-top: 18vh; }
+.palette input { font-size: var(--fs-lg, 16px); height: 52px; }
+.palette input:focus, .palette input:focus-visible { outline: none; box-shadow: none; border-bottom: 1px solid var(--line); }
+.palette .pal-ic svg { display: block; margin: auto; }
+.palette li.pal-group { padding-left: 20px; }
+.palette .pal-keys kbd { color: var(--muted-strong); background: color-mix(in srgb, var(--fg) 6%, transparent); border-color: var(--line); }
+.palette .hit-id { color: var(--muted); font-weight: var(--fw-medium, 500); margin-right: var(--sp-2, 8px); font-variant-numeric: tabular-nums; }
+.palette li mark { background: none; color: var(--fg); font-weight: var(--fw-semibold, 600); }
+.palette-foot { color: var(--muted); }
+.palette-foot kbd { color: var(--muted-strong); }
+.palette li.pal-empty { font-size: var(--fs-base, 13px); }

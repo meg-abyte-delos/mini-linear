@@ -89,6 +89,13 @@ function paletteIcon(id: string) {
   return <Icon name='inbox' />;
 }
 
+// Cmd+K: highlight the typed term inside an issue title (case-insensitive, first match), like Linear.
+function markTerm(text: string, term: string) {
+  const t = term.trim(); const i = t.length >= MIN_QUERY ? text.toLowerCase().indexOf(t.toLowerCase()) : -1;
+  if (i < 0) return text;
+  return <>{text.slice(0, i)}<mark>{text.slice(i, i + t.length)}</mark>{text.slice(i + t.length)}</>;
+}
+
 export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
@@ -834,7 +841,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             <ul id='palette-list' role='listbox' aria-label='Commands'>
               {results.map((c, idx) => (
                 <Fragment key={c.id}>{(idx === 0 || paletteGroup(results[idx - 1]!.id) !== paletteGroup(c.id)) && <li role='presentation' className='pal-group'>{paletteGroup(c.id)}</li>}
-                <li id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span className='pal-ic' aria-hidden='true'>{paletteIcon(c.id)}</span><span className='pal-label'>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <span className='pal-keys'>{c.hint.split(' ').map((k, j) => <kbd key={j}>{k}</kbd>)}</span>}</li></Fragment>
+                <li id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span className='pal-ic' aria-hidden='true'>{c.hit?.kind === 'issue' && c.hit.status && (STATUSES as readonly string[]).includes(c.hit.status) ? <StatusIcon status={c.hit.status as Status} /> : paletteIcon(c.id)}</span><span className='pal-label'>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : markTerm(c.hit.title, q)}</> : c.label}</span>{c.hint && <span className='pal-keys'>{c.hint.split(' ').map((k, j) => <kbd key={j}>{k}</kbd>)}</span>}</li></Fragment>
               ))}
               {api && q.trim().length >= MIN_QUERY && searchState === 'loading' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-searching'>Searching…</li>}
               {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-search-error'>Search failed. Try again.</li>}
