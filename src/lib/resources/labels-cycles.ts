@@ -83,7 +83,13 @@ export const deleteLabel = (req: Request, slug: string, rawId: string) => withWo
 const CYCLE_F = ["team_id", "name", "start_date", "end_date"];
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((s) => !Number.isNaN(Date.parse(s)) && new Date(s).toISOString().startsWith(s), "invalid date");
 const cycleBody = z.object({ team_id: uuidSchema, name: z.string().trim().min(1).max(255), start_date: date, end_date: date }).strict();
-const CSEL = (ctx: Ctx) => ctx.tx`select id, team_id, name, start_date::text as start_date, end_date::text as end_date, version, created_at, updated_at from cycles`;
+/** scope = non-canceled issues of the cycle, completed = done, started = in_progress/in_review, canceled apart; percent_complete = completed / scope (0 when empty).
+ *  Same numbers as GET /cycles/:id/stats. A cycle belongs to one team and the DB guard keeps its issues in that team, so team visibility of the cycle = visibility of its counts. */
+const CSEL = (ctx: Ctx) => ctx.tx`select cycles.id, cycles.team_id, cycles.name, cycles.start_date::text as start_date, cycles.end_date::text as end_date, cycles.version, cycles.created_at, cycles.updated_at,
+  st.scope, st.started, st.completed, st.canceled, case when st.scope = 0 then 0 else round(100.0 * st.completed / st.scope)::int end as percent_complete from cycles
+  cross join lateral (select (count(*) filter (where i.status <> 'canceled'))::int as scope, (count(*) filter (where i.status in ('in_progress','in_review')))::int as started,
+      (count(*) filter (where i.status = 'done'))::int as completed, (count(*) filter (where i.status = 'canceled'))::int as canceled
+    from issues i where i.cycle_id = cycles.id and i.deleted_at is null) st`;
 const getCycle = async (ctx: Ctx, id: string) => {
   const r = await ctx.tx<Row[]>`${CSEL(ctx)} where id = ${id} and ${teamVisible(ctx, "team_id")}`;
   if (!r[0]) throw new ApiError("not_found");
