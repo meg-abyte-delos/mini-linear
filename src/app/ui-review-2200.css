@@ -1,0 +1,48 @@
+/* Review 22:00 (Iris). Imported last. */
+
+/* 1. Below 900px the sidebar leaves the grid: hidden off-canvas, opened from a header toggle (Linear). */
+.side-toggle, .side-scrim { display:none; }
+@media (max-width:899px) {
+  .shell { grid-template-columns:minmax(0,1fr); }
+  .shell > .side { position:fixed; inset:0 auto 0 0; z-index:75; width:var(--sidebar-w, 244px); overflow-y:auto; transform:translateX(-100%); visibility:hidden; transition:transform var(--dur-base, 160ms) var(--ease-out), visibility 0s linear var(--dur-base, 160ms); }
+  .shell[data-nav='open'] > .side { transform:none; visibility:visible; box-shadow:var(--shadow-pop); transition:transform var(--dur-base, 160ms) var(--ease-out); }
+  .shell[data-nav='open'] > .side-scrim { display:block; position:fixed; inset:0; z-index:74; background:color-mix(in srgb, #000 30%, transparent); }
+  .side-toggle { display:grid; place-items:center; flex:none; width:28px; height:28px; margin-right:var(--sp-1); border:0; border-radius:6px; background:none; color:var(--muted); cursor:pointer; }
+  .side-toggle:hover { background:var(--hover); color:var(--fg); }
+  .side-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+}
+@media (max-width:899px) and (prefers-reduced-motion: reduce) { .shell > .side, .shell[data-nav='open'] > .side { transition:none; } }
+
+/* 2. Focused row / card: neutral subtle fill, no accent bar, no lavender (both themes). */
+.row[aria-selected=true],
+[data-theme='light'] .row[aria-selected=true] { background:color-mix(in srgb, var(--fg) 5%, transparent); box-shadow:none; }
+.card[aria-selected=true],
+[data-theme='dark'] .card[aria-selected=true],
+[data-theme='light'] .card[aria-selected=true] { background:color-mix(in srgb, var(--fg) 4%, var(--raised)); border-color:color-mix(in srgb, var(--fg) 18%, transparent); box-shadow:none; }
+.card[aria-selected=true] { --sel-solid:color-mix(in srgb, var(--fg) 4%, var(--raised)); }
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) .row[aria-selected=true] { background:color-mix(in srgb, var(--fg) 5%, transparent); box-shadow:none; }
+  html:not([data-theme]) .card[aria-selected=true] { background:color-mix(in srgb, var(--fg) 4%, var(--raised)); border-color:color-mix(in srgb, var(--fg) 18%, transparent); }
+}
+
+/* 3. New issue: lighter veil, visible 1px modal border. */
+.ni-scrim { background:color-mix(in srgb, #000 35%, transparent); }
+[data-theme='light'] .ni-scrim { background:color-mix(in srgb, #000 18%, transparent); }
+[data-theme='light'] .ni { border-color:color-mix(in srgb, var(--fg) 20%, transparent); }
+.ni { border-color:color-mix(in srgb, var(--fg) 14%, transparent); }
+
+/* 4. Settings: centred content column, 640px max. */
+/* ui-settings.css is imported by the settings route, after this file: win on specificity, not order. */
+.set-main .set-wrap { --set-content-w:640px; max-width:640px; margin-inline:auto; }
+
+/* 5. Projects: Issues right-aligned + tabular; Progress header aligned on its value. */
+.pj-head > span:nth-child(6), .pj-head > span:nth-child(8) { justify-self:end; }
+.cycles .project.pj-row > .pj-issues { justify-content:flex-end; font-variant-numeric:tabular-nums; }
+
+/* 6. Search: match highlight without horizontal padding, so the snippet never shifts. */
+.search-row mark, .search-snippet mark, .search-title mark { padding:0; margin:0; border:0; box-shadow:none; letter-spacing:inherit; }
+
+/* 2b. Board: ui-board/ui-bulk use :not(#_) for the selected card, so match it (one id level more) in both themes. */
+.board .card[aria-selected=true]:not(#_):not(#__),
+.board .card[aria-selected=true]:not(#_):not(#__):hover { background:color-mix(in srgb, var(--fg) 4%, var(--raised)); border-color:color-mix(in srgb, var(--fg) 18%, transparent); box-shadow:none; }
+.board .card[aria-selected=true]:not(#_):not(#__):focus-visible { box-shadow:none; }

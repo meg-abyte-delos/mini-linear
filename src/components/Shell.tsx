@@ -317,6 +317,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const returnFocus = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const [navOpen, setNavOpen] = useState(false);
+  useEffect(() => { if (!navOpen) return; const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [navOpen]);
   const [pick, setPick] = useState<{ kind: PickKind; id: string; ids: string[]; rect: DOMRect | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
@@ -806,8 +808,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   );
 
   return (
-    <div className='shell'>
-      <aside className='side' aria-label='Sidebar'>
+    <div className='shell' data-nav={navOpen ? 'open' : undefined}>
+      <div className='side-scrim' aria-hidden='true' onClick={() => setNavOpen(false)} />
+      <aside id='app-sidebar' className='side' aria-label='Sidebar' onClick={(e) => { if ((e.target as HTMLElement).closest('a.side-link')) setNavOpen(false); }}>
         <div className='side-head'>
           <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
           <button className='side-icbtn' onClick={openPalette} aria-label='Search' title='Search (⌘K)' aria-keyshortcuts='Meta+K Control+K'><SideIcon name='search' /></button>
@@ -838,6 +841,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       </aside>
       <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
+          <button type='button' className='side-toggle' aria-label='Open sidebar' aria-controls='app-sidebar' aria-expanded={navOpen} onClick={() => setNavOpen((o) => !o)}><svg width='16' height='16' viewBox='0 0 16 16' aria-hidden='true' focusable='false'><rect x='1.75' y='2.75' width='12.5' height='10.5' rx='2' fill='none' stroke='currentColor' strokeWidth='1.5' /><path d='M6 3v10' stroke='currentColor' strokeWidth='1.5' /></svg></button>
           <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
           {(view === 'list' || view === 'board') && !loadError && allIssues.length > 0 && (
             <div className='vtabs' role='group' aria-label='Issue views'>
