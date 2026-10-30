@@ -22,7 +22,7 @@ const SCREENS: Screen[] = [
   { name: 'issue-page', url: `/w/demo/issue/DEM-1?${TODAY}`, ready: (p) => expect(p.getByRole('complementary', { name: 'Properties' })).toBeVisible() },
   { name: 'search', bare: true, url: '/search?q=cron', ready: (p) => expect(p.getByRole('list', { name: /results/i }).getByRole('listitem').first()).toBeVisible() },
   { name: 'members', bare: true, url: '/w/demo/members', ready: (p) => expect(p.getByRole('heading', { level: 1 })).toBeVisible() },
-  { name: 'workspace-settings', bare: true, known: 'buttons render #f7f8f8 text on the default #efefef button background (1.08:1): missing button styles on /w/:slug/settings', url: '/w/demo/settings', ready: (p) => expect(p.getByRole('heading', { level: 1 })).toBeVisible() },
+  { name: 'workspace-settings', bare: true, url: '/w/demo/settings', ready: (p) => expect(p.getByRole('heading', { level: 1 })).toBeVisible() },
   { name: 'login', known: 'auth link uses --accent #5e6ad2 as text on #0f1011 (4.05:1, needs >= 4.5)', url: '/login', anon: true, ready: (p) => expect(p.locator('form')).toBeVisible() },
   { name: 'signup', known: 'auth link uses --accent #5e6ad2 as text on #0f1011 (4.05:1, needs >= 4.5)', url: '/signup', anon: true, ready: (p) => expect(p.locator('form')).toBeVisible() },
 ];
