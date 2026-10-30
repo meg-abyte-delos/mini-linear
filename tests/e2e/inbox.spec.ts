@@ -79,3 +79,34 @@ test('inbox: x toggles selection of the focused notification', async ({ page }) 
   await page.keyboard.press('x');
   await expect(page.getByText('1 selected')).toBeVisible();
 });
+
+test('inbox: two panes, no List/Board toggle, j/k drives the issue preview', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('option').first()).toBeVisible();
+  await expect(page.getByRole('group', { name: 'View', exact: true })).toHaveCount(0);
+  const detail = page.getByRole('complementary', { name: 'Notification detail' });
+  const list = page.getByRole('listbox', { name: 'Notifications' });
+  await expect(list).toBeVisible();
+  await expect(detail).toBeVisible();
+  // side by side: the list sits left of the preview and neither overflows the viewport
+  const [l, d] = await Promise.all([list.boundingBox(), detail.boundingBox()]);
+  expect(l!.x + l!.width).toBeLessThanOrEqual(d!.x + 1);
+  expect(d!.x + d!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+  await expect(detail.getByRole('region', { name: 'Issue preview' })).toBeVisible();
+  const first = await detail.getByRole('heading', { level: 2 }).textContent();
+  await page.keyboard.press('j');
+  await expect(detail.getByRole('heading', { level: 2 })).not.toHaveText(first!);
+  await page.keyboard.press('k');
+  await expect(detail.getByRole('heading', { level: 2 })).toHaveText(first!);
+  // mark read / archive from the preview actions
+  await detail.getByRole('button', { name: /^Mark .* (read|unread)$/ }).click();
+  await detail.getByRole('button', { name: /^Archive/ }).click();
+  await expect(page.getByRole('option')).toHaveCount(2);
+});
+
+test('inbox: the List/Board toggle stays on the issues views', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('group', { name: 'View', exact: true })).toBeVisible();
+});
