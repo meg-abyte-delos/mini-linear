@@ -2,7 +2,7 @@
 // Linear-style "New issue" modal: title, WYSIWYG description, property chips on ui/Combobox, Create more, Cmd+Enter, Esc, focus trap.
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Combobox, Kbd, type ComboOption } from '@/components/ui';
+import { Combobox, type ComboOption } from '@/components/ui';
 import { useExitMount } from '@/components/ui/useExitMount';
 import { RichEditor } from '@/components/RichEditor';
 import { Avatar, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
@@ -144,8 +144,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, t
             </div>
             <div className='ni-foot'>
               <label className='ni-more'><input type='checkbox' role='switch' checked={more} onChange={(e) => setMore(e.target.checked)} />Create more</label>
-              <span className='ni-hint'><Kbd keys={['⌘', '↵']} /></span>
-              <button type='button' className='dlg-btn dlg-confirm' disabled={busy} onClick={() => void submit()}>Create issue</button>
+              <button type='button' className='dlg-btn dlg-confirm' title='Create issue (⌘↵)' aria-keyshortcuts='Meta+Enter Control+Enter' disabled={busy} onClick={() => void submit()}>Create issue</button>
             </div>
           </div>
         </div>,
