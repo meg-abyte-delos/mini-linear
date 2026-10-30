@@ -18,7 +18,7 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 4. A body or query field that names a team the caller cannot see is refused **422** exactly like an unknown team (no existence oracle); a path id of a hidden team is 404.
 5. Lists are filtered by visibility: they answer 200 with an empty page to a role that sees nothing (projects for guests); item routes of the same resource answer 404.
 6. Guests: read-only on what is shared with them; no member list, labels, projects, cycles, views or webhooks; they may mint **read-scope API keys only** (any other scope is 403, Meg rule 2026-10-30).
-7. Workspace-scope labels and label groups, cycles, webhooks, invites, audit, workspace settings, team creation and deletion are admin+ (owner and admin behave the same except member management: only an owner may promote to or demote an owner/admin, see `mayManage` in `tenancy.ts`).
+7. Workspace-scope label groups and label deletion, cycles, webhooks, invites, audit, workspace settings, team creation and deletion are admin+ (owner and admin behave the same except member management: only an owner may promote to or demote an owner/admin, see `mayManage` in `tenancy.ts`).
 
 ## Workspace routes (`/api/v1/w/{slug}`)
 
@@ -112,9 +112,9 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `POST /comments/{comment}/reactions` | 201 | 201 | 201 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /comments/{comment}/reactions` | 204 | 204 | 204 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `GET /labels` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 200 | 404 |
-| `POST /labels` | 201 | 201 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
+| `POST /labels` | 201 | 201 | 201 | 201 | 403 | 403 | 401 | 403 | 404 |
 | `GET /labels/{label}` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 200 | 404 |
-| `PATCH /labels/{label}` | 200 | 200 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
+| `PATCH /labels/{label}` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /labels/{label}` | 204 | 204 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
 | `GET /label-groups` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 200 | 404 |
 | `POST /label-groups` | 201 | 201 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |

@@ -23,7 +23,7 @@ export function renderMatrix(): string {
   L.push('4. A body or query field that names a team the caller cannot see is refused **422** exactly like an unknown team (no existence oracle); a path id of a hidden team is 404.');
   L.push('5. Lists are filtered by visibility: they answer 200 with an empty page to a role that sees nothing (projects for guests); item routes of the same resource answer 404.');
   L.push('6. Guests: read-only on what is shared with them; no member list, labels, projects, cycles, views or webhooks; they may mint **read-scope API keys only** (any other scope is 403, Meg rule 2026-10-30).');
-  L.push('7. Workspace-scope labels and label groups, cycles, webhooks, invites, audit, workspace settings, team creation and deletion are admin+ (owner and admin behave the same except member management: only an owner may promote to or demote an owner/admin, see `mayManage` in `tenancy.ts`).', '');
+  L.push('7. Workspace-scope label groups and label deletion, cycles, webhooks, invites, audit, workspace settings, team creation and deletion are admin+ (owner and admin behave the same except member management: only an owner may promote to or demote an owner/admin, see `mayManage` in `tenancy.ts`).', '');
   L.push('## Workspace routes (`/api/v1/w/{slug}`)', '');
   L.push(`| Route | ${ROLES.join(' | ')} |`, `|---|${ROLES.map(() => '---').join('|')}|`);
   for (const r of ROWS) L.push(`| \`${rowId(r)}\`${r.sessionOnly ? ' (session only)' : ''} | ${ROLES.map((x) => cell(r, x)).join(' | ')} |`);
