@@ -10,7 +10,7 @@ import { load, visible } from "./handlers";
 type Row = Record<string, unknown>;
 
 // ------------------------------------------------ attachments
-const ATT_F = ["kind", "url", "title", "mime_type", "size_bytes"];
+export const ATT_F = ["kind", "url", "title", "mime_type", "size_bytes", "filename"];
 /** http(s) only: rejects javascript:, data:, file:, credentials in the URL and whitespace. */
 export function normalizeUrl(raw: string): string {
   let u: URL;
@@ -38,20 +38,25 @@ const attBody = z.object({
   title: z.string().trim().min(1).max(255).optional(),
   mime_type: z.string().max(255).regex(/^[\w.+-]+\/[\w.+-]+$/).optional(), size_bytes: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 }).strict().refine((b) => b.kind === "file" || (b.mime_type === undefined && b.size_bytes === undefined), { message: "mime_type/size_bytes only for kind=file" });
-const attDto = (r: Row) => ({ id: r.id, issue_id: r.issue_id, kind: r.kind, url: r.url, title: r.title, mime_type: r.mime_type ?? null,
-  size_bytes: r.size_bytes == null ? null : Number(r.size_bytes), created_by: r.created_by, created_at: r.created_at });
-const ATSEL = (ctx: Ctx) => ctx.tx`select id, issue_id, kind, url, title, mime_type, size_bytes, created_by, created_at, created_at::text as _k from issue_attachments`;
-const audit = (ctx: Ctx, entity: string, id: string, action: string, diff: Diff) =>
+export const attDto = (r: Row, slug?: string) => {
+  const stored = r.storage_key != null, ready = r.upload_status !== "pending";
+  return { id: r.id, issue_id: r.issue_id, kind: r.kind, url: stored ? null : r.url, title: r.title, mime_type: r.mime_type ?? null,
+    size_bytes: r.size_bytes == null ? null : Number(r.size_bytes), filename: r.filename ?? null, upload_status: r.upload_status ?? "ready",
+    sha256: r.sha256 ?? null, download_url: stored && ready && slug ? `/api/v1/w/${slug}/issues/${r.issue_id}/attachments/${r.id}/content` : null,
+    created_by: r.created_by, created_at: r.created_at };
+};
+export const ATSEL = (ctx: Ctx) => ctx.tx`select id, issue_id, kind, url, title, mime_type, size_bytes, filename, upload_status, sha256, storage_key, created_by, created_at, created_at::text as _k from issue_attachments`;
+export const audit = (ctx: Ctx, entity: string, id: string, action: string, diff: Diff) =>
   recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity, entityId: id, action, diff });
 
 export const listAttachments = (req: Request, slug: string, rawIssue: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const issueId = parseId(rawIssue), q = parseQuery(req, listQuery), scope = `attachments:${issueId}`;
   await load(ctx, issueId); // 404 when hidden (team / guest share)
   const c = q.cursor ? decodeCursor(q.cursor, ctx.workspaceId, scope) : null, t = ctx.tx;
-  const rows = await t<Row[]>`${ATSEL(ctx)} where issue_id = ${issueId} ${c ? t`and (created_at, id) > (${c.k}::text::timestamptz, ${c.id}::uuid)` : t``}
+  const rows = await t<Row[]>`${ATSEL(ctx)} where issue_id = ${issueId} and deleted_at is null and (upload_status = 'ready' or created_by = ${ctx.userId}) ${c ? t`and (created_at, id) > (${c.k}::text::timestamptz, ${c.id}::uuid)` : t``}
     order by created_at, id limit ${q.limit + 1}`;
   const p = page(rows, q.limit, ctx.workspaceId, scope, (r) => ({ k: r._k as string, id: r.id as string }));
-  return Response.json({ items: p.items.map(attDto), next_cursor: p.next_cursor });
+  return Response.json({ items: p.items.map((r) => attDto(r, slug)), next_cursor: p.next_cursor });
 });
 
 export const createAttachment = (req: Request, slug: string, rawIssue: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -59,12 +64,12 @@ export const createAttachment = (req: Request, slug: string, rawIssue: string) =
   const issueId = parseId(rawIssue), b = await parseJson(req, attBody);
   await load(ctx, issueId);
   const url = normalizeUrl(b.url), title = b.title ?? autoTitle(url, b.kind), id = uuidv7();
-  const n = await ctx.tx`select count(*)::int as n from issue_attachments where issue_id = ${issueId}`;
+  const n = await ctx.tx`select count(*)::int as n from issue_attachments where issue_id = ${issueId} and deleted_at is null`;
   if ((n[0]!.n as number) >= 500) throw new ApiError("validation_failed", "too many attachments on this issue (max 500)");
   await ctx.tx`insert into issue_attachments (id, workspace_id, issue_id, kind, url, title, mime_type, size_bytes, created_by)
     values (${id}, ${ctx.workspaceId}, ${issueId}, ${b.kind}, ${url}, ${title}, ${b.mime_type ?? null}, ${b.size_bytes ?? null}, ${ctx.userId})`;
   const row = (await ctx.tx<Row[]>`${ATSEL(ctx)} where id = ${id}`)[0]!;
-  const dto = attDto(row);
+  const dto = attDto(row, slug);
   await audit(ctx, "attachment", id, "create", { ...diffOf(null, dto, ATT_F), issue_id: { before: null, after: issueId } });
   return Response.json(dto, { status: 201, headers: { Location: `/api/v1/w/${slug}/issues/${issueId}/attachments/${id}` } });
 });
@@ -73,11 +78,12 @@ export const deleteAttachment = (req: Request, slug: string, rawIssue: string, r
   requireRole(ctx, "member");
   const issueId = parseId(rawIssue), id = parseId(rawId);
   await load(ctx, issueId);
-  const r = await ctx.tx<Row[]>`${ATSEL(ctx)} where id = ${id} and issue_id = ${issueId}`;
+  const r = await ctx.tx<Row[]>`${ATSEL(ctx)} where id = ${id} and issue_id = ${issueId} and deleted_at is null and (upload_status = 'ready' or created_by = ${ctx.userId})`;
   if (!r[0]) throw new ApiError("not_found");
   if (r[0].created_by !== ctx.userId && !atLeast(ctx.role, "admin")) throw new ApiError("forbidden"); // creator or admin
-  await ctx.tx`delete from issue_attachments where id = ${id}`;
-  await audit(ctx, "attachment", id, "delete", { ...diffOf(attDto(r[0]), null, ATT_F), issue_id: { before: issueId, after: null } });
+  // Soft delete: the row leaves lists at once, the GC removes the bytes (and then the row).
+  await ctx.tx`update issue_attachments set deleted_at = now() where id = ${id}`;
+  await audit(ctx, "attachment", id, "delete", { ...diffOf(attDto(r[0], slug), null, ATT_F), issue_id: { before: issueId, after: null } });
   return new Response(null, { status: 204 });
 });
 
