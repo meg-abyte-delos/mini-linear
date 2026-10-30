@@ -4,7 +4,7 @@ import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
-import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
+import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/sim-store';
@@ -80,7 +80,7 @@ function paletteGroup(id: string): string {
 function paletteIcon(id: string) {
   if (id === 'list' || id === 'go-project') return <Icon name='list' />;
   if (id === 'board') return <Icon name='board' />;
-  if (id === 'cycles') return <Icon name='views' />;
+  if (id === 'cycles') return <Icon name='cycle' />;
   if (id === 'projects') return <Icon name='team' />;
   if (id === 'create') return <Icon name='plus' />;
   if (id === 'search-all' || id.startsWith('filter-')) return <Icon name='search' />;
@@ -230,7 +230,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const on = (id: string) => filters[kind].includes(id);
     if (kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: on(st), lead: <StatusIcon status={st} /> }));
     if (kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: on(String(n)), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (kind === 'assignee') return [{ id: NONE, label: 'Unassigned', checked: on(NONE), lead: <span className='av av-none' aria-hidden='true' /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: on(u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (kind === 'assignee') return [{ id: NONE, label: 'Unassigned', checked: on(NONE), lead: <UnassignedIcon /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: on(u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     if (kind === 'label') return LABELS.map((l) => ({ id: l.id, label: l.name, badge: scopeBadge(l.scope), checked: on(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
     if (kind === 'project') return [{ id: NONE, label: 'No project', checked: on(NONE) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: on(p.id) }))];
     return [{ id: NONE, label: 'No cycle', checked: on(NONE) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: on(c.id) }))];
@@ -414,7 +414,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const cur = sel[0];
     if (!pick || !cur) return [];
     if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: sel.every((x) => x.priority === n), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <span className='av av-none' aria-hidden='true' /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <UnassignedIcon /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     if (pick.kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: sel.every((x) => x.status === st), lead: <StatusIcon status={st} /> }));
     if (pick.kind === 'project') return [{ id: 'none', label: 'No project', checked: sel.every((x) => x.project_id === null) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: sel.every((x) => x.project_id === p.id) }))];
     if (pick.kind === 'cycle') return [{ id: 'none', label: 'No cycle', checked: sel.every((x) => x.cycle_id === null) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: sel.every((x) => x.cycle_id === c.id) }))];
@@ -622,7 +622,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }, []);
 
   const who = (id: string | null) => findPerson(people, id);
-  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av av-none' aria-hidden='true' title='Unassigned' />; };
+  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av-wrap' title='Unassigned'><UnassignedIcon /></span>; };
   const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
   const row = (i: Issue) => (
@@ -690,7 +690,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               </button>
             ))}
             <div className='fwrap'>
-              <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='views' /><span>Filter</span></button>
+              <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></button>
               {tbMenu === 'filter' && (
                 <div className='tb-menu' role='menu' aria-label='Filter by' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-add')?.focus(); } }}>
                   {FILTER_KEYS.map((k, n) => <button key={k} id={`fb-${filters[k].length ? 'm-' : ''}${k}`} role='menuitem' autoFocus={n === 0} onClick={() => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }}>{FILTER_LABEL[k]}</button>)}
@@ -710,7 +710,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             )}
             {view === 'list' && (
               <div className='tb-right'>
-                <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='list' /><span>Display</span></button>
+                <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></button>
                 {tbMenu === 'display' && (
                   <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
                     <label>Grouping<select autoFocus value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>{(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => <option key={g} value={g}>{GROUPING_LABEL[g]}</option>)}</select></label>
