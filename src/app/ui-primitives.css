@@ -29,7 +29,9 @@
 .kbd { min-width:var(--kbd-min-w); padding:0 var(--sp-1); text-align:center; font:inherit; font-size:var(--fs-xs); line-height:var(--lh-base); color:var(--muted-strong); background:var(--panel); border:1px solid var(--line); border-radius:var(--r-sm); }
 
 /* Tooltip */
-.tip { position:fixed; z-index:70; transform:translateX(-50%); display:inline-flex; align-items:center; gap:var(--sp-2); padding:var(--sp-1) var(--sp-2); font-size:var(--fs-sm); color:var(--fg); background:var(--raised); border:1px solid var(--line); border-radius:var(--r-sm); box-shadow:var(--shadow-pop); pointer-events:none; white-space:nowrap; }
+.tip { position:fixed; z-index:70; transform:translateX(-50%); display:inline-flex; align-items:center; gap:var(--sp-2); padding:var(--sp-1) var(--sp-2); font-size:var(--fs-sm); color:var(--fg); background:var(--raised); border:1px solid var(--line); border-radius:var(--r-sm); box-shadow:var(--shadow-pop); pointer-events:none; width:max-content; max-width:min(360px, calc(100vw - 16px)); overflow-wrap:anywhere; }
+.tip .tip-label { min-width:0; }
+.tip .kbd { flex-shrink:0; white-space:nowrap; }
 .tip[data-state='open'] { animation:prim-fade-in var(--dur-base) var(--ease-out); }
 .tip[data-state='closed'] { animation:prim-fade-out var(--dur-fast) var(--ease-in) forwards; }
 @keyframes prim-fade-in { from { opacity:0; } to { opacity:1; } }

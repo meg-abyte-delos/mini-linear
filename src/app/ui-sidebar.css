@@ -10,7 +10,7 @@
 .ws-menu a, .ws-menu button { display:block; width:100%; height:28px; line-height:28px; padding:0 8px; border:0; border-radius:5px; background:none; color:var(--fg); font:inherit; font-size:var(--fs-base); text-align:left; text-decoration:none; cursor:pointer; }
 .ws-menu a:hover, .ws-menu button:hover, .ws-menu a:focus-visible, .ws-menu button:focus-visible { background:var(--hover); }
 .team-toggle { font:inherit; }
-.team-toggle .sb-chev { margin-left:auto; color:var(--dim); transition:transform .12s ease; }
+.team-toggle .sb-chev { margin-left:auto; color:var(--dim); transition:transform var(--dur-fast) var(--ease-out); }
 .team-toggle .sb-chev.open { transform:rotate(90deg); }
 .team-nav { display:flex; flex-direction:column; gap:1px; }
 .team-nav[hidden] { display:none; }

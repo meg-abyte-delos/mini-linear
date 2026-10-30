@@ -40,13 +40,13 @@ test('row: checkbox is hidden until hover/focus, then visible; selecting keeps i
   await expect(box).toHaveCSS('opacity', '0');
 });
 
-test('row: project chip, API assignee avatar with name tooltip, contextual date "Today" with full date in title', async ({ page }) => {
+test('row: project chip, API assignee avatar with name tooltip, short date with full date in title', async ({ page }) => {
   await home(page);
   const row = rowOf(page, T.rich);
   await expect(row.locator('.chip.proj')).toHaveText('Mini Linear');
   await expect(row.locator('[title="Demo Admin"]')).toBeVisible();
   await expect(row.locator('.av-none-ic')).toHaveCount(0);
-  await expect(row.locator('.date')).toHaveText('Today');
+  await expect(row.locator('.date')).toHaveText(/^[A-Z][a-z]{2} [0-9]{1,2}$/);
   expect(await row.locator('.date').getAttribute('title')).toBeTruthy();
   const none = rowOf(page, T.plain);
   await expect(none.locator('[title="Unassigned"] .av-none-ic')).toBeVisible();
@@ -59,11 +59,11 @@ test('row: an issue assigned to another member shows an avatar for that member (
   const p = await page.request.patch(`/api/v1/w/${DEMO.slug}/issues/${richId}`, { data: { assignee_id: USERS.mate.id }, headers: { 'If-Match': String(cur.version) } });
   expect(p.ok()).toBe(true);
   await home(page);
-  // FINDING: /members returns no display name, so other members are labelled from their email local part ("Mate"/"M"), not "Ada Kernel"/"AK" as the session user is.
+  // /members now carries display_name (D9), so other members are labelled "Ada Kernel"/"AK" like the session user, not from the email local part.
   const av = rowOf(page, T.rich).locator('.av-wrap');
   await expect(av).toBeVisible();
-  await expect(av).toHaveAttribute('title', /^mate$/i);
-  await expect(av.locator('.av')).toHaveText('M');
+  await expect(av).toHaveAttribute('title', 'Ada Kernel');
+  await expect(av.locator('.av')).toHaveText('AK');
   await expect(rowOf(page, T.rich).locator('.av-none-ic')).toHaveCount(0);
 });
 

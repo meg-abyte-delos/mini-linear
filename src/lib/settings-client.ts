@@ -71,3 +71,10 @@ export const matchesMember = (m: { email: string }, name: string, q: string) => 
   const s = q.trim().toLowerCase();
   return !s || name.toLowerCase().includes(s) || m.email.toLowerCase().includes(s);
 };
+
+// Role rules shared by the Members UI (the server enforces the same): owners are never edited here, only an owner may
+// grant admin or change an admin, and an owner can never be created by an invite.
+export type AssignableRole = 'admin' | 'member' | 'guest';
+export const assignableRoles = (viewer?: string): AssignableRole[] => (viewer === 'owner' ? ['admin', 'member', 'guest'] : viewer === 'admin' ? ['member', 'guest'] : []);
+export const canManageMember = (viewer: string | undefined, target: string): boolean =>
+  target !== 'owner' && (viewer === 'owner' || (viewer === 'admin' && target !== 'admin'));

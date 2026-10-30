@@ -23,6 +23,7 @@ Same endpoints as the app, so the API is always at parity:
 |---|---|
 | Issues | `GET/POST /issues`, `GET/PATCH/DELETE /issues/<id>`, `POST /issues/<id>/restore` |
 | Comments | `GET/POST /issues/<id>/comments`, `PATCH/DELETE /comments/<id>` |
+| Attachments | `GET/POST /issues/<id>/attachments` (links), `DELETE /issues/<id>/attachments/<aid>`, file uploads below |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/<id>` |
 | Teams | `GET/POST /teams`, `GET/PATCH/DELETE /teams/<id>`, `/teams/<id>/members` |
 | Also | `/cycles`, `/labels`, `/members`, `/audit` |
@@ -35,6 +36,18 @@ curl -H "Authorization: Bearer $ML_KEY" https://ml.example.com/api/v1/w/acme/iss
 ```
 
 A GraphQL endpoint is not provided (out of scope for this iteration).
+
+## File attachments
+
+1. `POST /issues/<id>/attachments/uploads` body `{ "filename", "mime_type", "size_bytes", "title"? }` (member+, strict). Reserves a `pending` row: `201 { id, upload_url, expires_at }` (expires after 1 h).
+2. `PUT <upload_url>` with the raw bytes, `Content-Type` = declared mime (parameters ignored), `Content-Length` = declared size. Only the creator, once. The server counts the bytes while streaming (never trusts `Content-Length`/chunked framing), hashes them (sha256), checks the first bytes against the mime (png, jpeg, gif, webp, pdf, zip and office types) and flips the row to `ready`: `200` with the attachment DTO. Errors: 422 wrong length (partial bytes are deleted, the row stays pending and can be retried), 415 wrong type or magic bytes, 403 other user, 409 already uploaded, 404 expired.
+3. `GET <upload_url>` streams the bytes (single `Range` supported: 206, or 416). Headers: `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`, `Cache-Control: private, max-age=0`, `Content-Disposition: attachment` with RFC 5987 `filename*` and a sanitised ASCII fallback. `?inline=1` is honoured only for png/jpeg/gif/webp.
+
+DTO: `id, issue_id, kind, url (null for uploads), title, mime_type, size_bytes, filename, upload_status (pending|ready), sha256, download_url (null for links and pending), created_by, created_at`. Lists show `ready` rows (the creator also sees their own pending ones); deleted rows are excluded.
+
+Limits: 25 MB per file (`ATTACHMENT_MAX_BYTES`, declared size above it is `413 payload_too_large` at step 1), 200 MB per workspace (`ATTACHMENT_WORKSPACE_QUOTA`, 422 `workspace attachment quota exceeded`, checked under an advisory lock, counts ready + pending), 20 pending per user, 500 per issue. Allowlist: png, jpeg, gif, webp, pdf, text/plain, text/markdown, text/csv, zip, json, docx, xlsx, pptx; anything else (svg and html included) is `415 unsupported_media_type`.
+
+Rights: list/download follow the issue's visibility (other-team member 404, guest with an active share can download); upload needs member+ (guest 403); delete by the uploader or admin+. DELETE is soft; a GC job (every 5 min, also at boot) removes pending rows older than 1 h and deleted rows older than 10 min with their bytes, plus stored keys no row references any more. Storage: `ATTACHMENTS_DIR` (default `./.data/attachments`) behind the `AttachmentStore` interface (`put/get/delete/list`). Migration: 0805. Content check: only the binary types above are verified against their signature; `text/plain`, `text/markdown`, `text/csv` and `application/json` have no content check (they are served as `attachment` with `nosniff` and `CSP: sandbox`). The PUT holds no database transaction while the body streams: it claims the row (`uploading`, internal; exposed as `pending`), streams to the store with an idle timeout (30 s, `ATTACHMENT_IDLE_TIMEOUT_MS`) and a total timeout (10 min), at most 8 PUTs per process (`ATTACHMENT_MAX_CONCURRENT_PUTS`) and 2 per user (`ATTACHMENT_MAX_CONCURRENT_PUTS_PER_USER`), else 429, then finalizes in a short transaction; a failed transfer deletes the partial bytes and returns the row to `pending`. GC also reclaims `uploading` rows stuck for 15 min (longer than the 10 min total upload timeout). The orphan-key and temp-file sweep runs hourly (bounded to 50 000 keys per pass, resuming from a cursor so the whole store is covered over several passes). A successful upload or a delete emits an `issue` update event on the parent (see Notes in the lane report).
 
 ## Notifications and realtime (A6)
 
@@ -86,6 +99,31 @@ Delivery: 2xx = success (redirects are not followed). Otherwise retried with bac
 **Scopes**: `read`, `write`, `admin`; creating a key above your own role is refused. Invalid keys are rate limited per IP (`API_BAD_KEY_LIMIT`, default 30/min); a non-Bearer Authorization header gets 401 (no cookie fallback).
 
 **Payload / retention**: `payload` is the row as JSON (`to_jsonb(row)`) minus the internal `tsv` column. Deliveries older than 30 days are purged by the dispatcher (`purge_webhook_deliveries`).
+
+## Project and cycle counters (A1)
+
+One rule for every surface (API, project list, project page, roadmap rings, cycles list): **canceled issues are out of scope, soft-deleted issues do not exist.**
+
+**Visibility**: counts only include issues the caller can see (team visibility). A member of team A looking at a project that spans A and B gets counts for A only; admins and owners get everything. The same member gets 404 on a cycle of a team they are not in, counts included. No count leaks the size of a hidden team.
+
+`GET /projects` and `GET /projects/<id>` return (old names kept):
+
+| Field | Meaning |
+|---|---|
+| `issues_total` (= `issue_count`) | visible, non-deleted, non-canceled issues |
+| `issues_done` (= `done_count`) | status `done` |
+| `issues_in_progress` | status `in_progress` or `in_review` |
+| `issues_canceled` | status `canceled` (informational, not in the total) |
+| `progress_pct` | `round(100 * done / total)`, 0 when empty |
+| `progress_by_estimate` | `round(100 * done estimate / total estimate)` over non-canceled issues; `null` when no issue has an estimate |
+| `health` | health of the latest posted project update, or `null` |
+| `health_computed` | derived, see below |
+
+`health_computed` is `on_track`, `at_risk`, `off_track` or `null`. `null` if the project is `completed` or `canceled`, has no `target_date`, or has no issue. Else `on_track` at 100%; `off_track` when today is past `target_date`; otherwise `gap = elapsed% - progress_pct`, where `elapsed%` is the share of the window `start_date` (or creation day) to `target_date` already elapsed: gap up to 10 is on_track, up to 25 at_risk, else off_track. Pure function in `src/lib/project-health.ts`.
+
+`GET /cycles` and `GET /cycles/<id>` also return `scope` (non-canceled), `started` (`in_progress` or `in_review`), `completed` (`done`), `canceled`, `percent_complete` (`round(100 * completed / scope)`, 0 when empty). Identical to `GET /cycles/<id>/stats`.
+
+UI fix in the same change: the Cycles list ring counted canceled issues in the total and as done (4 issues with 1 canceled showed 50%); it now matches the API (33%).
 
 ## Changelog
 - **Behavior change (A4):** `POST /issues/:id/relations` with `type: duplicate` now cancels the source issue by default (`cancel_source` defaults to `true`, was effectively false). Pass `{ "cancel_source": false }` to keep the previous behavior. Moving the source to the team's first `canceled` state happens in the same transaction.

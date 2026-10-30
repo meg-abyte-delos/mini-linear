@@ -4,13 +4,14 @@ import type { CycleBucket } from '@/lib/filters';
 
 export interface CycleScope { total: number; started: number; done: number; pct: number }
 
-/** Scope of one cycle: done counts done + canceled (Linear counts canceled as closed scope). */
+/** Scope of one cycle: canceled issues are out of scope (same rule as GET /cycles/:id/stats and the cycle list API): total = non-canceled, done = done. */
 export function cycleScope(issues: readonly Pick<Issue, 'cycle_id' | 'status'>[], cycleId: string): CycleScope {
   let total = 0, started = 0, done = 0;
   for (const i of issues) {
     if (i.cycle_id !== cycleId) continue;
+    if (i.status === 'canceled') continue;
     total++;
-    if (i.status === 'done' || i.status === 'canceled') done++;
+    if (i.status === 'done') done++;
     else if (i.status === 'in_progress' || i.status === 'in_review') started++;
   }
   return { total, started, done, pct: total ? Math.round((done / total) * 100) : 0 };

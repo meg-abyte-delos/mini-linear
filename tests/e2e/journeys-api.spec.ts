@@ -40,7 +40,7 @@ async function pickFromPanel(page: Page, button: RegExp, dialog: string, option:
 
 test('journey: create, assign, put in a cycle, complete, and it all survives a reload', async ({ page }) => {
   const me = (await (await page.request.get('/api/v1/me')).json()) as { id: string };
-  const members = ((await (await page.request.get(`${W}/members?limit=100`)).json()) as { items: { user_id: string; email: string }[] }).items;
+  const members = ((await (await page.request.get(`${W}/members?limit=100`)).json()) as { items: { user_id: string; email: string; display_name?: string | null }[] }).items;
   const other = members.find((m) => m.user_id !== me.id)!;
   const cycles = ((await (await page.request.get(`${W}/cycles?limit=100`)).json()) as { items: { id: string; name: string }[] }).items;
   expect(cycles.length).toBeGreaterThan(0);
@@ -52,7 +52,7 @@ test('journey: create, assign, put in a cycle, complete, and it all survives a r
 
   await pickFromPanel(page, /Backlog/, 'Change status', /^In Progress/i);
   expect((await get(page, it.id)).status).toBe('in_progress');
-  await pickFromPanel(page, /Assignee|Unassigned|No assignee/i, 'Assign to', new RegExp(esc(nameFromEmail(other.email)), 'i'));
+  await pickFromPanel(page, /Assignee|Unassigned|No assignee/i, 'Assign to', new RegExp(esc(other.display_name || nameFromEmail(other.email)), 'i'));
   expect((await get(page, it.id)).assignee_id).toBe(other.user_id);
   await pickFromPanel(page, /Add to cycle/, 'Move to cycle', new RegExp(esc(cyc.name)));
   expect((await get(page, it.id)).cycle_id).toBe(cyc.id);

@@ -4,7 +4,8 @@ import { ApiError } from "../http/errors";
 import { ifMatchVersion, listQuery, parseId, parseJson, parseQuery, uuidSchema } from "../http/validate";
 import { diffOf } from "../audit";
 import { uuidv7 } from "../uuid7";
-import { type Row, stale, out, audit, listPage, afterId, assertAssignee } from "./common";
+import { type Row, stale, out, audit, listPage, afterId, assertAssignee, teamVisible } from "./common";
+import { computeHealth } from "../project-health";
 import { subscribe } from "./subscriptions";
 import { emit } from "../notifications";
 import { parseMentions, normalizeEmoji, MAX_MENTIONS } from "../comments/mentions";
@@ -21,20 +22,26 @@ const pvisible = (ctx: Ctx) => atLeast(ctx.role, "admin") ? ctx.tx`true`
   : ctx.role === "guest" ? ctx.tx`false`
   : ctx.tx`exists (select 1 from project_teams pt join team_memberships tm on tm.team_id = pt.team_id and tm.workspace_id = pt.workspace_id
       where pt.project_id = p.id and tm.user_id = ${ctx.userId})`;
-/** progress_pct = done / (all non-canceled, non-deleted issues in the project), rounded; 0 when the project has no issues. */
+/** Counts are per issue VISIBLE to the caller (teamVisible), so a member of team A never learns the size of team B's share of a cross-team project.
+ *  issue_count/issues_total = non-canceled, non-deleted; progress_pct = done / issue_count (0 when empty); progress_by_estimate = done estimate / total estimate (null when no estimates).
+ *  health = latest posted update; health_computed = derived from target_date vs progress (src/lib/project-health.ts). */
 const PSEL = (ctx: Ctx) => ctx.tx`select p.id, p.name, p.description, p.icon, p.color, p.lead_id, p.status, p.start_date::text as start_date, p.target_date::text as target_date,
   p.version, p.created_at, p.updated_at,
   coalesce((select array_agg(team_id order by team_id) from project_teams where project_id = p.id), '{}') as team_ids,
   coalesce((select array_agg(user_id order by user_id) from project_members where project_id = p.id), '{}') as member_ids,
-  (select count(*)::int from issues i where i.project_id = p.id and i.deleted_at is null and i.status <> 'canceled') as issue_count,
-  (select count(*)::int from issues i where i.project_id = p.id and i.deleted_at is null and i.status = 'done') as done_count,
-  coalesce((select round(100.0 * count(*) filter (where i.status = 'done') / nullif(count(*), 0))::int from issues i
-    where i.project_id = p.id and i.deleted_at is null and i.status <> 'canceled'), 0) as progress_pct,
-  (select health from project_updates u where u.project_id = p.id order by u.created_at desc, u.id desc limit 1) as health from projects p`;
+  st.total as issue_count, st.done as done_count, st.total as issues_total, st.done as issues_done, st.in_progress as issues_in_progress, st.canceled as issues_canceled,
+  case when st.total = 0 then 0 else round(100.0 * st.done / st.total)::int end as progress_pct,
+  case when st.est_total > 0 then round(100.0 * st.est_done / st.est_total)::int else null end as progress_by_estimate,
+  (select health from project_updates u where u.project_id = p.id order by u.created_at desc, u.id desc limit 1) as health from projects p
+  cross join lateral (select count(*) filter (where i.status <> 'canceled')::int as total, count(*) filter (where i.status = 'done')::int as done,
+      count(*) filter (where i.status in ('in_progress','in_review'))::int as in_progress, count(*) filter (where i.status = 'canceled')::int as canceled,
+      coalesce(sum(i.estimate) filter (where i.status <> 'canceled'), 0)::int as est_total, coalesce(sum(i.estimate) filter (where i.status = 'done'), 0)::int as est_done
+    from issues i where i.project_id = p.id and i.deleted_at is null and ${teamVisible(ctx, 'i.team_id')}) st`;
+const withHealth = (rows: Row[]) => { const t = new Date().toISOString().slice(0, 10); return rows.map((r) => ({ ...r, health_computed: computeHealth(r as never, t) })) as Row[]; };
 export const getProject = async (ctx: Ctx, id: string) => {
   const r = await ctx.tx<Row[]>`${PSEL(ctx)} where p.id = ${id} and ${pvisible(ctx)}`;
   if (!r[0]) throw new ApiError("not_found");
-  return r[0];
+  return withHealth(r)[0]!;
 };
 async function setMembers(ctx: Ctx, id: string, ids: string[]) {
   for (const u of new Set(ids)) await assertAssignee(ctx, u);
@@ -48,7 +55,7 @@ async function setTeams(ctx: Ctx, id: string, ids: string[]) {
 export const listProjects = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const q = parseQuery(req, listQuery), c = afterId(ctx, "projects", q);
   const rows = await ctx.tx<Row[]>`${PSEL(ctx)} where ${pvisible(ctx)} ${c ? ctx.tx`and p.id > ${c}::uuid` : ctx.tx``} order by p.id limit ${q.limit + 1}`;
-  return listPage(ctx, "projects", q, rows);
+  return listPage(ctx, "projects", q, withHealth(rows));
 });
 export const createProject = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
@@ -68,7 +75,7 @@ export const createProject = (req: Request, slug: string) => withWorkspaceCtx(re
   await setMembers(ctx, id, b.member_ids ?? []);
   const rows = await ctx.tx<Row[]>`${PSEL(ctx)} where p.id = ${id}`; // not via pvisible: a member may create a project for teams they are not in
   await audit(ctx, "project", id, "create", diffOf(null, rows[0]!, PROJECT_F));
-  return out(rows[0]!, 201);
+  return out(withHealth(rows)[0]!, 201);
 });
 export const getProjectH = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => out(await getProject(ctx, parseId(rawId))));
 export const patchProject = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -91,7 +98,7 @@ export const patchProject = (req: Request, slug: string, rawId: string) => withW
   if (b.member_ids) await setMembers(ctx, id, b.member_ids);
   const rows = await ctx.tx<Row[]>`${PSEL(ctx)} where p.id = ${id}`;
   await audit(ctx, "project", id, "update", diffOf(before, rows[0]!, PROJECT_F));
-  return out(rows[0]!);
+  return out(withHealth(rows)[0]!);
 });
 // Note: like deleteCycle, issue versions are not bumped (issues.project_id is ON DELETE SET NULL); the change is recorded as activity per issue.
 export const deleteProject = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {

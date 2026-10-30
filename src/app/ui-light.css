@@ -82,3 +82,27 @@
   html:not([data-theme]) .card { box-shadow:0 1px 2px rgb(0 0 0 / .04); }
   html:not([data-theme]) .card[aria-selected=true] { border-color:var(--accent); background:var(--sel); }
 }
+
+/* Light legibility (Meg UI review 898d87d): hairlines, pill borders, IDs/dates and low-priority bars and the Todo ring were too faint on white.
+   Token-only bump, still Linear-light quiet. Text tokens stay >= 7:1 (muted) / 6:1 (dim) on #fff. */
+[data-theme='light'] {
+  --line:#dcdde1; --line-soft:#e7e8eb;
+  --muted:#50545c; --dim:#5a5e66;
+  --pill-line-strength:18%; --prio-dim-strength:36%; --s-todo:#8b8f97;
+}
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) {
+    --line:#dcdde1; --line-soft:#e7e8eb;
+    --muted:#50545c; --dim:#5a5e66;
+    --pill-line-strength:18%; --prio-dim-strength:36%; --s-todo:#8b8f97;
+  }
+}
+.row { --pill-line:color-mix(in srgb, var(--fg) var(--pill-line-strength, 10%), transparent); }
+.row .pi .dim { fill:color-mix(in srgb, var(--fg) var(--prio-dim-strength, 24%), transparent); }
+
+/* ⌘K, both themes: readable section labels and IDs; match highlight like Linear (brighter, bolder text, no violet wash). */
+.palette li.pal-group { color:color-mix(in srgb, var(--muted) 55%, var(--muted-strong)); }
+.palette .hit-id { color:var(--muted-strong); }
+.palette li mark,
+[data-theme='light'] .palette li mark { background:none; color:var(--fg); font-weight:var(--fw-semibold, 600); border-radius:0; }
+@media (prefers-color-scheme: light) { html:not([data-theme]) .palette li mark { background:none; } }

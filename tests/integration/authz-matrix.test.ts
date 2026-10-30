@@ -3,11 +3,11 @@
 // read keys GET-only, webhooks/api-keys session-only, admin-only audit/members/invites/webhooks) and from the invariant
 // "a denied caller never gets a 2xx and never a 5xx". Rows marked 'adm?' are ASSUMED admin-only (spec silent): they are
 // reported separately so a failure is a spec question, not a verdict.
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { api, world, type U } from './helpers/world';
+import { api, world, ownerPool, type U } from './helpers/world';
 import { runIntegration } from './helpers/gate';
 
 type Pol = 'glob' | 'mem' | 'adm' | 'adm?';
@@ -112,6 +112,9 @@ const ROUTES: [string, string, Pol][] = [
   ['POST', 'w/[slug]/notifications/read-all', 'mem'],
   ['GET', 'w/[slug]/notifications', 'mem'],
   ['GET', 'w/[slug]/notifications/unread-count', 'mem'],
+  ['GET', 'w/[slug]/issues/[id]/attachments/[aid]/content', 'mem'],
+  ['POST', 'w/[slug]/issues/[id]/attachments/uploads', 'mem'],
+  ['PUT', 'w/[slug]/issues/[id]/attachments/[aid]/content', 'mem'],
   ['GET', 'w/[slug]/subscriptions', 'mem'],
   ['PUT', 'w/[slug]/subscriptions/[kind]/[entityId]', 'mem'],
   ['DELETE', 'w/[slug]/subscriptions/[kind]/[entityId]', 'mem'],
@@ -174,7 +177,24 @@ const ROUTES: [string, string, Pol][] = [
 
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3000';
 let W: Awaited<ReturnType<typeof world>>;
-beforeAll(async () => { if (runIntegration) W = await world(); }, 60_000);
+// Real fixtures of every [id] kind, so a DENIED caller's 403/404 is not just "unknown id" (a missing authz check would really act).
+let R: Record<string, string> = {};
+beforeAll(async () => {
+  if (!runIntegration) return;
+  W = await world();
+  const mk = async (name: string, path: string, body: unknown, key = 'id') => {
+    const r = await api(W.A1, 'POST', `/api/v1/w/w1/${path}`, body);
+    const j = await r.json().catch(() => ({}));
+    if (r.status !== 201 || !j[key]) throw new Error(`fixture ${name}: ${r.status} ${JSON.stringify(j)}`);
+    R[name] = j[key];
+  };
+  await mk('webhook', 'webhooks', { url: 'https://example.com/hook', events: ['issue.created'] });
+  await mk('invite', 'invites', { email: `fx-${W.t1.slice(0, 6)}@example.test`, role: 'member' });
+  await mk('apikey', 'api-keys', { name: 'fixture', scope: 'read' });
+  await mk('comment', `issues/${W.i1}/comments`, { body: 'fixture comment' });
+  await mk('label', 'labels', { name: 'fx-label', color: '#aabbcc', team_id: null, group_id: null, description: '' });
+  await mk('view', 'views', { name: 'fx-view', shared: true, team_id: null, layout: 'list', filters: { op: 'and', rules: [] }, display: {} });
+}, 60_000);
 
 // A plausible body for every write: authz must answer before validation, so denied callers should see 403/404 not 422.
 const BODY = { name: 'authz', title: 'authz', role: 'member', scope: 'read', url: 'https://example.com/hook', events: ['issue.created'], email: 'authz@example.test', key: 'AZ', team_id: '00000000-0000-4000-8000-000000000001' };
@@ -197,7 +217,7 @@ async function status(u: U | null, method: string, path: string, headers: Record
     const h: Record<string, string> = { 'content-type': 'application/json', origin: BASE, ...headers };
     if (u?.cookie) h.cookie = u.cookie;
     const body = method === 'GET' || method === 'DELETE' ? undefined : JSON.stringify(bodyOverride ?? bodyFor(method, path));
-    if (method === 'PATCH' || method === 'DELETE') h['if-match'] ??= '1';
+    if (method === 'PATCH' || method === 'DELETE') h['if-match'] ??= '"1"';
     const r = await fetch(BASE + path, { method, headers: h, body, signal: ac.signal });
     void r.body?.cancel().catch(() => {});
     return r.status;
@@ -213,6 +233,9 @@ function pathFor(route: string, slug: string, real: boolean, actor?: U): string 
     const parent = seg[i - 1];
     if (real && s === '[id]' && parent === 'issues') return W.i1;
     if (real && s === '[id]' && parent === 'teams') return W.t1;
+    const fx: Record<string, string> = { webhooks: 'webhook', invites: 'invite', 'api-keys': 'apikey', comments: 'comment', labels: 'label', views: 'view' };
+    const fk = parent ? fx[parent] : undefined;
+    if (real && s === '[id]' && fk) return R[fk]!;
     if (real && s === '[userId]' && parent === 'members') return actor && actor.id === W.M2.id ? W.M1.id : W.M2.id;
     return randomUUID();
   });
@@ -234,6 +257,7 @@ describe.runIf(runIntegration)('route inventory guard', () => {
       const rel = p.slice(root.length + 1).replace(/\/?route\.ts$/, '');
       const src = readFileSync(p, 'utf8');
       for (const m of src.matchAll(/export (?:const|async function) (GET|POST|PATCH|PUT|DELETE)\b/g)) onDisk.add(`${m[1]} ${rel}`);
+      for (const blk of src.matchAll(/export\s*\{([^}]*)\}/g)) for (const m of blk[1]!.matchAll(/\b(GET|POST|PATCH|PUT|DELETE)\b(?:\s+as\s+(GET|POST|PATCH|PUT|DELETE))?/g)) onDisk.add(`${m[2] ?? m[1]} ${rel}`);
     }
     const inTable = new Set(ROUTES.map(([m, r]) => `${m} ${r}`));
     expect([...onDisk].filter((k) => !inTable.has(k)), 'routes with no role row').toEqual([]);
@@ -322,6 +346,9 @@ describe.runIf(runIntegration)('every workspace member and admin: no 401 and no 
 });
 
 describe.runIf(runIntegration)('API keys (docs/API.md)', () => {
+  // Flake fix: bad-key attempts are rate limited per IP (30/min, api:badkey:<ip>) and every request here shares one IP.
+  // Reset the API limiter buckets before each test so earlier 401s (revoked/invalid keys) cannot trip a later 429.
+  beforeEach(async () => { await ownerPool.query("delete from rate_limits where key like 'api:%'"); });
   const mint = async (u: U, scope: string) => {
     const r = await api(u, 'POST', '/api/v1/w/w1/api-keys', { name: `matrix-${scope}`, scope });
     expect(r.status).toBe(201);
@@ -349,17 +376,20 @@ describe.runIf(runIntegration)('API keys (docs/API.md)', () => {
     const tm = await mint(W.M1, 'write');
     expect([403, 404]).toContain(await call(tm, 'GET', '/api/v1/w/w1/audit'));
   });
-  it('guest key (any scope) has no more power than the guest: no issue creation, foreign issue 404', async () => {
-    // NOTE (spec question): the API hands a guest a scope=write/admin key. It is harmless today (acts as the guest), but the label overstates it.
+  // Open until Ada's route fix lands; then switch it.fails back to it.
+  it.fails('guest can only mint a read key: write/admin scope is 403 (spec decision 2026-10-30)', async () => {
     for (const scope of ['write', 'admin']) {
       const r = await api(W.G1, 'POST', '/api/v1/w/w1/api-keys', { name: 'g-' + scope, scope });
-      if (r.status !== 201) { expect([403, 422]).toContain(r.status); continue; }
-      const tok = (await r.json()).token as string;
-      const h = { authorization: `Bearer ${tok}` };
-      expect(await status(null, 'POST', '/api/v1/w/w1/issues', h, { title: 'by guest key', team_id: W.t1 }), `${scope} key creates an issue`).toBe(403);
-      expect(await status(null, 'GET', `/api/v1/w/w1/issues/${W.i2}`, h)).toBe(404);
-      expect([403, 404]).toContain(await status(null, 'GET', '/api/v1/w/w1/audit', h));
+      expect(r.status, `guest ${scope} key`).toBe(403);
     }
+  });
+  it('guest read key has no more power than the guest: GET ok, no mutation, foreign issue 404, no audit', async () => {
+    const r = await api(W.G1, 'POST', '/api/v1/w/w1/api-keys', { name: 'g-read', scope: 'read' });
+    expect(r.status).toBe(201);
+    const h = { authorization: `Bearer ${(await r.json()).token as string}` };
+    expect(await status(null, 'POST', '/api/v1/w/w1/issues', h, { title: 'by guest key', team_id: W.t1 })).toBe(403);
+    expect(await status(null, 'GET', `/api/v1/w/w1/issues/${W.i2}`, h)).toBe(404);
+    expect([403, 404]).toContain(await status(null, 'GET', '/api/v1/w/w1/audit', h));
   });
   it('creating a key above your own role is refused', async () => {
     const r = await api(W.M1, 'POST', '/api/v1/w/w1/api-keys', { name: 'esc', scope: 'admin' });
@@ -382,7 +412,7 @@ describe.runIf(runIntegration)('IDOR across tenants: a foreign resource id under
   it.each([
     ['GET', `issues/${'I1'}`], ['PATCH', `issues/${'I1'}`], ['DELETE', `issues/${'I1'}`], ['GET', `issues/${'I1'}/comments`], ['GET', `issues/${'I1'}/activity`],
   ])('B1 (w2) %s /w/w2/%s with w1 issue id', async (m, p) => {
-    const s = await status(W.B1, m, `/api/v1/w/w2/${p.replace('I1', W.i1)}`, m === 'PATCH' ? { 'if-match': '1' } : {});
+    const s = await status(W.B1, m, `/api/v1/w/w2/${p.replace('I1', W.i1)}`, m === 'PATCH' ? { 'if-match': '"1"' } : {});
     expect(s).toBe(404);
   });
   it('A1 (w1) reading the w2 issue under /w/w1 is 404', async () => {

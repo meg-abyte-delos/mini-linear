@@ -1,16 +1,17 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { USERS, STATUSES, STATUS_LABEL, PRIORITY_LABEL, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
 import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
 import { useIssueRealtime } from '@/lib/detail/use-issue-realtime';
-import { ConfirmDialog, type MenuEntry } from '@/components/ui';
+import { ConfirmDialog, Tooltip, type MenuEntry } from '@/components/ui';
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
+import { statusOf } from '@/lib/detail/activity-status';
 import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
 import { activeMention, insertMention, suggest, type MentionUser } from '@/lib/detail/mentions';
 import { safeHref } from '@/lib/detail/markdown';
@@ -96,7 +97,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const issueRef = useRef(issue); issueRef.current = issue;
   const [gone, setGone] = useState(false);
   const [rtOffline, setRtOffline] = useState(false);
-  useIssueRealtime(slug, api, initial.id, version, {
+  useIssueRealtime(slug, !!api, initial.id, version, {
     onSelf: (row) => {
       const cur = issueRef.current;
       version.current = row.version;
@@ -400,16 +401,17 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         </section>
 
         <section className='idp-sec' aria-labelledby='h-att'>
-          <h2 id='h-att'>Attachments</h2>
+          <h2 id='h-att'>Attachments
+            {!readOnly && <button className='sec-add' aria-label='Add link' onClick={() => setLinkForm((f) => f ?? { url: '', title: '' })}>+</button>}</h2>
           <ul className='idp-rows'>{attachments.map((a) => <li key={a.id}><a href={safeHref(a.url) ?? '#'} target='_blank' rel='noopener noreferrer nofollow'>{a.title}</a>{!readOnly && <button className='x' aria-label={`Remove attachment ${a.title}`} onClick={() => void removeAttachment(a)}>×</button>}</li>)}</ul>
-          {!readOnly && (linkForm ? <form className='inline-add' onSubmit={(e) => { e.preventDefault(); void addLink(); }}><label className='sr-only' htmlFor='att-url'>Link URL</label><input id='att-url' type='url' placeholder='https://…' value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} /><label className='sr-only' htmlFor='att-title'>Link title</label><input id='att-title' placeholder='Title (optional)' value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} /><button type='submit'>Attach</button><button type='button' onClick={() => setLinkForm(null)}>Cancel</button></form> : <button onClick={() => setLinkForm({ url: '', title: '' })}>Add link</button>)}
+          {!readOnly && linkForm && (<form className='inline-add' onSubmit={(e) => { e.preventDefault(); void addLink(); }}><label className='sr-only' htmlFor='att-url'>Link URL</label><input id='att-url' type='url' placeholder='https://…' value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} /><label className='sr-only' htmlFor='att-title'>Link title</label><input id='att-title' placeholder='Title (optional)' value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} /><button type='submit'>Attach</button><button type='button' onClick={() => setLinkForm(null)}>Cancel</button></form>)}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-act'>
           <h2 id='h-act'>Activity</h2>
           <ol className='feed' aria-label='Activity'>
             {timeline.map((t) => t.kind === 'event'
-              ? <li key={t.at.id} className='ev'><span className='dot' aria-hidden='true' /><span className='who'>{who(t.at.actor_id)?.name ?? 'Someone'}</span> {t.at.summary ?? t.at.action} <time dateTime={t.at.created_at}>{fmtTime(t.at.created_at)}</time></li>
+              ? <ActivityEvent key={t.at.id} at={t.at} actor={who(t.at.actor_id)} />
               : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={(x) => (client ? !!viewer?.userId && x.author_id === viewer.userId : x.author_id === ME)} canDelete={(x) => (client ? !!viewer?.userId && (x.author_id === viewer.userId || viewer.role === 'owner' || viewer.role === 'admin') : x.author_id === ME)} readOnly={readOnly} /></li>)}
           </ol>
           {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} />}
@@ -444,7 +446,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         <section className='side-group' aria-labelledby='sg-git'>
           <h3 id='sg-git' className='side-h'>Git</h3>
           <dl>
-          <dt>Branch</dt><dd><button className='branch-btn' onClick={() => void copyBranch()} title={`${branch} (click to copy)`} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code></button></dd>
+          <dt>Branch</dt><dd><Tooltip label={branch}><button className='branch-btn' onClick={() => void copyBranch()} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code><span className='branch-copy'><PropIcon name='copy' /></span></button></Tooltip></dd>
           </dl>
         </section>
       </aside>
@@ -457,13 +459,23 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   );
 }
 
+function ActivityEvent({ at, actor }: { at: ActivityItem; actor: Person | undefined }) {
+  const st = statusOf(at);
+  return (
+    <li className='ev'>
+      <span className='ev-lead' aria-hidden='true'>{actor ? <Avatar initials={actor.initials} hue={actor.hue} /> : <span className='dot' />}</span>
+      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action} <time dateTime={at.created_at}>{fmtTime(at.created_at)}</time></span>
+    </li>
+  );
+}
+
 function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, canDelete, readOnly }: { c: Comment; replies: Comment[]; onReact: (c: Comment, e: string) => void; onReply: (b: string) => Promise<boolean>; onEdit: (c: Comment, b: string) => Promise<boolean>; onDelete: (c: Comment) => void; canEdit: (c: Comment) => boolean; canDelete: (c: Comment) => boolean; readOnly: boolean }) {
   const people = useContext(PeopleCtx); const ME = useContext(MeCtx); const who = (id: string | null | undefined) => findPerson(people, id);
   const [replying, setReplying] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const one = (x: Comment) => (
     <article className='cmt' aria-label={`Comment by ${who(x.author_id)?.name ?? 'Someone'}`}>
-      <header><span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time>{x.edited_at && <span className='dim'> (edited)</span>}
+      <header>{(() => { const u = who(x.author_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}<span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time>{x.edited_at && <span className='dim'> (edited)</span>}
         {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <button aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</button>}{canDelete(x) && <button aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</button>}</span>}</header>
       {editing === x.id ? <Composer label='Edit comment' initial={x.body} autoFocus submitLabel='Save' onSubmit={async (b) => { const ok = await onEdit(x, b); if (ok) setEditing(null); return ok; }} onCancel={() => setEditing(null)} /> : <Markdown source={x.body} empty='' />}
       <div className='reacts' role='group' aria-label='Reactions'>
@@ -491,7 +503,7 @@ function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLa
   const at = activeMention(text, caret);
   const list = at ? suggest(mentionUsers(people), at.query) : [];
   const idx = Math.min(sel, Math.max(list.length - 1, 0));
-  const listId = useMemo(() => lid('ml'), []);
+  const listId = useId(); // stable across SSR and hydration (a Date.now() id made aria-controls mismatch)
   function choose(u: MentionUser) {
     if (!at) return;
     const r = insertMention(text, at, u);
@@ -502,7 +514,7 @@ function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLa
   return (
     <div className='composer'>
       <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}… (@ to mention, ⌘↵ to send)`} rows={3} value={text}
-        role='combobox' aria-expanded={list.length > 0} aria-controls={listId} aria-autocomplete='list' aria-activedescendant={list[idx] ? `${listId}-${list[idx].id}` : undefined}
+        role='combobox' aria-expanded={list.length > 0} aria-controls={list.length > 0 ? listId : undefined} aria-autocomplete='list' aria-activedescendant={list[idx] ? `${listId}-${list[idx].id}` : undefined}
         onChange={(e) => { setText(e.target.value); setCaret(e.target.selectionStart); setSel(0); }}
         onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
         onKeyDown={(e) => {
