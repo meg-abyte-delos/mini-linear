@@ -99,3 +99,10 @@
   .set-back { margin:0; }
   .set-nav-h { display:none; }
 }
+
+/* Role segmented control (invite popover: a nested menu would close the popover on outside press) */
+.set-seg { display:flex; gap:var(--sp-1); padding:2px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--bg); }
+.set-seg-btn { flex:1; height:calc(var(--set-ctl-h) - 6px); padding:0 var(--sp-2); font:inherit; color:var(--muted-strong); background:none; border:0; border-radius:calc(var(--r-sm) - 2px); cursor:pointer; }
+.set-seg-btn:hover { background:var(--hover); }
+.set-seg-btn[aria-checked='true'] { background:var(--sel); color:var(--fg); font-weight:var(--fw-medium); }
+.set-seg-btn:focus-visible { outline:none; box-shadow:var(--accent-ring); }
