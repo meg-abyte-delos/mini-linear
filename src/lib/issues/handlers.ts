@@ -176,7 +176,8 @@ export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req,
   const diff = diffOf(null, row, FIELDS);
   if (b.label_ids.length) diff.label_ids = { before: [], after: row.label_ids };
   await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "create", diff });
-  await emit(ctx, { kind: "issue_created", issueId: id, assigneeId: b.assignee_id ?? null });
+  await emit(ctx, { kind: "issue_created", issueId: id, assigneeId: b.assignee_id ?? null, parentId: b.parent_id ?? null,
+    scope: { teamId: b.team_id, projectId: b.project_id ?? null, cycleId: b.cycle_id ?? null, labelIds: b.label_ids } });
   const res = await out(ctx, slug, row, 201);
   res.headers.set("Location", `/api/v1/w/${slug}/issues/${id}`);
   return res;
@@ -210,7 +211,8 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
   const diff = diffOf(before, after, FIELDS);
   if (b.label_ids && JSON.stringify(before.label_ids) !== JSON.stringify(after.label_ids)) diff.label_ids = { before: before.label_ids, after: after.label_ids };
   if (Object.keys(diff).length) await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff }); // a no-op PATCH leaves no empty event in the feed
-  await emit(ctx, { kind: "issue_updated", issueId: id, before: { assignee_id: before.assignee_id, status: before.status }, after: { assignee_id: after.assignee_id, status: after.status } });
+  await emit(ctx, { kind: "issue_updated", issueId: id, before: { assignee_id: before.assignee_id, status: before.status, parent_id: before.parent_id }, after: { assignee_id: after.assignee_id, status: after.status, parent_id: after.parent_id },
+    scopeBefore: scopeOf(before), scopeAfter: scopeOf(after) });
   return out(ctx, slug, after);
 });
 
@@ -323,3 +325,5 @@ async function bulkPatchOne(ctx: Ctx, id: string, p: z.infer<typeof bulkPatch>) 
   if (JSON.stringify(before.label_ids) !== JSON.stringify(after.label_ids)) diff.label_ids = { before: before.label_ids, after: after.label_ids };
   if (Object.keys(diff).length) await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update", diff: { ...diff, bulk: { before: null, after: true } } });
 }
+
+const scopeOf = (r: Record<string, unknown>) => ({ teamId: r.team_id as string, projectId: r.project_id as string | null, cycleId: r.cycle_id as string | null, labelIds: r.label_ids as string[] });

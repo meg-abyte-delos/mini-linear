@@ -59,11 +59,11 @@ test('row: an issue assigned to another member shows an avatar for that member (
   const p = await page.request.patch(`/api/v1/w/${DEMO.slug}/issues/${richId}`, { data: { assignee_id: USERS.mate.id }, headers: { 'If-Match': String(cur.version) } });
   expect(p.ok()).toBe(true);
   await home(page);
-  // FINDING: /members returns no display name, so other members are labelled from their email local part ("Mate"/"M"), not "Ada Kernel"/"AK" as the session user is.
+  // /members now carries display_name (D9), so other members are labelled "Ada Kernel"/"AK" like the session user, not from the email local part.
   const av = rowOf(page, T.rich).locator('.av-wrap');
   await expect(av).toBeVisible();
-  await expect(av).toHaveAttribute('title', /^mate$/i);
-  await expect(av.locator('.av')).toHaveText('M');
+  await expect(av).toHaveAttribute('title', 'Ada Kernel');
+  await expect(av.locator('.av')).toHaveText('AK');
   await expect(rowOf(page, T.rich).locator('.av-none-ic')).toHaveCount(0);
 });
 

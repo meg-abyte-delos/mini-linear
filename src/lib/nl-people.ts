@@ -7,7 +7,7 @@ export interface NlPeople { users: NlUser[]; me: string | null }
 export const EMPTY_PEOPLE: NlPeople = { users: [], me: null };
 
 type Fetch = typeof fetch;
-export interface MemberRow { user_id: string; email: string }
+export interface MemberRow { user_id: string; email: string; display_name?: string | null }
 export interface MeRow { id: string; email?: string; name?: string | null; display_name?: string | null }
 
 /** "ada.byte@x.io" -> "Ada Byte" (members carry no name column; same local-part rule as /me's fallback). */
@@ -21,7 +21,7 @@ export function toNlPeople(members: readonly MemberRow[], me: MeRow | null): NlP
   const meId = me && isUuid(me.id) ? me.id : null;
   const users = members.filter((m) => isUuid(m.user_id)).map((m) => ({
     id: m.user_id,
-    name: m.user_id === meId && me?.display_name ? me.display_name : nameFromEmail(m.email),
+    name: (m.user_id === meId && me?.display_name) || m.display_name?.trim() || nameFromEmail(m.email),
   }));
   return { users, me: meId };
 }

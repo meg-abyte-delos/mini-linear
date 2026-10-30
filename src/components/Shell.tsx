@@ -1,9 +1,10 @@
 'use client';
 import { EmptyState } from '@/components/ui';
+import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
@@ -20,6 +21,8 @@ import { DISPLAY_PROP_LABEL, GROUPING_LABEL, ORDERING_LABEL, type DisplayProp, l
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
+import { ConfirmDialog } from '@/components/ui';
+import { detailApi } from '@/lib/detail/api';
 import { SelectionBar, type BulkKind } from './SelectionBar';
 import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
@@ -147,6 +150,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     void fetchNlPeople(api.slug).then((p) => { if (live) setNlPeople(p); }).finally(() => { if (live) setNlPeopleLoaded(true); });
     return () => { live = false; };
   }, [api?.slug]);
+  const issueById = useMemo(() => new Map(allIssues.map((x) => [x.id, x] as const)), [allIssues]);
+  const getIssue = useCallback((id: string) => issueById.get(id), [issueById]);
   const people = useMemo<readonly Person[]>(() => (api ? peopleFromNl(nlPeople) : MOCK_PEOPLE), [api, nlPeople]);
   // Push a change to the API (no-op in mock mode). Local state is already updated (optimistic); the server row then wins.
   // 412 -> refetch the issue, toast "modified elsewhere", no automatic retry.
@@ -261,7 +266,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [view, setViewState] = useState<View>(initialView);
   // The view lives in the URL too (?view=board|cycles; list is the default and drops the param).
   function setView(v: View) {
-    setViewState(v);
+    if (v !== view) withViewTransition(() => setViewState(v)); else setViewState(v);
     const sp = new URLSearchParams(window.location.search);
     if (v === 'list') sp.delete('view'); else sp.set('view', v);
     const qs = sp.toString().replace(/%2C/gi, ',');
@@ -377,7 +382,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (!pick) return;
     const items = pick.ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x); if (!items.length) return;
     const NO = 'none';
-    if (items.length > 1) {
+    if (items.length > 1 || pick.kind === 'status' || pick.kind === 'project' || pick.kind === 'cycle') {
       const k = pick.kind, ids = items.map((x) => x.id);
       if (k === 'label') { void applyBulk(ids, labelTogglePatch(items, optId), 'Labels'); return; }
       const m: Record<string, [string, BulkPatch]> = { priority: ['Priority', { priority: Number(optId) }], assignee: ['Assignee', { assignee_id: optId === NO ? null : optId }], status: ['Status', { status: optId as Status }], project: ['Project', { project_id: optId === NO ? null : optId }], cycle: ['Cycle', { cycle_id: optId === NO ? null : optId }] };
@@ -505,6 +510,62 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (!v) { const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
   }
   const [multi, setMulti] = useState<string[]>([]);
+  // Delete (# / Delete / Backspace / bar button): confirm, then soft-delete the selection. API mode: DELETE /issues/<id> (If-Match);
+  // rows the server refuses are put back.
+  const [confirmDel, setConfirmDel] = useState<string[] | null>(null);
+  const [undoDel, setUndoDel] = useState<{ msg: string; items: Issue[] } | null>(null);
+  const confirmTarget = confirmDel?.length === 1 ? store.current.list().find((x) => x.id === confirmDel[0]) : undefined;
+  // Delete only acts in the list and board, on an explicit target: the multi-selection, or the cursor row the user moved to (no fallback to the first row).
+  function askDelete() {
+    if (view !== 'list' && view !== 'board') return;
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
+    const explicit = multiRef.current.length ? multiRef.current : selId && ordered.some((i) => i.id === selId) ? [selId] : [];
+    const ids = explicit.filter((id) => store.current.list().some((x) => x.id === id && !x.deleted_at));
+    if (ids.length) setConfirmDel(ids);
+    else setToast('Select an issue first (J/K to move, X to select).');
+  }
+  async function undoDelete() {
+    const u = undoDel; if (!u) return;
+    setUndoDel(null); setToast(null);
+    let failed = 0;
+    for (const it of u.items) {
+      if (api) {
+        const r = await detailApi(api.slug).restore(it.id);
+        if (!r.ok) { failed += 1; continue; }
+        const row = (r as { data?: unknown }).data as Partial<Issue> | null | undefined;
+        store.current.upsert({ ...it, ...(row && typeof row === 'object' ? row : {}), deleted_at: null });
+        if (row && typeof row.version === 'number') versions.current.set(it.id, row.version);
+      } else store.current.upsert({ ...it, deleted_at: null });
+    }
+    sync();
+    setToast(failed ? `Could not restore ${failed} of ${u.items.length} issues` : `${u.items.length} issue${u.items.length === 1 ? '' : 's'} restored`);
+  }
+  async function deleteIssues(ids: string[]) {
+    const items = ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x);
+    const keep = ordered.filter((i) => !ids.includes(i.id));
+    const at = ordered.findIndex((i) => ids.includes(i.id));
+    for (const it of items) store.current.remove(it.id);
+    setMulti([]); setSelId(keep[Math.min(Math.max(at, 0), keep.length - 1)]?.id ?? '');
+    sync();
+    let failed = 0;
+    const gone: Issue[] = [];
+    if (api) {
+      await Promise.all(ids.map((id) => chains.current.get(id)).filter(Boolean));
+      const client = detailApi(api.slug);
+      await Promise.all(items.map(async (it) => {
+        const r = await client.remove(it.id, versions.current.get(it.id) ?? it.version);
+        if (r.ok) { versions.current.delete(it.id); gone.push(it); }
+        else { failed += 1; store.current.upsert(it); }
+      }));
+      sync();
+    } else gone.push(...items);
+    const done = items.length - failed;
+    const msg = failed ? `Deleted ${done} of ${items.length}, ${failed} could not be deleted` : `${done} issue${done === 1 ? '' : 's'} deleted`;
+    setToast(msg);
+    setUndoDel(gone.length ? { msg, items: gone } : null);
+  }
+
+  function selectAll() { if (view !== 'list' && view !== 'board') return; const list = orderedRef.current; setMulti(list.map((i) => i.id)); if (list.length) setSelId(currentIdRef.current ?? list[0]!.id); }
   function toggleSelect(id: string | undefined) { if (id) setMulti((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id])); }
   // Shift+J/K: move the cursor and add both ends to the selection.
   function extend(dir: 1 | -1) {
@@ -534,7 +595,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'go-project', label: 'Go to project…', run: () => setTimeout(() => setProjPick(null), 0) },
     { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
     ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => { if (view === 'cycles' || view === 'projects') setView('list'); setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0); } })),
-    { id: 'status', label: multi.length > 1 ? `Cycle status of ${multi.length} selected` : 'Change status of selected issue', hint: 'S', run: cycleStatus },
+    { id: 'status', label: multi.length > 1 ? `Cycle status of ${multi.length} selected` : 'Cycle status of selected issue', run: cycleStatus },
+    { id: 'set-status', label: 'Set status…', hint: 'S', run: () => setTimeout(() => openPick('status'), 0) },
+    { id: 'select-all', label: 'Select all issues', hint: '⌘A', run: selectAll },
+    { id: 'delete', label: multi.length > 1 ? `Delete ${multi.length} selected issues…` : 'Delete selected issue…', hint: '#', run: () => setTimeout(askDelete, 0) },
     ...STATUSES.map((st) => ({ id: `move-${st}`, label: multi.length > 1 ? `Move ${multi.length} selected to ${STATUS_LABEL[st]}` : `Move to ${STATUS_LABEL[st]}`, run: () => setStatusBulk(st) })),
     { id: 'set-priority', label: 'Set priority…', hint: 'P', run: () => setTimeout(() => openPick('priority'), 0) },
     { id: 'set-assignee', label: 'Set assignee…', hint: 'A', run: () => setTimeout(() => openPick('assignee'), 0) },
@@ -599,11 +663,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // No hit and no command: one 'No results' line with the single 'Search all' row under it (no separate group).
   const noResults = api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0;
   useEffect(() => { if (palette && activeId) document.getElementById(`pc-${activeId}`)?.scrollIntoView({ block: 'nearest' }); }, [palette, activeId]);
-  const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
+  const actions = useRef({ askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
   const readOnlyRef = useRef(readOnly);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -625,10 +689,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         return;
       }
       if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); actions.current.reorder(e.key === 'ArrowUp' ? -1 : 1); return; }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'a' && !document.querySelector('main[data-view=inbox]')) { e.preventDefault(); actions.current.selectAll(); return; }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (helpOpen.current && e.key !== 'Escape') return;
       // Bare modifier / navigation keydowns (Shift, Control, Tab...) must not reset a pending g sequence.
-      if (e.key.length > 1 && e.key !== 'Enter' && e.key !== 'Escape') return;
+      if (e.key.length > 1 && !['Enter', 'Escape', 'Delete', 'Backspace'].includes(e.key)) return;
       // The inbox owns its list keys while it is the current view.
       if (document.querySelector('main[data-view=inbox]') && ['j', 'k', 'u', 'e', 'h', 's', 'x', '1', '2', '3', 'Enter'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) return;
       const key = keyOf(e); if (!key) return;
@@ -654,7 +719,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         case 'toggle-select': actions.current.toggleSelect(currentIdRef.current); break;
         case 'open': setOpen(true); break;
         case 'create': e.preventDefault(); if (!readOnlyRef.current) actions.current.create(); break;
-        case 'status': actions.current.cycleStatus(); break;
+        case 'status': e.preventDefault(); actions.current.openPick('status'); break;
+        case 'delete': case 'delete-key': case 'delete-bs': e.preventDefault(); actions.current.askDelete(); break;
         case 'priority': e.preventDefault(); actions.current.openPick('priority'); break;
         case 'assignee': e.preventDefault(); actions.current.openPick('assignee'); break;
         case 'label': e.preventDefault(); actions.current.openPick('label'); break;
@@ -727,10 +793,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
           <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
-          <div className='switch' role='group' aria-label='View'>
-            <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
-            <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>
-          </div>
+          {view !== 'inbox' && (
+            <div className='switch' role='group' aria-label='View'>
+              <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
+              <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>
+            </div>
+          )}
         </header>
         {view !== 'cycles' && view !== 'projects' && view !== 'inbox' && !loadError && allIssues.length > 0 && (
           <div className='filterbar' role='toolbar' aria-label='Filters'>
@@ -785,7 +853,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <EmptyState icon='issues' title='No issues yet' hint='Issues track the work your team is doing. Create one to get started.'
             action={!readOnly && <button className='primary' onClick={() => create()}>Create issue <kbd>C</kbd></button>} />
         ) : view === 'inbox' ? (
-          <Inbox client={inboxClient} refreshKey={rtTick} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
+          <Inbox client={inboxClient} refreshKey={rtTick} getIssue={getIssue} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
           <ProjectDetail refreshKey={rtTick} slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
             issues={allIssues.filter((i) => i.project_id === detailId).map((i) => ({ id: i.id, identifier: i.identifier ?? i.id, title: i.title, done: i.status === 'done' || i.status === 'canceled' }))}
@@ -834,19 +902,22 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </dl>
         </aside>
       )}
-      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} openKind={pick && pick.ids.length > 1 ? (pick.kind as BulkKind) : null} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} />}
+      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} openKind={pick && pick.ids.length > 1 ? (pick.kind as BulkKind) : null} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} onDelete={askDelete} />}
+      <ConfirmDialog open={!!confirmDel} title={confirmDel?.length === 1 ? `Delete ${confirmTarget ? (confirmTarget.identifier ?? confirmTarget.id) : 'issue'}?` : `Delete ${confirmDel?.length ?? 0} issues?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDel(null)} onConfirm={() => { const ids = confirmDel ?? []; setConfirmDel(null); void deleteIssues(ids); }}>
+        {confirmDel?.length === 1 && confirmTarget && <p>{confirmTarget.title}</p>}Use Undo right after, or the issue page, to restore.
+      </ConfirmDialog>
       {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
       {help && (
         <div className='overlay' onClick={() => setHelp(false)}>
           <div className='palette' role='dialog' aria-modal='true' aria-label='Keyboard shortcuts' onClick={(e) => e.stopPropagation()} ref={(el) => el?.focus()} tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setHelp(false); } else if (e.key === 'Tab') e.preventDefault(); /* focus trap: the dialog is the only focusable element */ }}>
             {(['Issues', 'Navigation', 'Selection', 'General'] as const).map((g) => (
-              <section key={g}><h3>{g}</h3><ul>{SHORTCUTS.filter((d) => d.group === g).map((d) => <li key={d.id}><span>{d.label}</span><kbd>{formatKeys(d.keys)}</kbd></li>)}</ul></section>
+              <section key={g}><h3>{g}</h3><ul>{SHORTCUTS.filter((d) => d.group === g && !d.hidden).map((d) => <li key={d.id}><span>{d.label}</span><kbd>{formatKeys(d.keys)}</kbd></li>)}</ul></section>
             ))}
           </div>
         </div>
       )}
       <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
-      {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}</div>}
+      {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
       {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}
       {filterPick && <Picker title={`Filter by ${FILTER_LABEL[filterPick.kind].toLowerCase()}`} multi anchor={filterPick.rect} options={filterOptions(filterPick.kind)} onPick={(id) => toggleFilter(filterPick.kind, id)} onClose={() => { const k = filterPick.kind; setFilterPick(null); setTimeout(() => document.getElementById(`fb-${k}`)?.focus(), 0); }} />}
