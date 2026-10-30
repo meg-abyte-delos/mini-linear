@@ -11,12 +11,12 @@ import { emit } from "../notifications";
 import { parseMentions, normalizeEmoji, MAX_MENTIONS } from "../comments/mentions";
 
 // ------------------------------------------------ projects (span teams)
-const PROJECT_F = ["name", "description", "team_ids", "icon", "color", "lead_id", "status", "start_date", "target_date", "member_ids"];
+const PROJECT_F = ["name", "description", "team_ids", "icon", "color", "lead_id", "status", "start_date", "target_date", "priority", "member_ids"];
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((d) => !Number.isNaN(Date.parse(d)), "invalid date");
 const projectBody = z.object({ name: z.string().trim().min(1).max(255), description: z.string().max(100000), team_ids: z.array(uuidSchema).max(50),
   icon: z.string().max(64).nullable(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(), lead_id: uuidSchema.nullable(),
   status: z.enum(["backlog", "planned", "in_progress", "paused", "completed", "canceled"]),
-  start_date: dateStr.nullable(), target_date: dateStr.nullable(), member_ids: z.array(uuidSchema).max(200) }).strict();
+  start_date: dateStr.nullable(), target_date: dateStr.nullable(), priority: z.number().int().min(0).max(4), member_ids: z.array(uuidSchema).max(200) }).strict();
 /** Admins/owners see every project; members see projects sharing a team with them; guests see none. */
 const pvisible = (ctx: Ctx) => atLeast(ctx.role, "admin") ? ctx.tx`true`
   : ctx.role === "guest" ? ctx.tx`false`
@@ -25,7 +25,7 @@ const pvisible = (ctx: Ctx) => atLeast(ctx.role, "admin") ? ctx.tx`true`
 /** Counts are per issue VISIBLE to the caller (teamVisible), so a member of team A never learns the size of team B's share of a cross-team project.
  *  issue_count/issues_total = non-canceled, non-deleted; progress_pct = done / issue_count (0 when empty); progress_by_estimate = done estimate / total estimate (null when no estimates).
  *  health = latest posted update; health_computed = derived from target_date vs progress (src/lib/project-health.ts). */
-const PSEL = (ctx: Ctx) => ctx.tx`select p.id, p.name, p.description, p.icon, p.color, p.lead_id, p.status, p.start_date::text as start_date, p.target_date::text as target_date,
+const PSEL = (ctx: Ctx) => ctx.tx`select p.id, p.name, p.description, p.icon, p.color, p.lead_id, p.status, p.priority, p.start_date::text as start_date, p.target_date::text as target_date,
   p.version, p.created_at, p.updated_at,
   coalesce((select array_agg(team_id order by team_id) from project_teams where project_id = p.id), '{}') as team_ids,
   coalesce((select array_agg(user_id order by user_id) from project_members where project_id = p.id), '{}') as member_ids,
@@ -69,8 +69,8 @@ export const createProject = (req: Request, slug: string) => withWorkspaceCtx(re
     const mine = ids.length ? await ctx.tx`select 1 from team_memberships where user_id = ${ctx.userId} and team_id in ${ctx.tx(ids)}` : [];
     if (mine.length === 0) throw new ApiError("validation_failed", "team_ids must include one of your teams");
   }
-  await ctx.tx`insert into projects (id, workspace_id, name, description, icon, color, lead_id, status, start_date, target_date)
-    values (${id}, ${ctx.workspaceId}, ${b.name}, ${b.description ?? ""}, ${b.icon ?? null}, ${b.color ?? null}, ${b.lead_id ?? null}, ${b.status ?? "backlog"}, ${b.start_date ?? null}, ${b.target_date ?? null})`;
+  await ctx.tx`insert into projects (id, workspace_id, name, description, icon, color, lead_id, status, start_date, target_date, priority)
+    values (${id}, ${ctx.workspaceId}, ${b.name}, ${b.description ?? ""}, ${b.icon ?? null}, ${b.color ?? null}, ${b.lead_id ?? null}, ${b.status ?? "backlog"}, ${b.start_date ?? null}, ${b.target_date ?? null}, ${b.priority ?? 0})`;
   await setTeams(ctx, id, b.team_ids ?? []);
   await setMembers(ctx, id, b.member_ids ?? []);
   const rows = await ctx.tx<Row[]>`${PSEL(ctx)} where p.id = ${id}`; // not via pvisible: a member may create a project for teams they are not in
@@ -91,7 +91,7 @@ export const patchProject = (req: Request, slug: string, rawId: string) => withW
   if (sd && td && td < sd) throw new ApiError("validation_failed", "target_date before start_date");
   const u = await ctx.tx`update projects set name = ${b.name ?? (before.name as string)}, description = ${b.description ?? (before.description as string)},
     icon = ${pick("icon", before.icon) as string | null}, color = ${pick("color", before.color) as string | null}, lead_id = ${lead},
-    status = ${b.status ?? (before.status as string)}, start_date = ${sd}, target_date = ${td}, version = version + 1, updated_at = now()
+    status = ${b.status ?? (before.status as string)}, priority = ${b.priority ?? (before.priority as number)}, start_date = ${sd}, target_date = ${td}, version = version + 1, updated_at = now()
     where id = ${id} and version = ${want} returning id`;
   if (!u.length) throw stale(before);
   if (b.team_ids) await setTeams(ctx, id, b.team_ids);
@@ -118,8 +118,9 @@ const commentBody = z.object({ body: z.string().min(1).max(100000), parent_comme
 const editBody = z.object({ body: z.string().min(1).max(100000) }).strict();
 const reactionBody = z.object({ emoji: z.string().min(1).max(64) }).strict();
 const issueVisible = async (ctx: Ctx, issueId: string) => {
+  // Same visibility as the issue itself (shared with a guest / in one of the caller's teams / admin+): a hidden issue hides its comments.
   const r = await ctx.tx`select 1 from issues i where i.id = ${issueId} and i.deleted_at is null and ${ctx.role === "guest"
-    ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = i.id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)` : ctx.tx`true`}`;
+    ? ctx.tx`exists (select 1 from issue_shares s where s.issue_id = i.id and s.guest_user_id = ${ctx.userId} and s.revoked_at is null)` : teamVisible(ctx, "i.team_id")}`;
   if (!r.length) throw new ApiError("not_found");
 };
 const CMSEL = (ctx: Ctx) => ctx.tx`select c.id, c.issue_id, c.parent_comment_id, c.author_id, c.body, c.version, c.created_at, c.updated_at,

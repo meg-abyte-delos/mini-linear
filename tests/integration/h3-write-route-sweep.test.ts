@@ -50,6 +50,8 @@ describe.runIf(runIntegration)('write-route sweep', () => {
     for (const r of routes) {
       // A caller's own notifications are theirs whatever their role: those two bulk routes legitimately answer 200 to a guest.
       if (/\/notifications\/(read-all|archive-read)$/.test(r.path)) continue;
+      // Search recents are the caller own history (guests may search): clearing or deleting their own rows is legitimate for any role.
+      if (r.method === "DELETE" && /\/search\/recents(\/|$)/.test(r.path)) continue;
       const res = await api(W.G1, r.method, r.path, r.method === 'DELETE' ? undefined : {});
       if (res.status < 400 || res.status >= 500) bad.push(`${label(r)} -> ${res.status}`);
     }
