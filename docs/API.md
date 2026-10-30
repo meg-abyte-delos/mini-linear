@@ -24,7 +24,7 @@ Same endpoints as the app, so the API is always at parity:
 | Issues | `GET/POST /issues`, `GET/PATCH/DELETE /issues/<id>`, `POST /issues/<id>/restore` |
 | Comments | `GET/POST /issues/<id>/comments`, `PATCH/DELETE /comments/<id>` |
 | Attachments | `GET/POST /issues/<id>/attachments` (links), `DELETE /issues/<id>/attachments/<aid>`, file uploads below |
-| Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/<id>` |
+| Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/<id>` (field `priority`: 0 none, 1 urgent .. 4 low, default 0) |
 | Teams | `GET/POST /teams`, `GET/PATCH/DELETE /teams/<id>`, `/teams/<id>/members` |
 | Also | `/cycles`, `/labels`, `/members`, `/audit` |
 
