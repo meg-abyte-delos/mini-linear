@@ -218,6 +218,7 @@ if (process.env.CI && !haveDb) throw new Error('CI=true but DB urls unset: integ
     expect(await types(seed.a.member, done.id)).toEqual(['assigned']);
     const n = (await inbox(seed.a.member)).find((x) => x.issue_id === i.id && x.type === 'due_soon')!;
     expect(n.meta).toEqual({ due_date: today });
+    expect(n).toMatchObject({ kind: 'system', actor_id: null, actor: null });
     const r2 = (await (await call('s3cret')).json()) as { created: number };
     expect(r2.created).toBe(0); // idempotent
     expect((await types(seed.a.member, i.id)).filter((t) => t === 'due_soon').length).toBe(1);
