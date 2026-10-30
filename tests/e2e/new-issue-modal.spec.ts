@@ -143,6 +143,28 @@ test('board column header: hover reveals + and ···; Hide column removes it an
   await expect(page.locator('#c-backlog')).toHaveCount(1);
 });
 
+test('board j/k skips cards of hidden columns and a folded column stays folded after Hide/Show', async ({ page }) => {
+  await page.getByRole('button', { name: /board/i }).click();
+  const col = page.locator('section.col', { has: page.locator('#c-backlog') });
+  await col.locator('.col-head').hover();
+  await col.getByRole('button', { name: 'Backlog column options' }).click();
+  await page.getByRole('menuitem', { name: 'Collapse column' }).click();
+  await expect(col).toHaveClass(/folded/);
+  await col.locator('.col-head').hover();
+  await col.getByRole('button', { name: 'Backlog column options' }).click();
+  await page.getByRole('menuitem', { name: 'Hide column' }).click();
+  await expect(page.locator('#c-backlog')).toHaveCount(0);
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  for (let n = 0; n < 6; n++) {
+    await page.keyboard.press('j');
+    const sel = page.locator('.card[aria-selected="true"], .card.selected, .card[data-selected="true"]');
+    await expect(sel).toHaveCount(1);
+    await expect(sel).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Show Backlog column' }).click();
+  await expect(page.locator('section.col', { has: page.locator('#c-backlog') })).toHaveClass(/folded/);
+});
+
 test('board scrolls horizontally with right padding after the last column', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole('button', { name: /board/i }).click();
