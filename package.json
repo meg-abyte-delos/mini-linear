@@ -16,6 +16,8 @@
     "test:e2e": "playwright test",
     "db:e2e-reset": "E2E_ISOLATED=1 tsx scripts/e2e-db.mts",
     "test:e2e:isolated": "pnpm db:e2e-reset && E2E_ISOLATED=1 playwright test",
+    "test:visual": "pnpm db:e2e-reset && E2E_ISOLATED=1 playwright test tests/e2e/00-visual.spec.ts",
+    "test:visual:update": "pnpm db:e2e-reset && E2E_ISOLATED=1 playwright test tests/e2e/00-visual.spec.ts --update-snapshots",
     "db:migrate": "for f in db/migrations/*.sql; do psql \"$DATABASE_OWNER_URL\" -v ON_ERROR_STOP=1 -f \"$f\" || exit 1; done",
     "db:seed-demo": "tsx scripts/seed-demo.mts",
     "db:seed-demo-rich": "tsx scripts/seed-demo-rich.mts",
