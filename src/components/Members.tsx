@@ -118,7 +118,7 @@ export function Members({ slug }: { slug: string }) {
         <section aria-labelledby='mem-h' className='set-card set-flush'>
           <h2 id='mem-h' className='sr-only'>Members</h2>
           <table className='set-table'>
-            <thead><tr><th scope='col'>Name</th><th scope='col'>Email</th><th scope='col'>Role</th><th scope='col'>State</th><th scope='col'><span className='sr-only'>Actions</span></th></tr></thead>
+            <thead><tr><th scope='col' className='set-col-name'>Name</th><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th><th scope='col' className='set-col-state'>State</th><th scope='col' className='set-col-end'><span className='sr-only'>Actions</span></th></tr></thead>
             <tbody>
               {shown.map((m) => {
                 const name = nameFromEmail(m.email);
@@ -150,11 +150,11 @@ export function Members({ slug }: { slug: string }) {
             <h2 id='inv-h' className='set-h2'>Pending invitations <span className='set-key'>{invites.length}</span></h2>
             <div className='set-card set-flush'>
               <table className='set-table'>
-                <thead><tr><th scope='col'>Email</th><th scope='col'>Role</th><th scope='col'>Expires</th><th scope='col'><span className='sr-only'>Actions</span></th></tr></thead>
+                <thead><tr><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th><th scope='col' className='set-col-state'>Expires</th><th scope='col' className='set-col-end'><span className='sr-only'>Actions</span></th></tr></thead>
                 <tbody>
                   {invites.map((i) => (
                     <tr key={i.id} data-testid='invite-row'>
-                      <td>{i.email}</td>
+                      <td className='set-muted'>{i.email}</td>
                       <td><span className='set-role' data-role={i.role}>{i.role}</span></td>
                       <td className='set-muted'>{dateFmt.format(new Date(i.expires_at))}</td>
                       <td className='set-end'><RowMenu label={`Actions for invitation to ${i.email}`} entries={[

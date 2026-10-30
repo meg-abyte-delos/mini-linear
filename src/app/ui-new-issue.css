@@ -52,3 +52,12 @@
 .ni .re-bar[data-floating] { position:absolute; bottom:calc(100% + var(--sp-1)); left:0; z-index:5; margin:0; padding:0 var(--sp-1); background:var(--raised); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); animation:prim-fade-in var(--dur-fast) var(--ease-out); }
 .ni-desc { overflow:visible; }
 .ni-desc .re-surface { max-height:var(--ni-desc-max-h); overflow:auto; }
+
+/* Review 20:00: Linear title (borderless, no fill, 18px/500, no ring) and a token switch for Create more. */
+.ni input.ni-title, .ni input.ni-title:focus, .ni input.ni-title:focus-visible { height:auto; padding:var(--sp-1) 0; font-size:var(--fs-xl); font-weight:var(--fw-medium); line-height:1.35; background:transparent; border:0; border-radius:0; box-shadow:none; outline:none; }
+.ni input.ni-title[aria-invalid='true'] { box-shadow:inset 0 -1px 0 var(--danger); }
+.ni-more input[role='switch'] { appearance:none; -webkit-appearance:none; flex:none; position:relative; width:26px; height:16px; margin:0; border-radius:8px; background:color-mix(in srgb, var(--fg) 16%, transparent); border:1px solid var(--line); cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.ni-more input[role='switch']::after { content:''; position:absolute; top:2px; left:2px; width:10px; height:10px; border-radius:50%; background:var(--fg); transition:transform var(--dur-fast) var(--ease-out); }
+.ni-more input[role='switch']:checked { background:var(--accent); border-color:var(--accent); }
+.ni-more input[role='switch']:checked::after { transform:translateX(10px); background:var(--accent-fg); }
+@media (prefers-reduced-motion: reduce) { .ni-more input[role='switch'], .ni-more input[role='switch']::after { transition:none; } }

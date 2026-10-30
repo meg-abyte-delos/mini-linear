@@ -109,3 +109,12 @@
 .set-seg-btn:hover { background:var(--hover); }
 .set-seg-btn[aria-checked='true'] { background:var(--sel); color:var(--fg); font-weight:var(--fw-medium); }
 .set-seg-btn:focus-visible { outline:none; box-shadow:var(--accent-ring); }
+
+/* Review 20:00: Members and Pending invitations share one fixed column grid (Role/State land on the same x); pending email muted like member emails. */
+.set-table:has(.set-col-role) { table-layout:fixed; }
+.set-table .set-col-role { width:160px; }
+.set-table .set-col-state { width:140px; }
+.set-table .set-col-end { width:48px; }
+.set-table .set-col-email { width:auto; }
+.set-table:has(.set-col-name) .set-col-name { width:auto; }
+.set-table:has(.set-col-role) td { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
