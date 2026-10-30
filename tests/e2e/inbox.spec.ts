@@ -110,3 +110,14 @@ test('inbox: the List/Board toggle stays on the issues views', async ({ page }) 
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('group', { name: 'View', exact: true })).toBeVisible();
 });
+
+test('shell: the List/Board toggle is hidden on Inbox, Cycles and Projects', async ({ page }) => {
+  for (const v of ['inbox', 'cycles', 'projects']) {
+    await page.goto(`/?view=${v}`);
+    await page.waitForSelector('html[data-ready]');
+    await expect(page.getByRole('group', { name: 'View', exact: true })).toHaveCount(0);
+  }
+  await page.goto('/?view=board');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('group', { name: 'View', exact: true })).toBeVisible();
+});
