@@ -7,7 +7,8 @@
 .feed .ev { position:relative; min-height:28px; }
 .feed .ev .ev-text { color:var(--muted); }
 .feed .ev .ev-sep, .feed .ev .ev-age { color:var(--fg-tertiary); margin-left:0; }
-.feed .ev .ev-age { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cmt .ev-age { color:var(--fg-tertiary); }
+.feed .ev .ev-age, .cmt .ev-age { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .feed .ev .ev-lead { position:relative; z-index:1; background:var(--bg); width:16px; height:20px; }
 .feed > .ev:not(:last-child)::before { content:''; position:absolute; left:7.5px; top:20px; bottom:-8px; width:1px; background:var(--line); }
 
