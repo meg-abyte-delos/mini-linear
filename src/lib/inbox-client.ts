@@ -1,10 +1,11 @@
 // Inbox data access behind one interface: HTTP (API mode) or in-memory (mock mode, used by the e2e suite).
+import { personName } from '@/lib/nl-people';
 export type NotifType = 'assigned' | 'mention' | 'comment' | 'status_change' | 'due_soon';
 export type Notif = {
   id: string; type: NotifType; issue_id: string; comment_id: string | null; actor_id: string | null;
   read_at: string | null; archived_at: string | null; snoozed_until: string | null; created_at: string;
   issue: { id: string; number: number; title: string; status: string; team_id: string; identifier: string } | null;
-  actor: { id: string; email: string } | null;
+  actor: { id: string; email: string; display_name?: string | null } | null;
   /** 'system' = no actor (e.g. due_soon). Optional: older servers omit it. */
   kind?: 'system' | 'user';
 };
@@ -35,7 +36,7 @@ export interface InboxClient {
   readAll(): Promise<boolean>;
 }
 
-export const TYPE_LABEL: Record<NotifType, string> = { assigned: 'assigned you', mention: 'mentioned you', comment: 'commented', status_change: 'changed the status', due_soon: 'is due soon' };
+export const TYPE_LABEL: Record<NotifType, string> = { assigned: 'assigned you', mention: 'mentioned you', comment: 'commented', status_change: 'changed status', due_soon: 'is due soon' };
 
 export function httpInboxClient(slug: string, f: typeof fetch = fetch): InboxClient {
   const b = `/api/v1/w/${slug}/notifications`;
@@ -115,7 +116,7 @@ export function relTime(iso: string, nowMs = Date.now()): string {
 /** Who did it: "Due soon" for system notifications (no actor), else "name <verb>". */
 export function whoLabel(n: Notif): string {
   if (n.kind === 'system') return 'Due soon';
-  return `${n.actor?.email.split('@')[0] ?? 'Someone'} ${TYPE_LABEL[n.type]}`;
+  return `${n.actor ? personName(n.actor) : 'Someone'} ${TYPE_LABEL[n.type]}`;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

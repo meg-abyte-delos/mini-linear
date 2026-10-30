@@ -16,6 +16,11 @@ export function nameFromEmail(email: string): string {
   return local.split(/[._+-]+/).filter(Boolean).map((w) => w[0]!.toUpperCase() + w.slice(1)).join(' ') || email;
 }
 
+/** Display name of a person row: display_name when set, else the email-derived name. */
+export function personName(p: { email: string; display_name?: string | null }): string {
+  return p.display_name?.trim() || nameFromEmail(p.email);
+}
+
 /** Pure: API rows -> parser input. Non-UUID ids are dropped; the session user keeps its display_name when set. */
 export function toNlPeople(members: readonly MemberRow[], me: MeRow | null): NlPeople {
   const meId = me && isUuid(me.id) ? me.id : null;

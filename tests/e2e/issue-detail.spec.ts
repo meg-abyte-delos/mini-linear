@@ -81,6 +81,9 @@ test('comments: mention autocomplete, reply thread, reactions', async ({ page })
   await page.getByRole('button', { name: 'Comment', exact: true }).click();
   const c = page.getByRole('article', { name: /Comment by/ }).first();
   await expect(c.locator('.mention')).toHaveText('@ada');
+  // comment timestamps are relative like events, absolute date on hover
+  await expect(c.locator('time.ev-age')).toHaveText(/^(now|[0-9]+m)$/);
+  await expect(c.locator('time.ev-age')).toHaveAttribute('title', /^[A-Z][a-z]{2} \d{1,2}, /);
   await c.getByRole('button', { name: /React 👍/ }).click();
   await expect(c.getByRole('button', { name: 'React 👍, 1' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Reply', exact: true }).click();

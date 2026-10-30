@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as S from '@/lib/settings-client';
-import { nameFromEmail } from '@/lib/nl-people';
+import { personName } from '@/lib/nl-people';
 import { ConfirmDialog, Popover, Select, UserAvatar, type MenuEntry } from '@/components/ui';
 import { RowMenu } from '@/components/RowMenu';
 import { SettingsShell } from '@/components/SettingsShell';
@@ -83,7 +83,7 @@ export function Members({ slug }: { slug: string }) {
   useEffect(() => { void load(); }, [load]);
 
   const admin = isAdmin(role);
-  const shown = useMemo(() => (rows ?? []).filter((m) => S.matchesMember(m, nameFromEmail(m.email), q)), [rows, q]);
+  const shown = useMemo(() => (rows ?? []).filter((m) => S.matchesMember(m, personName(m), q)), [rows, q]);
   const act = async (p: Promise<unknown>, ok: string) => { try { await p; setMsg(ok); await load(); } catch (e) { setMsg((e as Error).message); } };
   const confirmRemove = async () => {
     if (!removing) return;
@@ -121,7 +121,7 @@ export function Members({ slug }: { slug: string }) {
             <thead><tr><th scope='col' className='set-col-name'>Name</th><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th><th scope='col' className='set-col-state'>State</th><th scope='col' className='set-col-end'><span className='sr-only'>Actions</span></th></tr></thead>
             <tbody>
               {shown.map((m) => {
-                const name = nameFromEmail(m.email);
+                const name = personName(m);
                 const self = m.user_id === meId;
                 const entries: MenuEntry[] = [
                   ...S.assignableRoles(role).map((r) => ({ id: `role-${r}`, label: `Make ${r}`, disabled: m.role === r, onSelect: () => void act(S.setMemberRole(slug, m.user_id, r), `${name} is now ${r}`) })),
@@ -170,7 +170,7 @@ export function Members({ slug }: { slug: string }) {
           </section>
         )}
         <InvitePopover open={inviteOpen} anchorRef={inviteBtn} onClose={() => setInviteOpen(false)} roles={S.assignableRoles(role)} onSend={send} />
-        <ConfirmDialog open={!!removing} destructive busy={busy} title={`Remove ${removing ? nameFromEmail(removing.email) : 'member'}?`} confirmLabel='Remove' onConfirm={() => void confirmRemove()} onCancel={() => setRemoving(null)}>
+        <ConfirmDialog open={!!removing} destructive busy={busy} title={`Remove ${removing ? personName(removing) : 'member'}?`} confirmLabel='Remove' onConfirm={() => void confirmRemove()} onCancel={() => setRemoving(null)}>
           {removing?.email} loses access to this workspace and is removed from all of its teams.
         </ConfirmDialog>
       </div>

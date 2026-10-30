@@ -493,7 +493,7 @@ function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, 
   const [editing, setEditing] = useState<string | null>(null);
   const one = (x: Comment) => (
     <article className='cmt' aria-label={`Comment by ${who(x.author_id)?.name ?? 'Someone'}`}>
-      <header>{(() => { const u = who(x.author_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}<span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time>{x.edited_at && <span className='dim'> (edited)</span>}
+      <header>{(() => { const u = who(x.author_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}<span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <Age iso={x.created_at} />{x.edited_at && <span className='dim'> (edited)</span>}
         {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <button aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</button>}{canDelete(x) && <button aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</button>}</span>}</header>
       {editing === x.id ? <Composer label='Edit comment' initial={x.body} autoFocus submitLabel='Save' onSubmit={async (b) => { const ok = await onEdit(x, b); if (ok) setEditing(null); return ok; }} onCancel={() => setEditing(null)} /> : <Markdown source={x.body} empty='' />}
       <div className='reacts' role='group' aria-label='Reactions'>

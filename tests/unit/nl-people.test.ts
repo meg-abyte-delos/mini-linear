@@ -57,3 +57,12 @@ describe('member display names', () => {
     expect(ps.users.map((u) => u.name)).toEqual(['A', 'Jonas Weber', 'Kim Lee']);
   });
 });
+
+import { personName } from '../../src/lib/nl-people';
+describe('personName', () => {
+  it('prefers display_name, falls back to the email local part', () => {
+    expect(personName({ email: 'mate@example.test', display_name: ' Sam Okafor ' })).toBe('Sam Okafor');
+    expect(personName({ email: 'mate@example.test', display_name: null })).toBe('Mate');
+    expect(personName({ email: 'ada.byte@x.io' })).toBe('Ada Byte');
+  });
+});
