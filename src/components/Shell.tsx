@@ -862,7 +862,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
           <button type='button' ref={navToggleRef} className='side-toggle' aria-label='Open sidebar' aria-controls='app-sidebar' aria-expanded={navOpen} onClick={() => setNavOpen((o) => !o)}><svg width='16' height='16' viewBox='0 0 16 16' aria-hidden='true' focusable='false'><rect x='1.75' y='2.75' width='12.5' height='10.5' rx='2' fill='none' stroke='currentColor' strokeWidth='1.5' /><path d='M6 3v10' stroke='currentColor' strokeWidth='1.5' /></svg></button>
-          <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
+          <div className='crumbs'><span>{view === 'inbox' || !api ? 'Delos' : (sideTeams.find((t) => t.id === teamScope)?.name ?? teamName)}</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
           {(view === 'list' || view === 'board') && !loadError && allIssues.length > 0 && (
             <div className='vtabs' role='group' aria-label='Issue views'>
               {VIEW_TABS.map((t) => { const on = sameSet(filters.status, t.status); return (

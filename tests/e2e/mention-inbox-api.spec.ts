@@ -28,6 +28,14 @@ test('a comment mention creates an inbox notification for the mentioned member',
   const row = mate.getByRole('option').filter({ hasText: title });
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('mentioned you');
+  // Avatar initials come from the actor full name (display_name), not the email local part.
+  const first = (await (await mate.request.get(`/api/v1/w/${DEMO.slug}/notifications?limit=100`)).json()) as { items: { issue_id: string; actor: { email: string; display_name?: string | null } | null }[] };
+  const full = first.items.find((n) => n.issue_id === issue.id)?.actor?.display_name?.trim();
+  if (full) {
+    const w = full.split(' ').filter(Boolean);
+    const want = (w.length === 1 ? [...w[0]!].slice(0, 2).join('') : [...w[0]!][0]! + [...w[w.length - 1]!][0]!).toUpperCase();
+    await expect(row.locator('.av')).toHaveText(want);
+  }
   // API agrees: one 'mention' on this issue, tied to a comment.
   const j = (await (await mate.request.get(`/api/v1/w/${DEMO.slug}/notifications?limit=100`)).json()) as { items: { type: string; issue_id: string; comment_id: string | null }[] };
   const mine = j.items.filter((n) => n.issue_id === issue.id);
