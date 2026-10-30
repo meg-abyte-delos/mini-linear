@@ -1,5 +1,5 @@
 'use client';
-import { EmptyState } from '@/components/ui';
+import { EmptyState, Menu, type MenuEntry } from '@/components/ui';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
@@ -48,7 +48,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }
     return () => ro.disconnect();
   }, []);
   // Keep the selected card inside the rendered window (J/K moves selection through off-screen cards).
-  const heights = useMemo(() => items.map((i) => cardHeight(i.label_ids.length)), [items]);
+  const heights = useMemo(() => items.map((i) => cardHeight(i.label_ids.length, i.title.length)), [items]);
   const selIdx = selectedId ? items.findIndex((i) => i.id === selectedId) : -1;
   useEffect(() => {
     const el = ref.current; if (!el || selIdx < 0) return;
@@ -56,11 +56,20 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }
     if (next !== el.scrollTop) { el.scrollTop = next; setTop(next); }
   }, [selIdx, vh, heights]);
   const w = visibleWindowVar(heights, top, vh);
+  const [menu, setMenu] = useState(false);
+  const [folded, setFolded] = useState(false);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const entries: MenuEntry[] = [
+    ...(onAdd ? [{ id: 'add', label: 'Add issue', onSelect: () => onAdd(status) }] : []),
+    { id: 'fold', label: folded ? 'Expand column' : 'Collapse column', onSelect: () => setFolded((f) => !f) },
+  ];
   return (
-    <section className={`col${overZone ? ' over-zone' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
+    <section className={`col${overZone ? ' over-zone' : ''}${folded ? ' folded' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
       <div className='col-head'>
         <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
+        <button type='button' ref={moreRef} className='col-act' aria-label={`${STATUS_LABEL[status]} column options`} title='Column options' aria-haspopup='menu' aria-expanded={menu} onClick={() => setMenu((m) => !m)}><Icon name='more' /></button>
         {onAdd && <button type='button' className='col-act' aria-label={`Add issue to ${STATUS_LABEL[status]}`} title='Add issue' onClick={() => onAdd(status)}><Icon name='plus' /></button>}
+        <Menu open={menu} anchorRef={moreRef} onClose={() => setMenu(false)} label={`${STATUS_LABEL[status]} column`} entries={entries} align='end' />
       </div>
       <div className='col-scroll' ref={ref} onScroll={(e) => setTop(e.currentTarget.scrollTop)} data-testid={`col-${status}`}>
         <div role='listbox' aria-labelledby={`c-${status}`} style={{ paddingTop: w.padTop, paddingBottom: w.padBottom }}>
