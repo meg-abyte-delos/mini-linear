@@ -287,6 +287,9 @@ type Res = { status: number; body: { items: (Hit & Rec)[]; next_cursor: string; 
   });
 
   it("rate limit: 121st search within a minute is 429 rate_limited with Retry-After; recents are not limited", async () => {
+    // The limiter is a fixed 60s window aligned on the clock: 121 hits straddling a minute boundary land in two buckets (flaky 200). Start right after a boundary when close to one.
+    const intoWindow = Date.now() % 60_000;
+    if (intoWindow > 45_000) await new Promise((r) => setTimeout(r, 60_000 - intoWindow + 250));
     let last = 0;
     for (let i = 0; i < 121; i++) last = (await get(seed.a.owner, "q=zebra&limit=1")).status;
     expect(last).toBe(429);
@@ -296,7 +299,7 @@ type Res = { status: number; body: { items: (Hit & Rec)[]; next_cursor: string; 
     expect((await raw.json()).error?.code).toBe("rate_limited");
     expect((await recent(listRecents, seed.a.owner, "GET")).status).toBe(200);
     expect((await get(seed.a.admin, "q=zebra&limit=1")).status).toBe(200); // other user, own bucket
-  });
+  }, 30_000);
 
   it("unauthenticated: 401", async () => {
     setSessionResolver(async () => null);
