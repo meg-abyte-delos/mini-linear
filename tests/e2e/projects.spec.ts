@@ -77,11 +77,11 @@ test('roadmap axis: sticky header, pill and month labels pass axe contrast in da
   }
 });
 
-test('projects table: 7 column headers, Priority/Lead/Issues hidden under 900px', async ({ page }) => {
+test('projects table: 8 column headers, Priority/Lead/Issues hidden under 900px', async ({ page }) => {
   await page.goto('/?view=projects');
   await page.waitForSelector('html[data-ready]');
   const table = page.getByRole('table', { name: 'Projects' });
-  await expect(table.getByRole('columnheader')).toHaveCount(7);
+  await expect(table.getByRole('columnheader')).toHaveCount(8);
   await page.setViewportSize({ width: 860, height: 800 });
   for (const h of ['Priority', 'Lead', 'Issues']) await expect(table.getByRole('columnheader', { name: h, exact: true })).toBeHidden();
   const row = page.locator(`.pj-row[data-project="${PROJECTS.p1}"]`);

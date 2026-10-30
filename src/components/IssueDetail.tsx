@@ -505,6 +505,8 @@ function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLa
   const [caret, setCaret] = useState(initial.length);
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // Autosize fallback for browsers without CSS field-sizing (CSSOM writes are allowed by the strict CSP).
+  useEffect(() => { const el = ref.current; if (!el || CSS.supports('field-sizing', 'content')) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }, [text]);
   const at = activeMention(text, caret);
   const list = at ? suggest(mentionUsers(people), at.query) : [];
   const idx = Math.min(sel, Math.max(list.length - 1, 0));

@@ -16,6 +16,22 @@ export function StatusIcon({ status }: { status: Status }) {
   );
 }
 
+// Project status (Linear): backlog dotted, planned dashed, in progress half pie, paused two bars,
+// completed filled check, canceled filled x. Colors in ui-projects.css (.psi-*), tokens only.
+export function ProjectStatusIcon({ status }: { status?: string | null }) {
+  const s = status ?? 'backlog';
+  return (
+    <svg className={`psi psi-${s}`} width='14' height='14' viewBox='0 0 14 14' aria-hidden='true' focusable='false'>
+      {s === 'backlog' && <circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' strokeDasharray='1.4 1.75' />}
+      {s === 'planned' && <circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' strokeDasharray='3.2 1.6' />}
+      {s === 'in_progress' && (<><circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' /><path d={pie(0.5)} className='fill' /></>)}
+      {s === 'paused' && (<><circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' /><path d='M5.6 5v4M8.4 5v4' fill='none' strokeWidth='1.5' strokeLinecap='round' /></>)}
+      {s === 'completed' && (<><circle cx='7' cy='7' r='6.75' className='fill' stroke='none' /><path d='M4.5 7.1 6.3 8.9 9.6 5.4' fill='none' stroke='var(--bg)' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' /></>)}
+      {s === 'canceled' && (<><circle cx='7' cy='7' r='6.75' className='fill' stroke='none' /><path d='M5 5 9 9M9 5 5 9' fill='none' stroke='var(--bg)' strokeWidth='1.5' strokeLinecap='round' /></>)}
+    </svg>
+  );
+}
+
 // Priority: Linear bars (3 x 3px, heights 4/7/10, baseline 12), urgent = rounded square with "!".
 export function PriorityIcon({ priority }: { priority: Issue['priority'] }) {
   if (priority === 0) return (<svg className='pi' width='14' height='14' viewBox='0 0 14 14' aria-hidden='true' focusable='false'><g className='dimfill'><rect x='1.5' y='6.25' width='2.5' height='1.5' rx='.5' /><rect x='5.75' y='6.25' width='2.5' height='1.5' rx='.5' /><rect x='10' y='6.25' width='2.5' height='1.5' rx='.5' /></g></svg>);
