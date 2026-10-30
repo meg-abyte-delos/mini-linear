@@ -65,9 +65,7 @@ test('visual: cycles', async ({ page }) => {
 
 test.describe('inbox', () => {
   test.use({ storageState: INBOX_STATE });
-  // FIXME(#187 tokens): inbox buttons (.inbox-bar > button, Archive/Snooze/Mark read/Open issue) render with the native light button background (#efefef) and light text:
-  // contrast 1.08 to 2.42. Un-fixme and add the baseline (--update-snapshots) once they are styled with tokens.
-  test.fixme('visual: inbox', async ({ page }) => {
+  test('visual: inbox', async ({ page }) => {
     await resetInbox();
     await ready(page, `/?view=inbox&${TODAY}`, () => expect(page.getByRole('option').first()).toBeVisible());
     await check(page, 'inbox');
