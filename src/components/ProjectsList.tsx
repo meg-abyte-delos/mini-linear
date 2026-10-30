@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, PriorityIcon, UnassignedIcon } from '@/components/icons';
+import { Avatar, PriorityIcon, ProjectStatusIcon, UnassignedIcon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { MOCK_PEOPLE, findPerson, type Person } from '@/lib/people';
@@ -47,7 +47,7 @@ export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, ca
         {sorted.length === 0 ? <EmptyState compact icon='views' title='No projects' hint='Projects group issues around a shared goal and target date.' /> : mode === 'list' ? (
           <div className='pj-table' role='table' aria-label='Projects'>
             <div className='pj-head' role='row'>
-              {['Name', 'Health', 'Priority', 'Lead', 'Target date', 'Issues', 'Status'].map((h) => <span key={h} role='columnheader'>{h}</span>)}
+              {['Name', 'Health', 'Priority', 'Lead', 'Target date', 'Issues', 'Status', 'Progress'].map((h) => <span key={h} role='columnheader'>{h}</span>)}
             </div>
             {sorted.map((p0) => {
               const p = p0 as Row;
@@ -58,7 +58,7 @@ export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, ca
               return (
                 <div key={p.id} className='cycle project pj-row' role='row' data-project={p.id}>
                   <span className='cy-name' role='cell'>
-                    <ProgressRing pct={pr.pct} size={14} showPct={false} label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`} />
+                    <ProjectStatusIcon status={p.status} />
                     {canOpen ? <button className='pj-name' onClick={() => onOpen(p.id)}>{p.name}</button> : <span className='pj-name'>{p.name}</span>}
                     <span className='pj-actions'><button onClick={() => onViewIssues(p.id)}>View issues</button></span>
                   </span>
@@ -67,8 +67,8 @@ export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, ca
                   <span className='pj-lead' role='cell' title={lead(p.lead_id)}>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av-wrap'><UnassignedIcon /></span>}<span className='pj-lead-t'>{u ? u.name : 'No lead'}</span></span>
                   <span className={`pj-date${late ? ' pj-late' : ''}`} role='cell' data-testid={`target-${p.id}`}>{p.target_date ? <><span className='sr-only'>Target </span>{fmtDate(p.target_date)}{late ? <span className='sr-only'> (overdue)</span> : null}</> : <span className='pj-none'>No date</span>}</span>
                   <span className='pj-issues' role='cell'>{pr.done}/{pr.total}</span>
-                  <span className='pj-prog' role='cell'>
-                    <span className='pj-status' data-status={p.status ?? 'backlog'}>{statusLabel(p.status)}</span>
+                  <span className='pj-stat' role='cell'><ProjectStatusIcon status={p.status} /><span className='pj-status' data-status={p.status ?? 'backlog'}>{statusLabel(p.status)}</span></span>
+                  <span className='pj-prog' role='cell' aria-label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`}>
                     {/* SVG attributes, not inline style: the strict CSP drops style attributes. */}
                     <svg className='pj-bar' height='4' aria-hidden='true' focusable='false'><rect className='pj-track' width='100%' height='4' rx='2' /><rect className='pj-fill' data-done={pr.pct >= 100 || undefined} width={`${pr.pct}%`} height='4' rx='2' /></svg>
                     <span className='cy-count'>{pr.pct}%</span>
