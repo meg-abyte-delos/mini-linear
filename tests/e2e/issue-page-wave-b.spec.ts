@@ -30,7 +30,7 @@ test.afterAll(async ({ request }) => {
     const g = await request.get('/api/v1/w/demo/issues/' + id);
     if (g.status() === 404) continue;
     const v = (await g.json()).version;
-    const r = await request.delete('/api/v1/w/demo/issues/' + id, { headers: { 'If-Match': String(v) } });
+    const r = await request.delete('/api/v1/w/demo/issues/' + id, { headers: { 'If-Match': '"' + v + '"' } });
     expect(r.status()).toBeLessThan(300);
   }
 });
