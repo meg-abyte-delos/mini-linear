@@ -6,7 +6,6 @@
 /* Light: the 18% track vanished on white and a 12% arc read as nothing. Stronger track (Linear-like). */
 [data-theme='light'] .ring-track { stroke:color-mix(in srgb, var(--fg) 28%, transparent); }
 @media (prefers-color-scheme: light) { html:not([data-theme]) .ring-track { stroke:color-mix(in srgb, var(--fg) 28%, transparent); } }
-.ring-arc { transition:stroke-dasharray .3s ease-out; }
 .ring-arc { transition:stroke-dasharray var(--dur-slow) var(--ease-out); }
 .ring-s0 { stop-color:var(--accent); }
 .ring-s1 { stop-color:color-mix(in srgb, var(--accent) 55%, #ffffff); }
