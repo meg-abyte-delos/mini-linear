@@ -215,7 +215,7 @@ export const deleteTeam = (req: Request, slug: string, rawId: string) => withWor
 export const listTeamMembers = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   if (ctx.role === "guest") throw new ApiError("not_found"); // member emails are not for guests (same 404 as the other team subroutes)
   const id = parseId(rawId); await getTeam(ctx, id);
-  const items = await ctx.tx<Row[]>`select t.user_id, u.email, t.role from team_memberships t join users u on u.id = t.user_id where t.team_id = ${id} order by t.user_id`;
+  const items = await ctx.tx<Row[]>`select t.user_id, u.email, u.display_name, t.role from team_memberships t join users u on u.id = t.user_id where t.team_id = ${id} order by t.user_id`;
   return Response.json({ items, next_cursor: null });
 });
 const TEAM_ROLES = ["admin", "member", "guest"] as const;
