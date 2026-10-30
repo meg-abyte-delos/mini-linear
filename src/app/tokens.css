@@ -81,3 +81,5 @@ body { font-family:var(--font-sans); font-size:var(--fs-base); line-height:var(-
 .card { transition:border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
 .card:hover { border-color:color-mix(in srgb, var(--fg) 14%, transparent); }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration:var(--dur-slow); animation-timing-function:var(--ease-out); }
+/* List columns (Linear parity): fixed widths so labels, project and date line up row to row. */
+:root { --list-labels-w:168px; --list-proj-w:132px; --list-date-w:76px; }
