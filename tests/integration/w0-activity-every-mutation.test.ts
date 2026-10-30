@@ -81,7 +81,12 @@ describe.runIf(runIntegration)('activity feed: one entry per mutation', () => {
   it('a no-op PATCH (same value) does not invent a change on the field', async () => {
     const { id, etag } = await mk({ priority: 2 });
     await patch(id, etag, { priority: 2 });
-    for (const u of (await feed(id)).filter((i) => i.action === 'update')) expect(u.changes.filter((c) => c.field === 'priority' && c.before === c.after)).toEqual([]);
+    const updates = (await feed(id)).filter((i) => i.action === 'update');
+    expect(updates).toHaveLength(0); // #192: no empty events, a no-op PATCH writes no update row at all
+    for (const u of updates) expect(u.changes.filter((c) => c.field === 'priority' && c.before === c.after)).toEqual([]);
+    // control: a real change right after produces exactly one update row
+    await patch(id, (await api(W.M1, 'GET', `${P}/issues/${id}`)).headers.get('etag')!, { priority: 3 });
+    expect((await feed(id)).filter((i) => i.action === 'update')).toHaveLength(1);
   });
 
   it('description edits are reported as updated and never quote the text', async () => {
