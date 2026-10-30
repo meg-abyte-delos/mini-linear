@@ -98,12 +98,16 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     const prev = issue;
     const next = { ...issue, ...patch, version: issue.version + 1 };
     setIssue(next);
-    log(label);
-    if (!api) return;
+    if (!api) { log(label); return; }
+    // API mode: show the change at once, then swap it for the server's entry once the PATCH has landed (the server wording names the old and new values).
+    const optId = lid('a');
+    setActivity((a) => [...a, { id: optId, actor_id: ME, action: label, summary: label, created_at: now() }]);
     const r = await patchIssue(slug, prev, version.current, patch as Record<string, unknown>);
     if (r.issue) { version.current = r.issue.version; if (r.kind !== 'ok') setIssue(r.issue); }
     if (r.kind === 'conflict') setToast('Issue modified elsewhere. Reloaded the latest version.');
     else if (r.kind === 'error') setToast('Could not save the change.');
+    if (r.kind !== 'ok') { setActivity((a) => a.filter((x) => x.id !== optId)); }
+    if (client) { const f = await client.activity(issue.id); if (f.ok && f.data.items.length) setActivity(f.data.items); }
   }
 
   async function copy(text: string, what: string) {
