@@ -25,7 +25,7 @@
 1. `GET /issues/:id/sub-issues?limit&cursor&include=children|descendants` (default `children`). Items are the standard issue DTO, ordered `(sort_key, id)`; `descendants` returns the whole subtree flattened with a `depth` (1..4) field. Hidden/deleted issues are excluded. 404 if the parent is not visible. Read: any role that sees the parent.
 2. `GET /issues/:id` and list DTO gain `estimate_rollup: { own: number|null, children: number|null, total: number }` (`children` = sum of non-null estimates of direct children; `total` = `own ?? 0` + `children ?? 0`) and `sub_issues` gains `in_progress` (children whose state category is `started`).
 3. `POST /issues/:id/sub-issues` is **not** added: create a child with `POST /issues { parent_id }` (team must match the parent's team, else 422 `validation_failed` "sub-issue must be in the parent's team"; this rule is new and enforced on POST and PATCH). It also holds when a PATCH changes `team_id` of an issue that has relatives: moving a parent to another team while it has children, or a child to another team than its parent, is 422 `validation_failed` (same message). Detach or move the whole subtree first.
-4. Relations: `POST` with `type: duplicate` also accepts `{ cancel_source: true }` (default false): when true, the source issue moves to the team's first `canceled` state in the same transaction (audited as a status change). Everything else unchanged. Duplicate-of chains deeper than 1 are allowed.
+4. Relations: `POST` with `type: duplicate` also accepts `{ cancel_source: true }` (default **true**): unless explicitly false, the source issue moves to the team's first `canceled` state in the same transaction (audited as a status change). Everything else unchanged. Duplicate-of chains deeper than 1 are allowed.
 5. Closing a parent does not touch children; reopening is manual. Completing the last open child does not auto-close the parent (explicit non-goal).
 6. `GET /teams/:id/estimate-scale` returns `{ scale, allow_zero, values: number[] }` (admin+ always passes; any other caller must be a member of that team, else 404; guests 403). Replaces client-side duplication of `team-config.ts`.
 
@@ -36,4 +36,7 @@ Existing events (`parent_id`, `estimate`, relation create/delete) already render
 `sql/0801_a4_subissue_rollup.up.sql`: two indexes only (`issues (workspace_id, parent_id)` partial, `issue_relations (workspace_id, related_issue_id, type)`). No table, no column.
 
 ### Tests required (acceptance)
-Moving a parent or child to another team 422; scale route for admin outside the team vs member outside the team. Sub-issues list pagination + descendants depth; rollup arithmetic with nulls; team-mismatch 422; cycle/depth 422; guest 404 on hidden parent; cancel_source atomicity; RLS cross-workspace.
+Moving a parent or child to another team is out of scope (no team move feature); the 422 rule on PATCH team_id stays; scale route for admin outside the team vs member outside the team. Sub-issues list pagination + descendants depth; rollup arithmetic with nulls; team-mismatch 422; cycle/depth 422; guest 404 on hidden parent; cancel_source atomicity; RLS cross-workspace.
+
+## Bulk (decision 2026-10-30)
+Bulk issue updates (estimate, labels, versions) keep the existing contract: max 250 ids per call, response `{ succeeded: [...], failed: [{ id, code }] }`; a partial failure is still HTTP 200.
