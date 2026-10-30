@@ -6,7 +6,7 @@
 // Cross-origin cookie requests are refused by withWorkspaceCtx (originAllowed); this route does no Host / X-Forwarded-Host check of its own.
 import { db, withWorkspaceCtx, type Ctx } from '../../http/ctx';
 import { ApiError, errorResponse } from '../../http/errors';
-import { readFeed, type FeedPage } from './feed';
+import { readFeed, readPresence, type FeedPage, type PresenceSnapshot } from './feed';
 
 export const SSE = { pollMs: 2000, authEvery: 5, heartbeatMs: 15_000, maxLifetimeMs: 10 * 60_000, perUserMax: 10 };
 const open = new Map<string, number>(); // user/slug key -> open streams in this instance
@@ -22,11 +22,12 @@ export async function eventsRoute(req: Request, slug: string): Promise<Response>
   const url = new URL(req.url);
   const raw = req.headers.get('last-event-id') ?? url.searchParams.get('last_event_id');
   let cursor: string | null = raw && raw.trim() ? raw.trim().slice(0, 64) : null; // sealed token, validated by readFeed
-  let page: FeedPage | null = null; let userKey = ''; let known: Ctx | null = null; let ticks = 0;
+  let page: FeedPage | null = null; let pres: PresenceSnapshot[] = []; const seen = new Map<string, string>(); let userKey = ''; let known: Ctx | null = null; let ticks = 0;
   const full = (): Promise<Response> => withWorkspaceCtx(req, slug, async (ctx) => {
     userKey = `${ctx.userId}:${ctx.workspaceId}`;
     known = { userId: ctx.userId, workspaceId: ctx.workspaceId, role: ctx.role, req } as Ctx;
     page = await readFeed(ctx, cursor);
+    pres = await readPresence(ctx);
     return new Response(null, { status: 204 });
   });
   // Between full authentications: same user, workspace and role, but membership is re-verified and RLS re-applied.
@@ -38,7 +39,9 @@ export async function eventsRoute(req: Request, slug: string): Promise<Response>
         if (rows.length === 0 || rows[0]!.workspace_id !== k.workspaceId) throw new ApiError('not_found');
         await tx`select set_config('app.workspace_id', ${k.workspaceId}, true)`;
         await tx`select set_config('app.user_id', ${k.userId}, true)`;
-        return readFeed({ ...k, tx } as Ctx, cursor);
+        const c = { ...k, tx } as Ctx;
+        pres = await readPresence(c);
+        return readFeed(c, cursor);
       });
       return new Response(null, { status: 204 });
     } catch (e) { return e instanceof ApiError ? errorResponse(e) : new Response(null, { status: 500 }); }
@@ -61,19 +64,25 @@ export async function eventsRoute(req: Request, slug: string): Promise<Response>
     start(c) {
       const send = (s: string) => { if (closed) return; try { c.enqueue(enc.encode(s)); lastWrite = Date.now(); } catch { release(); } };
       const emit = (p: FeedPage) => {
-        if (p.resync) send(frame({ id: p.cursor, event: 'resync', data: { cursor: p.cursor } }));
+        if (p.resync) { seen.clear(); /* client drops its presence on resync: resend the snapshot */ send(frame({ id: p.cursor, event: 'resync', data: { cursor: p.cursor } })); }
         for (const e of p.events) send(frame({ id: e.id, event: `${e.entity}.${e.op}`, data: e }));
         if (p.events.length === 0 && !p.resync && cursor !== p.cursor) send(`id: ${p.cursor}\n\n`); // advance Last-Event-ID past filtered events
         cursor = p.cursor;
       };
+      // `presence` events (no id: they never move Last-Event-ID) carry the full viewer list of an issue whenever it changes; a new stream starts with a snapshot.
+      const emitPresence = () => {
+        const now = new Map(pres.map((p) => [p.issue_id, p]));
+        for (const [issue_id, p] of now) { const k = JSON.stringify([p.viewers, p.count]); if (seen.get(issue_id) !== k) { seen.set(issue_id, k); send(frame({ event: 'presence', data: p })); } }
+        for (const issue_id of [...seen.keys()]) if (!now.has(issue_id)) { seen.delete(issue_id); send(frame({ event: 'presence', data: { issue_id, viewers: [], count: 0 } })); }
+      };
       send(`retry: 2000\n: open\n\n`);
-      emit(page!);
+      emit(page!); emitPresence();
       const loop = async () => {
         if (closed) return;
         if (Date.now() - started > SSE.maxLifetimeMs) { release(); try { c.close(); } catch { /* gone */ } return; }
         const r = await tick().catch(() => new Response(null, { status: 500 }));
         if (r.status === 401 || r.status === 404 || r.status === 403) { send(frame({ event: 'auth', data: { status: r.status } })); release(); try { c.close(); } catch { /* gone */ } return; }
-        if (r.status === 204 && page) emit(page);
+        if (r.status === 204 && page) { emit(page); emitPresence(); }
         if (Date.now() - lastWrite >= SSE.heartbeatMs) send(': ping\n\n');
         timer = setTimeout(() => { void loop(); }, SSE.pollMs);
       };
