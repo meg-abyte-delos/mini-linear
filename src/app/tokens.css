@@ -21,6 +21,7 @@
   --tracking-id:-0.26px;
   --row-h:44px; --group-h:36px; --side-item-h:28px;
   --row-gap:10px; --id-w:60px; --chip-h:22px;
+  --dp-pick-h:26px; --dp-pick-min-w:120px; --dp-switch-w:28px; --dp-switch-h:16px; --dp-knob:12px; --dp-knob-gap:2px; --op-disabled-deco:.4; /* Display popover controls */
   --shadow-pop:0 4px 24px rgb(0 0 0 / .4), 0 0 0 1px var(--line);
 }
 @media (prefers-reduced-motion: reduce) {

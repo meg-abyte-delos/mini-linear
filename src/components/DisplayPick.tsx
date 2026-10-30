@@ -15,7 +15,7 @@ export function DisplayPick<K extends string>({ label, value, labels, onChange, 
       <button ref={ref} type='button' className='dp-pick' aria-label={label} aria-haspopup='menu' aria-expanded={open} data-value={value} autoFocus={autoFocus} onClick={() => setOpen((o) => !o)}>
         <span>{labels[value]}</span><Chev />
       </button>
-      <Menu open={open} anchorRef={ref} onClose={() => setOpen(false)} label={label} align='end'
+      <Menu open={open} anchorRef={ref} onClose={() => setOpen(false)} label={label} align='end' matchWidth
         entries={keys.map((k) => ({ id: k, label: labels[k], icon: k === value ? <Check /> : undefined, onSelect: () => onChange(k) }))} />
     </>
   );
