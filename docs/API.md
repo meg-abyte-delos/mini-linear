@@ -55,6 +55,7 @@ Rights: list/download follow the issue's visibility (other-team member 404, gues
 | Endpoint | Notes |
 |---|---|
 | `GET /notifications` | items add `coalesced_count`, `last_event_at`, `meta` (`{from,to}` for `status_change`, `{child_id}` for `sub_issue`, `{reason:"followed_<kind>"}`, `{relation_type,related_issue_id}`, `{due_date}`); reply carries `unread_count` |
+| `GET /notifications` (kind) | every item carries `kind`: `"system"` when it has no actor (`actor_id` and `actor` are null, always the case for `due_soon`), `"user"` otherwise. A client renders a system item as "Due soon", never as "Someone"; `status` stays the raw enum (the UI formats it) |
 | `POST /notifications/bulk` | `{ids (1..100), action: read\|unread\|archive\|unarchive}` strict. `200 { updated, results:[{id,status:"ok"\|"not_found"}], unread_count }`. Foreign, hidden and unknown ids are `not_found`, never an error |
 | `GET /subscriptions?kind=project\|cycle\|team\|label` | caller's own entity subscriptions `{ items:[{kind,entity_id,created_at}] }`. Guests: 403, bad kind: 422 |
 | `PUT/DELETE /subscriptions/<kind>/<entityId>` | 204, idempotent. Unknown or invisible entity (for a project: not visible to the caller, same rule as `GET /projects/:id`): 404 on PUT and, for projects, on DELETE; entityId not a uuid: 422, more than 200: 422 |
