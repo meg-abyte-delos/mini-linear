@@ -9,7 +9,7 @@
 The active filters/display of a list persist per user, independent of saved views (a view is a named, shareable snapshot; state is what you currently have open).
 - `scope` is one of `all`, `my-issues`, `team:<uuid>`, `project:<uuid>`, `cycle:<uuid>`, `view:<uuid>` (anything else: 422).
 - `GET /view-state?scope=<scope>` returns `{ scope, layout, filters, display, version, updated_at }`, or **200 with defaults** (`layout: list`, empty filters, `{}` display, `version: 0`) when nothing is stored. Member+; guest 403.
-- `PUT /view-state` body strict `{ scope, layout, filters, display }`, header `If-Match: <version>` (use `0` to create). 200 with the new row. 412 `precondition_failed` on stale, 428 when missing. `filters`/`display` use exactly the schemas of `/views` (max 32 KB / 8 KB: larger is 422). Referenced ids in filter values are **not** validated (a deleted label simply matches nothing).
+- `PUT /view-state` body strict `{ scope, layout, filters, display }`, header `If-Match: <version>` (use `0` to create). 200 with the new row. 412 `precondition_failed` on stale, 428 when missing. Two concurrent first PUTs with `If-Match: 0` race on the primary key: the loser catches the unique violation (23505) and answers 412, never 500 (test with two parallel requests). `filters`/`display` use exactly the schemas of `/views` (max 32 KB / 8 KB: larger is 422). Referenced ids in filter values are **not** validated (a deleted label simply matches nothing).
 - `DELETE /view-state?scope=` resets to defaults, 204, idempotent.
 - `GET /view-state` without scope: `{ items: [...] }` for the caller only (max 100 rows).
 - Scopes `team:`/`project:`/`cycle:`/`view:` must reference something the caller can see, else 404.
@@ -30,4 +30,4 @@ State and favourites are personal and **not** audited. Saved view writes keep th
 `sql/0802_a5_user_view_state.*`: `user_view_state` PK `(workspace_id, user_id, scope)`, `view_favorites` PK `(workspace_id, user_id, view_id)` with composite FK to `saved_views` (cascade). RLS tenant + RESTRICTIVE `own_rows` on `app.user_id`: even admins never read another user's state.
 
 ### Tests required
-Round trip + defaults; stale 412 / missing 428; oversize 422; bad scope 422; invisible scope 404; user B never sees A's state (RLS); favourite on a view that becomes invisible disappears from the list; cap 50; cascade when the view is deleted.
+The `DELETE /views/:id` handler also deletes the caller-independent `view_state` rows whose scope is `view:<uuid>` (all users) in the same transaction; test that no scope row survives and that `/view-state` for that scope returns defaults. Round trip + defaults; stale 412 / missing 428; oversize 422; bad scope 422; invisible scope 404; user B never sees A's state (RLS); favourite on a view that becomes invisible disappears from the list; cap 50; cascade when the view is deleted.
