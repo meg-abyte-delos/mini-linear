@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { initialsOf } from '../../src/lib/member-hue';
-import { RICH_ISSUES, RICH_COMMENTS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, RICH_USERS, issueByKey, mentionsOf, commentAt, atDay, lastStateChangeAt } from '../../scripts/demo-rich-data';
+import { RICH_ISSUES, RICH_COMMENTS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, RICH_USERS, issueByKey, mentionsOf, commentAt, atDay, lastStateChangeAt, issueEventTimes, issueCreatedAt, commentAuditAt } from '../../scripts/demo-rich-data';
 
 const PROJECT_NAMES = ['Mini Linear', 'Cronkit', 'Design System']; // projects created by the demo seeds
 const BASE_RETITLED = 'Port the cron parser from the prototype'; // DEM-7, retitled by the rich seed
@@ -121,6 +121,29 @@ describe('seed v2 activity timeline', () => {
       const created = atDay(r.day, 0, (r.n * 7) % 50), last = lastStateChangeAt(r), updated = atDay(r.day + r.age, 6);
       expect(last >= created, `${r.team}-${r.n} last>=created`).toBe(true);
       expect(last <= updated, `${r.team}-${r.n} last<=updated`).toBe(true);
+    }
+  });
+});
+
+describe('seed v2 event instants (pure functions)', () => {
+  it('issue events are strictly increasing, after creation, ending at the last state change', () => {
+    for (const r of RICH_ISSUES) {
+      const steps = 1 + (r.who ? 1 : 0) + (r.cy ? 1 : 0) + (r.pj ? 1 : 0) + r.labels.length + (r.prio === 1 ? 1 : 0) + (r.state === 5 ? 2 : r.state);
+      const t = issueEventTimes(r, steps);
+      expect(t.length).toBe(steps);
+      expect(t[0]! > issueCreatedAt(r), `${r.team}-${r.n} first>created`).toBe(true);
+      for (let i = 1; i < t.length; i++) expect(t[i]! > t[i - 1]!, `${r.team}-${r.n} step ${i}`).toBe(true);
+      expect(t.at(-1)! >= lastStateChangeAt(r)).toBe(true);
+      expect(new Set(t).size).toBe(t.length);
+    }
+  });
+  it('no comment audit falls before the last state change of its issue, and each is unique per issue', () => {
+    const seen = new Set<string>();
+    for (const m of RICH_COMMENTS) {
+      const at = commentAuditAt(m), last = lastStateChangeAt(issueByKey('DEM', m.n));
+      expect(at > last, `comment ${m.k}`).toBe(true);
+      expect(seen.has(`${m.n}|${at}`), `comment ${m.k} dup`).toBe(false);
+      seen.add(`${m.n}|${at}`);
     }
   });
 });
