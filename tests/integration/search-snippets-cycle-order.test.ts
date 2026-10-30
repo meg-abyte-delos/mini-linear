@@ -60,7 +60,8 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
     await withWorkspace(owner, seed.a.id, async (tx) => {
       await tx`insert into issues (id, workspace_id, team_id, number, title, description, sort_key, created_by) values (${id}, ${seed.a.id}, ${team}, 3, 'Separator check', ${desc}, 'a3', ${seed.a.admin})`;
     });
-    const [{ p }] = await owner`select search_plain(${desc}) as p`;
+    const [row] = await owner<{ p: string }[]>`select search_plain(${desc}) as p`;
+    const p = row!.p;
     expect(p).toBe("Behaviour. 5 attempts per minute Scale: one to five Done. Note: marmoset only Solo. end");
     const h = (await search("marmoset")).find((x) => x.id === id)!;
     expect(h.snippet.replace(/<\/?mark>/g, "")).toContain("Note: ");
