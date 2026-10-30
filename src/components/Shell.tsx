@@ -632,7 +632,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
 
   const row = (i: Issue) => (
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
-      {!readOnly && <span className={`rowsel${multi.includes(i.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${i.identifier ?? i.id}`} onClick={(e) => { e.stopPropagation(); toggleSelect(i.id); }}>{multi.includes(i.id) ? '☑' : '☐'}</span>}
+      {!readOnly && <span className={`rowsel${multi.includes(i.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${i.identifier ?? i.id}`} onClick={(e) => { e.stopPropagation(); toggleSelect(i.id); }} />}
       {shown('priority') && <PriorityIcon priority={i.priority} />}
       {shown('id') && <span className='id'>{i.identifier ?? i.id}</span>}
       {shown('status') && <StatusIcon status={i.status} />}
@@ -768,7 +768,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                 <section key={key} className={`group${s && overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${key}`} {...(s ? zoneProps(s) : {})}>
                   <h2 id={`g-${key}`}>
                     <button className='gh-toggle' aria-expanded={!shut} aria-controls={`gl-${key}`} onClick={() => toggleGroup(key)}>{s && <StatusIcon status={s} />}<span>{s ? STATUS_LABEL[s] : 'All issues'}</span><span className='count'>{items.length}</span><i className='chev' aria-hidden='true'>▾</i></button>
-                    {s && !readOnly && <button className='gh-add' aria-label={`Add issue to ${STATUS_LABEL[s]}`} onClick={() => create(s)}>+</button>}
+                    {s && !readOnly && <button className='gh-add' aria-label={`Add issue to ${STATUS_LABEL[s]}`} onClick={() => create(s)}><Icon name='plus' /></button>}
                   </h2>
                   {!shut && <div id={`gl-${key}`} role='listbox' aria-labelledby={`g-${key}`}>{items.map(row)}</div>}
                 </section>
