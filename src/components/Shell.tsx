@@ -50,7 +50,7 @@ const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'P
 type PickKind = 'priority' | 'assignee' | 'label' | BulkKind;
 interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit; disabled?: boolean }
 
-function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd, onHide }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object; onAdd?: (s: Status) => void; onHide?: (s: Status) => void }) {
+function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd, onHide, folded, onFold }: { status: Status; items: Issue[]; renderCard: (i: Issue, pos?: number, size?: number) => React.ReactNode; selectedId?: string; overZone: boolean; zone: object; onAdd?: (s: Status) => void; onHide?: (s: Status) => void; folded: boolean; onFold: (s: Status) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState(0);
   const [vh, setVh] = useState(800);
@@ -71,11 +71,10 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd, 
   }, [selIdx, vh, heights]);
   const w = visibleWindowVar(heights, top, vh);
   const [menu, setMenu] = useState(false);
-  const [folded, setFolded] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
   const entries: MenuEntry[] = [
     ...(onAdd ? [{ id: 'add', label: 'Add issue', onSelect: () => onAdd(status) }] : []),
-    { id: 'fold', label: folded ? 'Expand column' : 'Collapse column', onSelect: () => setFolded((f) => !f) },
+    { id: 'fold', label: folded ? 'Expand column' : 'Collapse column', onSelect: () => onFold(status) },
     ...(onHide ? [{ id: 'hide', label: 'Hide column', onSelect: () => onHide(status) }] : []),
   ];
   const listRef = useRef<HTMLDivElement>(null);
@@ -195,7 +194,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     };
     chains.current.set(id, (chains.current.get(id) ?? Promise.resolve()).then(run, run));
   }
-  const [hiddenCols, setHiddenCols] = useState<Status[]>([]);
+  const [hiddenCols, setHiddenCols] = useState<Set<Status>>(() => new Set());
+  // Fold state lives here so hiding then showing a column keeps it.
+  const [foldedCols, setFoldedCols] = useState<Set<Status>>(() => new Set());
+  const toggleIn = (set: Set<Status>, st: Status, on?: boolean) => { const n = new Set(set); if (on ?? !n.has(st)) n.add(st); else n.delete(st); return n; };
   const [filters, setFiltersState] = useState<Filters>(initialFilters);
   const [projPick, setProjPick] = useState<DOMRect | null | false>(false);
   const [filterPick, setFilterPick] = useState<{ kind: FilterKey; rect: DOMRect | null } | null>(null);
@@ -333,8 +335,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // Same grouping, ordering and collapsed state as the list render, so j/k never lands on a hidden row.
   const groups = useMemo(() => listGroups(issues, STATUSES, grouping, ordering, showEmpty), [issues, grouping, ordering, showEmpty]);
   const ordered = useMemo(
-    () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.flatMap((s) => issues.filter((i) => i.status === s))),
-    [view, groups, collapsed, issues],
+    () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.filter((s) => !hiddenCols.has(s)).flatMap((s) => issues.filter((i) => i.status === s))),
+    [view, groups, collapsed, issues, hiddenCols],
   );
   // Manual ordering only: with priority/created ordering a drop position would be meaningless.
   const canDrag = view !== 'list' || ordering === 'manual';
@@ -934,14 +936,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         ) : (
           <div className='board'>
-            {STATUSES.filter((s) => !hiddenCols.includes(s)).map((s) => (
-              <Column key={s} status={s} items={issues.filter((i) => i.status === s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} onAdd={readOnly ? undefined : create} onHide={(st) => setHiddenCols((h) => [...h, st])} />
+            {STATUSES.filter((s) => !hiddenCols.has(s)).map((s) => (
+              <Column key={s} status={s} items={issues.filter((i) => i.status === s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} onAdd={readOnly ? undefined : create} onHide={(st) => setHiddenCols((h) => toggleIn(h, st, true))} folded={foldedCols.has(s)} onFold={(st) => setFoldedCols((f) => toggleIn(f, st))} />
             ))}
-            {hiddenCols.length > 0 && (
+            {hiddenCols.size > 0 && (
               <aside className='board-hidden' aria-label='Hidden columns'>
                 <h3>Hidden columns</h3>
-                {hiddenCols.map((s) => (
-                  <button key={s} type='button' className='board-hidden-row' aria-label={`Show ${STATUS_LABEL[s]} column`} onClick={() => setHiddenCols((h) => h.filter((x) => x !== s))}>
+                {STATUSES.filter((s) => hiddenCols.has(s)).map((s) => (
+                  <button key={s} type='button' className='board-hidden-row' aria-label={`Show ${STATUS_LABEL[s]} column`} onClick={() => setHiddenCols((h) => toggleIn(h, s, false))}>
                     <StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span>
                   </button>
                 ))}
