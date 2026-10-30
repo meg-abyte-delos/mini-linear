@@ -5,7 +5,14 @@ test('projects view lists projects with progress and drills into issues', async 
   await page.goto('/?view=projects');
   await page.waitForSelector('html[data-ready]');
   await expect(page.locator('.cycle.project')).toHaveCount(2);
-  await page.locator(`.cycle.project[data-project="${PROJECTS.p2}"]`).getByRole('button', { name: 'View issues' }).click();
+  const p2 = page.locator(`.cycle.project[data-project="${PROJECTS.p2}"]`);
+  const view = p2.getByRole('button', { name: 'View issues' });
+  // Linear-style quiet action: hidden until the row is hovered or focused (keyboard: :focus-within).
+  await view.focus();
+  await expect(view).toHaveCSS('pointer-events', 'auto');
+  await page.keyboard.press('Shift+Tab');
+  await p2.hover();
+  await view.click();
   await expect(page).toHaveURL(new RegExp(`project=${PROJECTS.p2}`));
   await expect(page.getByRole('button', { name: /^Project: Cronkit/ })).toBeVisible();
 });
