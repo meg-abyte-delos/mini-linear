@@ -30,3 +30,6 @@
 
 @media (max-width:860px) { .idp { grid-template-columns:1fr; } }
 @media (prefers-reduced-motion: reduce) { .re-bar, .re-link, .idh-btn, .idh-status, .re-btn, .re-surface ul[data-tasks] > li::before { transition:none; animation:none; } }
+
+/* Review 20:00: Linear issue title 24px/600. */
+.idp-title { font-size:var(--fs-2xl); font-weight:var(--fw-semibold); line-height:1.3; letter-spacing:-0.01em; }
