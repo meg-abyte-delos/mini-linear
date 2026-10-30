@@ -57,6 +57,7 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `PATCH /teams/{team}` | 200 | 200 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /teams/{team}` | 204 | 204 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
 | `GET /teams/{team}/members` | 200 | 200 | 200 | 200 | 404 | 404 | 401 | 200 | 404 |
+| `GET /teams/{team}/estimate-scale` | 200 | 200 | 200 | 404 | 403 | 403 | 401 | 200 | 404 |
 | `POST /teams/{team}/members/{target}` | 201 | 201 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
 | `PATCH /teams/{team}/members/{memberId}` | 200 | 200 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /teams/{team}/members/{target}` | 204 | 204 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
@@ -86,6 +87,7 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `POST /issues/{issue}/unarchive` | 200 | 200 | 200 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `POST /issues/{trashed}/restore` | 200 | 200 | 200 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `GET /issues/{issue}/children` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
+| `GET /issues/{issue}/sub-issues` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
 | `GET /issues/{issue}/attachments` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
 | `POST /issues/{issue}/attachments` | 201 | 201 | 201 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /issues/{issue}/attachments/{attachment}` | 204 | 204 | 204 | 404 | 403 | 403 | 401 | 403 | 404 |

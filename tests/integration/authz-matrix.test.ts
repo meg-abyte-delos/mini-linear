@@ -112,6 +112,8 @@ const ROUTES: [string, string, Pol][] = [
   ['POST', 'w/[slug]/notifications/read-all', 'mem'],
   ['GET', 'w/[slug]/notifications', 'mem'],
   ['GET', 'w/[slug]/notifications/unread-count', 'mem'],
+  ['GET', 'w/[slug]/issues/[id]/sub-issues', 'mem'],
+  ['GET', 'w/[slug]/teams/[id]/estimate-scale', 'mem'],
   ['GET', 'w/[slug]/view-state', 'mem'],
   ['PUT', 'w/[slug]/view-state', 'mem'],
   ['DELETE', 'w/[slug]/view-state', 'mem'],
