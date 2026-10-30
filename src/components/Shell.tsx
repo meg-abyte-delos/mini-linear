@@ -768,7 +768,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : view === 'inbox' ? (
           <Inbox client={inboxClient} refreshKey={rtTick} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
-          <ProjectDetail slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
+          <ProjectDetail refreshKey={rtTick} slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
             issues={allIssues.filter((i) => i.project_id === detailId).map((i) => ({ id: i.id, identifier: i.identifier ?? i.id, title: i.title, done: i.status === 'done' || i.status === 'canceled' }))}
             leadName={who(PROJECTS.find((p) => p.id === detailId)?.lead_id ?? null)?.name ?? null}
             onOpenIssue={(id) => { setDetailId(null); setView('list'); setSelId(id); }} />
