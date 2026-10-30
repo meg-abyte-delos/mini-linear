@@ -42,8 +42,17 @@ function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: bool
         <div className='set-field' role='radiogroup' aria-label='Role'>
           <span className='set-label' aria-hidden='true'>Role</span>
           <div className='set-seg'>
-            {roles.map((r) => (
-              <button key={r} type='button' role='radio' aria-checked={role === r} className='set-seg-btn' onClick={() => setRole(r as 'admin' | 'member' | 'guest')}>{cap(r)}</button>
+            {roles.map((r, i) => (
+              <button key={r} type='button' role='radio' aria-checked={role === r} tabIndex={role === r ? 0 : -1} className='set-seg-btn'
+                onClick={() => setRole(r as 'admin' | 'member' | 'guest')}
+                onKeyDown={(e) => {
+                  const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+                  if (!d) return;
+                  e.preventDefault();
+                  const next = roles[(i + d + roles.length) % roles.length];
+                  setRole(next as 'admin' | 'member' | 'guest');
+                  (e.currentTarget.parentElement?.children[(i + d + roles.length) % roles.length] as HTMLElement | undefined)?.focus();
+                }}>{cap(r)}</button>
             ))}
           </div>
         </div>

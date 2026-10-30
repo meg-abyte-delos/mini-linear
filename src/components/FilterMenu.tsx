@@ -39,7 +39,7 @@ export function FilterMenu({ filters, onPick, onClose }: { filters: Filters; onP
     else if (e.key === 'Home' && at >= 0) { e.preventDefault(); els[0]?.focus(); }
     else if (e.key === 'End' && at >= 0) { e.preventDefault(); els[els.length - 1]?.focus(); }
     else if (e.key === 'Enter' && at < 0 && keys[0]) { e.preventDefault(); onPick(keys[0]); }
-    else if (at >= 0 && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) input.current?.focus(); // typing from a row goes to the input
+    else if (at >= 0 && e.key.length === 1 && e.key !== ' ' && !e.metaKey && !e.ctrlKey && !e.altKey) input.current?.focus(); // typing from a row goes to the input
   };
   return (
     <div className='tb-menu filter-menu' role='menu' aria-label='Filter by' onKeyDown={onKey}>

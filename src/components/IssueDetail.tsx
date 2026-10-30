@@ -465,7 +465,7 @@ function ActivityEvent({ at, actor }: { at: ActivityItem; actor: Person | undefi
   return (
     <li className='ev'>
       <span className='ev-lead' aria-hidden='true'>{actor ? <Avatar initials={actor.initials} hue={actor.hue} /> : <span className='dot' />}</span>
-      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action} <time dateTime={at.created_at}>{fmtTime(at.created_at)}</time></span>
+      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && !/^created/.test(at.summary ?? at.action) && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action} <time dateTime={at.created_at}>{fmtTime(at.created_at)}</time></span>
     </li>
   );
 }
