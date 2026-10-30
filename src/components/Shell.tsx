@@ -39,6 +39,13 @@ import { NewIssueModal, type NewIssueDraft } from '@/components/NewIssueModal';
 import { FilterMenu } from '@/components/FilterMenu';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
+// Linear-like view tabs above the list: each one is a status filter set (A5 saved views stay in the sidebar).
+const VIEW_TABS: { id: string; label: string; status: readonly string[] }[] = [
+  { id: 'all', label: 'All issues', status: [] },
+  { id: 'active', label: 'Active', status: ['todo', 'in_progress', 'in_review'] },
+  { id: 'backlog', label: 'Backlog', status: ['backlog'] },
+];
+const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && b.every((x) => a.includes(x));
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'Priority', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
 type PickKind = 'priority' | 'assignee' | 'label' | BulkKind;
 interface Cmd { id: string; label: string; hint?: string; run: () => void; hit?: SearchHit; disabled?: boolean }
@@ -819,19 +826,29 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
           <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
-          {(view === 'list' || view === 'board') && (
-            <div className='switch' role='group' aria-label='View'>
-              <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
-              <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>
+          {(view === 'list' || view === 'board') && !loadError && allIssues.length > 0 && (
+            <div className='vtabs' role='group' aria-label='Issue views'>
+              {VIEW_TABS.map((t) => { const on = sameSet(filters.status, t.status); return (
+                <button key={t.id} type='button' className='vtab' data-testid={`vtab-${t.id}`} aria-pressed={on} onClick={() => { setActiveViewId(null); setFilters({ ...filters, status: [...t.status] }); }}>{t.label}</button>
+              ); })}
             </div>
+          )}
+          {(view === 'list' || view === 'board') && (
+          <div className='switch' role='group' aria-label='View'>
+            <button aria-pressed={view === 'list'} onClick={() => setView('list')} title='List'><Icon name='list' /><span>List</span></button>
+            <button aria-pressed={view === 'board'} onClick={() => setView('board')} title='Board'><Icon name='board' /><span>Board</span></button>
+          </div>
           )}
         </header>
         {view !== 'cycles' && view !== 'projects' && view !== 'inbox' && !loadError && allIssues.length > 0 && (
           <div className='filterbar' role='toolbar' aria-label='Filters'>
             {FILTER_KEYS.filter((k) => filters[k].length > 0).map((k) => (
-              <button key={k} id={`fb-${k}`} className='fchip on' aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed='true' onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
-                {FILTER_LABEL[k]}<span className='fval'>: {filterValueLabel(k)}</span>
-              </button>
+              <span key={k} className='fseg' data-kind={k}>
+                <button id={`fb-${k}`} className='fchip on' aria-label={`${FILTER_LABEL[k]}: ${filterValueLabel(k)}`} aria-haspopup='dialog' aria-expanded={filterPick?.kind === k} aria-pressed='true' onClick={(e) => setFilterPick({ kind: k, rect: e.currentTarget.getBoundingClientRect() })}>
+                  <span className='fkey'>{FILTER_LABEL[k]}<span className='fcolon' aria-hidden='true'>:</span></span><span className='fval'>{' '}{filterValueLabel(k)}</span>
+                </button>
+                <button type='button' className='fx' aria-label={`Remove ${FILTER_LABEL[k].toLowerCase()} filter`} title='Remove filter' onClick={() => { setActiveViewId(null); setFilters({ ...filters, [k]: [] }); }}><Icon name='x' size={12} /></button>
+              </span>
             ))}
             <div className='fwrap'>
               <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></button>

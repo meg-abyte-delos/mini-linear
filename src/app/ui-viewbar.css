@@ -1,0 +1,45 @@
+/* I8: Linear-like view bar (tabs in the header, segmented filter chips, quiet toolbar) + responsive from 768px. Tokens only. */
+.head { gap:var(--row-gap); }
+.head .crumbs { flex:none; }
+.vtabs { display:flex; align-items:center; gap:2px; margin-right:auto; margin-left:4px; min-width:0; overflow-x:auto; scrollbar-width:none; }
+.vtab { height:24px; padding:0 10px; border:1px solid transparent; border-radius:var(--r-sm); background:none; color:var(--muted); font:inherit; font-size:var(--fs-sm); font-weight:var(--fw-medium); white-space:nowrap; cursor:pointer; transition:color var(--dur-instant) var(--ease-out), background var(--dur-instant) var(--ease-out), border-color var(--dur-instant) var(--ease-out); }
+.vtab:hover { color:var(--fg); background:var(--hover); }
+.vtab[aria-pressed=true] { color:var(--fg); background:var(--sel); border-color:var(--line); }
+.vtab:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; box-shadow:none; }
+.fseg .fx:focus-visible, .fseg .fchip.on:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; box-shadow:none; }
+
+/* Filter row: one compact line, quiet buttons */
+.filterbar { gap:6px; padding:6px 16px; min-height:36px; }
+.filterbar .tb-btn { border-color:transparent; color:var(--muted); }
+.filterbar .tb-btn:hover, .filterbar .tb-btn[aria-expanded=true] { border-color:var(--line); }
+
+/* Segmented chip: key | value | x, one hairline box (Linear's "Status is Todo ×") */
+.fseg { display:inline-flex; align-items:stretch; height:24px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel); overflow:hidden; }
+.fseg .fchip.on { height:22px; border:0; border-radius:0; padding:0; display:inline-flex; align-items:stretch; background:none; color:var(--muted-strong); }
+.fseg .fchip.on:hover { background:var(--hover); }
+.fseg .fkey { display:inline-flex; align-items:center; padding:0 8px; color:var(--muted); border-right:1px solid var(--line); }
+.fseg .fval { display:inline-flex; align-items:center; padding:0 8px; color:var(--fg); font-weight:var(--fw-medium); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fseg .fcolon { font-size:0; } /* keeps the accessible name 'Status: Todo' without showing the colon */
+.fx { display:inline-flex; align-items:center; justify-content:center; width:24px; padding:0; border:0; border-left:1px solid var(--line); background:none; color:var(--muted); cursor:pointer; transition:color var(--dur-instant) var(--ease-out), background var(--dur-instant) var(--ease-out); }
+.fx:hover { color:var(--fg); background:var(--hover); }
+.fclear { text-decoration:none; color:var(--muted); }
+.fclear:hover { text-decoration:underline; }
+.filterbar .save-view { border-style:solid; border-radius:var(--r-sm); border-color:var(--line); }
+
+/* Responsive: Linear keeps the shell from 768px, with a narrower sidebar and fewer columns */
+@media (max-width:1100px) {
+  .shell { grid-template-columns:200px 1fr; }
+}
+@media (max-width:960px) {
+  .shell { grid-template-columns:184px 1fr; }
+  .switch button span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .switch button { padding:0 8px; }
+  .row .labels .chip:not(.proj) { display:none; }
+  .fseg .fval { max-width:140px; }
+}
+@media (max-width:840px) {
+  .row .labels, .row .date { display:none; }
+  .vtab { padding:0 8px; }
+  .filterbar .tb-btn span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+}
+@media (prefers-reduced-motion: reduce) { .vtab, .fx { transition:none; } }
