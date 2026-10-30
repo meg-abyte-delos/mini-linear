@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+
+// Axe samples colors at one instant: with the 120ms motion tokens (#216) a fading row/toast reads as low contrast on slow CI runners.
+test.use({ reducedMotion: 'reduce' });
 // D6: settings layout (left nav, centered column) and the Members page (search, invite, row actions). API mode, demo session = owner.
 test('settings page: left nav, primitives, delete team confirms in a dialog, axe clean', async ({ page }) => {
   await page.goto('/w/demo/settings');
