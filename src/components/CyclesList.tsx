@@ -46,8 +46,8 @@ export function CyclesList({ cycles, issues, today, slug, onViewIssues }: Props)
               const bdOpen = burnOpen.has(c.id);
               return (
                 <Fragment key={c.id}>
-                  <div className='cycle' data-cycle={c.id} data-bucket={b.id}>
-                    <span className='cy-name'><CycleGlyph bucket={b.id} /><span className='cy-title'>{c.name}</span>{b.id === 'active' && <span className='cy-badge'>Current</span>}</span>
+                  <div className='cycle' data-cycle={c.id} data-bucket={b.id} onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) onViewIssues(c.id); }}>
+                    <span className='cy-name'><CycleGlyph bucket={b.id} /><button type='button' className='cy-title' aria-label={`View issues in ${c.name}`} onClick={() => onViewIssues(c.id)}>{c.name}</button>{b.id === 'active' && <span className='cy-badge'>Current</span>}</span>
                     <span className='cy-dates'>{fmtDate(c.start_date)} <span aria-hidden='true'>→</span><span className='sr-only'>to</span> {fmtDate(c.end_date)}{timing && <span className='cy-timing'>{timing}</span>}</span>
                     <span className='cy-scope'>
                       <span title='Scope'>{s.total} {s.total === 1 ? 'issue' : 'issues'}</span>
@@ -60,7 +60,6 @@ export function CyclesList({ cycles, issues, today, slug, onViewIssues }: Props)
                     </span>
                     <span className='cy-actions'>
                       {slug && isUuid(c.id) && <button aria-expanded={bdOpen} aria-controls={`bd-${c.id}`} aria-label={`${bdOpen ? 'Hide' : 'Show'} burndown for ${c.name}`} title='Burndown' onClick={() => toggle(c.id)}><Icon name='chart' /></button>}
-                      <button aria-label={`View issues in ${c.name}`} title='View issues' onClick={() => onViewIssues(c.id)}><Icon name='arrowRight' /></button>
                     </span>
                   </div>
                   {bdOpen && slug && <div id={`bd-${c.id}`}><CycleBurndown slug={slug} cycleId={c.id} name={c.name} today={today} /></div>}
