@@ -1,5 +1,5 @@
 'use client';
-import { EmptyState, Menu, type MenuEntry } from '@/components/ui';
+import { EmptyState, Menu, Tooltip, type MenuEntry } from '@/components/ui';
 import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
@@ -19,7 +19,7 @@ import { MIN_QUERY, searchApi, searchLocal, snippetParts, type SearchHit } from 
 import { CyclesList } from '@/components/CyclesList';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
-import { DISPLAY_PROP_LABEL, GROUPING_LABEL, ORDERING_LABEL, type DisplayProp, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
+import { DISPLAY_PROP_LABEL, GROUPING_LABEL, ORDERING_LABEL, type DisplayProp, fitLabels, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
@@ -778,7 +778,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       {shown('status') && <StatusIcon status={i.status} />}
       <span className='title'>{i.title}</span>
       {subBadge(i)}
-      {shown('labels') && <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</span>}
+      {shown('labels') && <span className='labels'>{(() => { const { shown: vis, hidden } = fitLabels(i.label_ids.flatMap((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? [lb] : []; })); return <>{vis.map((lb) => <span key={lb.id} className={`chip ${lb.hue}`}>{lb.name}</span>)}{hidden.length > 0 && <Tooltip label={hidden.map((h) => h.name).join(', ')}><span className='chip chip-more' tabIndex={0} aria-label={`${hidden.length} more labels: ${hidden.map((h) => h.name).join(', ')}`}>+{hidden.length}</span></Tooltip>}</>; })()}</span>}
       {shown('project') && <span className='proj-col'>{(() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj' title={pj.name}><PropIcon name='project' /><span className='proj-name'>{pj.name}</span></span> : null; })()}</span>}
       {shown('created') && <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>}
       {shown('assignee') && assignee(i)}

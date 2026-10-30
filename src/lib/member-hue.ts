@@ -1,14 +1,9 @@
-// Stable avatar hue for API members (no hue column): FNV-1a hash of the id over the palette
-// the USERS mock already uses, so a given member keeps the same colour everywhere.
-import { USERS } from '@/lib/issues';
+// Stable avatar colour for API members (no hue column): the same 8-slot hash UserAvatar uses, as a class
+// suffix (.av.c0..c7), so a member keeps one colour everywhere and the palette is not 5 shades of blue.
+import { avatarSlot, initialsOf as initialsFromName } from '@/lib/ui/avatar';
 
-export type Hue = (typeof USERS)[number]['hue'];
-const HUES: readonly Hue[] = Array.from(new Set(USERS.map((u) => u.hue)));
+export type Hue = string;
+export const hueFor = (id: string): Hue => `c${avatarSlot(id)}`;
 
-export function hueFor(id: string): Hue {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
-  return HUES[h % HUES.length]!;
-}
-
-export const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+/** First + last name initials ("Maya Chen" -> "MC"; one word -> its first two letters). */
+export const initialsOf = initialsFromName;
