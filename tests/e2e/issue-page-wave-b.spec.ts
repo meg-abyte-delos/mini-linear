@@ -37,17 +37,16 @@ test.afterAll(async ({ request }) => {
 
 test.beforeAll(async ({ request }) => { teamId = (await (await request.get('/api/v1/w/demo/teams')).json()).items[0].id; });
 
-test('header shows the ID and the status; the status button opens the picker', async ({ page }) => {
+test('header breadcrumb shows team and ID; status is changed from Properties only', async ({ page }) => {
   const a = await mk(page, `wb header ${stamp}`);
   await open(page, a.identifier);
   const head = page.locator('.idp-head');
   await expect(head.getByLabel('Breadcrumb')).toContainText(a.identifier);
-  const st = head.getByRole('button', { name: /^Status: .*Change status$/ });
-  await expect(st).toBeVisible();
-  await st.click();
+  await expect(head.getByRole('button', { name: /^Status: / })).toHaveCount(0);
+  const props = page.getByRole('complementary', { name: 'Properties' });
+  await props.getByRole('button', { name: /Backlog|Todo/ }).first().click();
   await page.getByRole('dialog', { name: 'Change status' }).getByRole('option', { name: /Done/ }).click();
-  await expect(st).toContainText('Done');
-  await expect(page.getByRole('complementary', { name: 'Properties' })).toContainText('Done');
+  await expect(props).toContainText('Done');
 });
 
 test('properties are grouped under four headings', async ({ page }) => {

@@ -42,14 +42,14 @@ export function WorkspaceSwitcher({ slug, name = 'Delos', people }: { slug: stri
 }
 
 const KEY = 'ml.side.team.open';
-export function TeamSection({ name, children }: { name: string; children: ReactNode }) {
+export function TeamSection({ name, children, id = 'team-nav' }: { name: string; children: ReactNode; id?: string }) {
   const [open, setOpen] = useState(true);
   useEffect(() => { try { if (localStorage.getItem(KEY) === '0') setOpen(false); } catch { /* storage off */ } }, []);
   const toggle = () => setOpen((o) => { const n = !o; try { localStorage.setItem(KEY, n ? '1' : '0'); } catch { /* storage off */ } return n; });
   return (
     <>
-      <button className='side-link team-toggle' aria-expanded={open} aria-controls='team-nav' onClick={toggle}><Icon name='team' /><span>{name}</span><Chevron open={open} /></button>
-      <div id='team-nav' className='team-nav' hidden={!open}>{children}</div>
+      <button className='side-link team-toggle' aria-expanded={open} aria-controls={id} onClick={toggle}><Icon name='team' /><span>{name}</span><Chevron open={open} /></button>
+      <div id={id} className='team-nav' hidden={!open}>{children}</div>
     </>
   );
 }

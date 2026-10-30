@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
-import { PriorityIcon, StatusIcon } from '@/components/icons';
+import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
+import { hueFor, initialsOf } from '@/lib/member-hue';
 import { PRIORITY_LABEL, STATUS_LABEL, type Issue, type Status } from '@/lib/issues';
 import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
 
@@ -125,7 +126,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, refresh
               <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
                 <span className={`rowsel${checked.has(n.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }}>{checked.has(n.id) ? '☑' : '☐'}</span>
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
-                <span className='nav-av' aria-hidden='true' data-kind={n.actor ? 'user' : 'system'}>{n.actor ? n.actor.email.charAt(0) : <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.5'><circle cx='8' cy='8' r='5.5' /><path d='M8 5v3l2 1.5' /></svg>}</span>
+                {n.actor ? <Avatar initials={initialsOf(n.actor.email.split('@')[0] ?? '')} hue={hueFor(n.actor.id)} /> : <span className='nav-av' aria-hidden='true' data-kind='system'><svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.5'><circle cx='8' cy='8' r='5.5' /><path d='M8 5v3l2 1.5' /></svg></span>}
                 <span className='nmain'>
                   <span className='ntitle' title={n.issue?.title ?? ''}>{n.issue?.title ?? ''}</span>
                   <span className='nsub'>

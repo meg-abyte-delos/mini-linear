@@ -15,8 +15,7 @@
 
 /* 3. Cmd+K: readable group labels and footer keycaps (12px, AA), quiet 12px ID, heavier title. */
 .palette li.pal-group { font-size:var(--fs-sm); color:var(--muted-strong); }
-.palette-foot { font-size:var(--fs-sm); color:var(--muted-strong); }
-.palette-foot kbd, .palette .pal-keys kbd { font-size:var(--fs-sm); color:var(--fg); background:color-mix(in srgb, var(--fg) 8%, transparent); border-color:var(--line); }
+.palette .pal-keys kbd { font-size:var(--fs-sm); color:var(--fg); background:color-mix(in srgb, var(--fg) 8%, transparent); border-color:var(--line); }
 .palette .hit-id { font-size:var(--fs-sm); font-weight:var(--fw-regular); color:var(--muted); }
 .palette .pal-label { color:var(--fg); font-weight:var(--fw-medium, 500); }
 

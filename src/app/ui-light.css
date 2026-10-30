@@ -49,7 +49,7 @@
 /* Surfaces that hard-coded dark literals now read tokens */
 .palette, .picker { box-shadow:var(--shadow-lg); }
 .tb-menu, .ws-menu, .snooze-menu { box-shadow:var(--shadow-pop); }
-.palette-foot, .palette .hit-id { color:var(--muted); }
+.palette .hit-id { color:var(--muted); }
 .row[aria-selected=true] .date { color:var(--muted); }
 .pd-health.on_track { color:var(--st-ok, #3fb950); } .pd-health.at_risk { color:var(--st-warn, #d29922); } .pd-health.off_track, .pd-err { color:var(--st-danger, #f85149); }
 /* Light-only: these load after ui-night, so unscoped they would also restyle dark. */

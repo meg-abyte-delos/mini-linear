@@ -18,12 +18,12 @@ test('settings page: left nav, primitives, delete team confirms in a dialog, axe
   // Create a throwaway team, then delete it through the confirm dialog (no window.confirm).
   await page.getByLabel('Team name').fill('Zeta Scratch');
   await page.getByRole('button', { name: 'Create team' }).click();
-  await page.getByRole('button', { name: 'Delete Zeta Scratch' }).click();
+  await page.getByRole('button', { name: 'Delete team Zeta Scratch' }).click();
   const dlg = page.getByRole('alertdialog');
   await expect(dlg).toContainText('cannot be undone');
   await expect(dlg.getByRole('button', { name: 'Delete team' })).toHaveAttribute('data-destructive', 'true');
   await dlg.getByRole('button', { name: 'Delete team' }).click();
-  await expect(page.getByRole('button', { name: 'Delete Zeta Scratch' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Delete team Zeta Scratch' })).toHaveCount(0);
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(r.violations.map((v) => `${v.id} x${v.nodes.length}`)).toEqual([]);
 });

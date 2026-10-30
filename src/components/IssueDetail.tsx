@@ -11,6 +11,7 @@ import { RichEditor } from '@/components/RichEditor';
 import { useIssueRealtime } from '@/lib/detail/use-issue-realtime';
 import { ConfirmDialog, Tooltip, type MenuEntry } from '@/components/ui';
 import { createIssue, patchIssue } from '@/lib/api-client';
+import { listTeams } from '@/lib/settings-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
 import { statusOf } from '@/lib/detail/activity-status';
 import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
@@ -92,6 +93,10 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const version = useRef(initial.version);
   const client = useMemo(() => (api ? detailApi(slug) : null), [api, slug]);
   const ident = identifierOf(issue);
+  // Breadcrumb root is the owning team's name ("Demo"), falling back to the identifier key until the team list loads.
+  const [teamNames, setTeamNames] = useState<Record<string, string>>({});
+  useEffect(() => { if (!api) return; let live = true; void listTeams(slug).then((ts) => { if (live) setTeamNames(Object.fromEntries(ts.map((t) => [t.id, t.name]))); }).catch(() => { /* keep fallback */ }); return () => { live = false; }; }, [api, slug]);
+  const teamLabel = teamNames[(issue as { team_id?: string }).team_id ?? teamId ?? ''] ?? (ident.includes('-') ? ident.slice(0, ident.lastIndexOf('-')) : 'Issues');
   const branch = issue.branch_name || branchName(ident, issue.title);
   const children = others.filter((i) => i.parent_id === issue.id && !i.deleted_at);
   const parent = others.find((i) => i.id === issue.parent_id);
@@ -379,8 +384,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     <div className='idp'>
       <main className='idp-main' aria-label={`Issue ${ident}`}>
         <header className='idp-head'>
-          <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>Issues</Link><span className='sep' aria-hidden='true'>/</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>/</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
-          <button className='idh-status' disabled={readOnly} onClick={open('status')} aria-haspopup='dialog' aria-label={`Status: ${STATUS_LABEL[issue.status]}. Change status`}><StatusIcon status={issue.status} /><span>{STATUS_LABEL[issue.status]}</span></button>
+          <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>{teamLabel}</Link><span className='sep' aria-hidden='true'>›</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>›</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
           <PresenceStack presence={viewers} size='md' />
           <IssueHeaderBar ident={ident} nav={nav} readOnly={readOnly} entries={menuEntries} moreRef={moreRef} onRestore={() => void lifecycle('restore')} />
         </header>

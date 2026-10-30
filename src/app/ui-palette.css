@@ -33,13 +33,11 @@
 .palette li[aria-selected='true'] .pal-ic { color: var(--fg); }
 .palette .pal-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette .pal-keys { display: inline-flex; gap: 4px; margin-left: auto; }
-.palette .pal-keys kbd, .palette-foot kbd { margin: 0; min-width: 18px; text-align: center; }
+.palette .pal-keys kbd { margin: 0; min-width: 18px; text-align: center; }
 .palette li.pal-empty { justify-content: center; height: 72px; color: var(--muted); cursor: default; }
 .palette li.pal-empty .pal-ic { display: none; }
 .palette li.nl-action::before { content: none; }
 .palette li.nl-action .pal-ic { color: var(--accent); }
-.palette-foot { gap: 16px; padding: 10px 20px; }
-.palette-foot > span { display: inline-flex; align-items: center; gap: 4px; }
 [data-theme='light'] .palette li[aria-selected='true'] { background: rgb(0 0 0 / 0.05); }
 .palette { background: color-mix(in srgb, var(--bg-elevated, #1c1d1f) 97%, transparent); }
 .palette ul { scroll-padding: 30px 0 8px; }
@@ -53,8 +51,6 @@
 .palette .pal-keys kbd { color: var(--muted-strong); background: color-mix(in srgb, var(--fg) 6%, transparent); border-color: var(--line); }
 .palette .hit-id { color: var(--muted); font-weight: var(--fw-medium, 500); margin-right: var(--sp-2, 8px); font-variant-numeric: tabular-nums; }
 .palette li mark { background: none; color: var(--fg); font-weight: var(--fw-semibold, 600); }
-.palette-foot { color: var(--muted); }
-.palette-foot kbd { color: var(--muted-strong); }
 .palette li.pal-empty { font-size: var(--fs-base, 13px); }
 
 /* No results: compact message line above the single Search all row */
@@ -63,4 +59,3 @@
 /* Review 20:00: the scrolling list ends on whole rows above the footer. Height = top pad 4 + 2 group labels (30) + 7 rows (40) + bottom pad 8, so the default view stops exactly after the 3rd Navigation row; filtered lists keep the bottom pad and scroll-padding. */
 .palette { display:flex; flex-direction:column; }
 .palette ul { box-sizing:border-box; flex:0 1 auto; min-height:0; max-height:calc(4px + 2 * 30px + 7 * 40px + 8px); padding-bottom:8px; scroll-padding-bottom:8px; }
-.palette-foot { flex:none; }

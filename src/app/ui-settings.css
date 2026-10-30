@@ -108,3 +108,8 @@
 .set-table .set-col-email { width:auto; }
 .set-table:has(.set-col-name) .set-col-name { width:auto; }
 .set-table:has(.set-col-role) td { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Review 22:00: team deletion lives in a danger zone at the bottom of the card, not in the header. */
+.set-danger { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); margin-top:var(--sp-4); padding-top:var(--sp-3); border-top:1px solid var(--line); }
+.set-danger-text { display:flex; flex-direction:column; gap:2px; font-size:var(--fs-sm); color:var(--muted); }
+.set-danger-text strong { font-size:var(--fs-base); font-weight:500; color:var(--fg); }
