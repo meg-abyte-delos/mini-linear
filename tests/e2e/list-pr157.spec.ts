@@ -45,11 +45,11 @@ test('row: project chip, API assignee avatar with name tooltip, contextual date 
   const row = rowOf(page, T.rich);
   await expect(row.locator('.chip.proj')).toHaveText('Mini Linear');
   await expect(row.locator('[title="Demo Admin"]')).toBeVisible();
-  await expect(row.locator('.av-none')).toHaveCount(0);
+  await expect(row.locator('.av-none-ic')).toHaveCount(0);
   await expect(row.locator('.date')).toHaveText('Today');
   expect(await row.locator('.date').getAttribute('title')).toBeTruthy();
   const none = rowOf(page, T.plain);
-  await expect(none.locator('.av-none')).toHaveAttribute('title', 'Unassigned');
+  await expect(none.locator('[title="Unassigned"] .av-none-ic')).toBeVisible();
   await expect(none.locator('.chip.proj')).toHaveCount(0);
 });
 
@@ -64,7 +64,7 @@ test('row: an issue assigned to another member shows an avatar for that member (
   await expect(av).toBeVisible();
   await expect(av).toHaveAttribute('title', /^mate$/i);
   await expect(av.locator('.av')).toHaveText('M');
-  await expect(rowOf(page, T.rich).locator('.av-none')).toHaveCount(0);
+  await expect(rowOf(page, T.rich).locator('.av-none-ic')).toHaveCount(0);
 });
 
 test('group header: toggle has aria-expanded/aria-controls, collapses the list, keeps the count, keyboard operable', async ({ page }) => {
