@@ -6,6 +6,7 @@ Base URL: `https://<host>/api/v1/w/<workspace-slug>/...`. JSON in, JSON out. Err
 
 Create a key in a signed-in session: `POST /api/v1/w/<slug>/api-keys` `{ "name": "CI bot", "scope": "read" | "write", "expires_in_days"?: 1..3650 }`.
 The response carries `token` (`mlk_<prefix>_<secret>`) **once**; only its sha256 is stored. The 8-char `prefix` is shown in listings.
+**Guests** may only create `read`-scope keys. `scope` defaults to `write`, so omitting it returns 403 (`forbidden`); send `"scope": "read"` explicitly.
 
 Call the API with `Authorization: Bearer mlk_...`.
 
