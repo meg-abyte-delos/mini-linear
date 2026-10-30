@@ -1,3 +1,7 @@
+/* Light veil token (drawer + New issue), Linear-like: lighter than --scrim. */
+:root { --scrim-soft:rgb(0 0 0 / .35); }
+[data-theme='light'] { --scrim-soft:rgb(0 0 0 / .18); }
+@media (prefers-color-scheme: light) { html:not([data-theme]) { --scrim-soft:rgb(0 0 0 / .18); } }
 /* Review 22:00 (Iris). Imported last. */
 
 /* 1. Below 900px the sidebar leaves the grid: hidden off-canvas, opened from a header toggle (Linear). */
@@ -6,7 +10,7 @@
   .shell { grid-template-columns:minmax(0,1fr); }
   .shell > .side { position:fixed; inset:0 auto 0 0; z-index:75; width:var(--sidebar-w, 244px); overflow-y:auto; transform:translateX(-100%); visibility:hidden; transition:transform var(--dur-base, 160ms) var(--ease-out), visibility 0s linear var(--dur-base, 160ms); }
   .shell[data-nav='open'] > .side { transform:none; visibility:visible; box-shadow:var(--shadow-pop); transition:transform var(--dur-base, 160ms) var(--ease-out); }
-  .shell[data-nav='open'] > .side-scrim { display:block; position:fixed; inset:0; z-index:74; background:color-mix(in srgb, #000 30%, transparent); }
+  .shell[data-nav='open'] > .side-scrim { display:block; position:fixed; inset:0; z-index:74; background:var(--scrim-soft); }
   .side-toggle { display:grid; place-items:center; flex:none; width:28px; height:28px; margin-right:var(--sp-1); border:0; border-radius:6px; background:none; color:var(--muted); cursor:pointer; }
   .side-toggle:hover { background:var(--hover); color:var(--fg); }
   .side-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
@@ -26,8 +30,7 @@
 }
 
 /* 3. New issue: lighter veil, visible 1px modal border. */
-.ni-scrim { background:color-mix(in srgb, #000 35%, transparent); }
-[data-theme='light'] .ni-scrim { background:color-mix(in srgb, #000 18%, transparent); }
+.ni-scrim, [data-theme='light'] .ni-scrim { background:var(--scrim-soft); }
 [data-theme='light'] .ni { border-color:color-mix(in srgb, var(--fg) 20%, transparent); }
 .ni { border-color:color-mix(in srgb, var(--fg) 14%, transparent); }
 
@@ -46,3 +49,9 @@
 .board .card[aria-selected=true]:not(#_):not(#__),
 .board .card[aria-selected=true]:not(#_):not(#__):hover { background:color-mix(in srgb, var(--fg) 4%, var(--raised)); border-color:color-mix(in srgb, var(--fg) 18%, transparent); box-shadow:none; }
 .board .card[aria-selected=true]:not(#_):not(#__):focus-visible { box-shadow:none; }
+
+/* Rex #302 should-fix: j/k selected row must read clearly in both themes. 8% neutral fill + 2px neutral left bar (no accent). */
+.list .row[aria-selected=true]:not(#_),
+[data-theme] .row[aria-selected=true]:not(#_),
+html:not([data-theme]) .row[aria-selected=true]:not(#_) { background:color-mix(in srgb, var(--fg) 8%, transparent); box-shadow:inset 2px 0 0 color-mix(in srgb, var(--fg) 40%, transparent); }
+@media (forced-colors: active) { .row[aria-selected=true]:not(#_) { outline:1px solid Highlight; outline-offset:-1px; } }
