@@ -252,7 +252,7 @@ type Res = { status: number; body: { items: (Hit & Rec)[]; next_cursor: string; 
     expect(top.query).toBe("q59");
     expect((await recent(deleteRecent, a, "DELETE", undefined, top.id)).status).toBe(204);
     expect((await recent(deleteRecent, a, "DELETE", undefined, top.id)).status).toBe(204); // idempotent
-    expect((await recent(deleteRecent, a, "DELETE", undefined, "not-a-uuid")).status).toBe(204);
+    expect((await recent(deleteRecent, a, "DELETE", undefined, "not-a-uuid")).status).toBe(400);
     expect((await recent(listRecents, a, "GET")).body.items[0]!.query).toBe("q58");
     expect((await recent(clearRecents, a, "DELETE")).status).toBe(204);
     expect((await recent(listRecents, a, "GET")).body.items).toEqual([]);

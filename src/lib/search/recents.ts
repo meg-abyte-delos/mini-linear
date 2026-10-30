@@ -60,9 +60,10 @@ export const clearRecents = (req: Request, slug: string) => withWorkspaceCtx(req
   return new Response(null, { status: 204 });
 });
 
-/** Idempotent: unknown, foreign (RLS) or malformed ids are 204 too. */
+/** Idempotent: unknown or foreign (RLS) ids are 204 too (malformed: 400). */
 export const deleteRecent = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const r = uuidSchema.safeParse(rawId);
-  if (r.success) await ctx.tx`delete from search_recents where user_id = ${ctx.userId} and id = ${r.data}`;
+  if (!r.success) throw new ApiError("bad_request", "id must be a uuid");
+  await ctx.tx`delete from search_recents where user_id = ${ctx.userId} and id = ${r.data}`;
   return new Response(null, { status: 204 });
 });
