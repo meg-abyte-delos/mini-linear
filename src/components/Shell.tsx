@@ -35,6 +35,7 @@ import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilter
 import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
 import { listTeams } from '@/lib/settings-client';
 import { DisplayPick } from '@/components/DisplayPick';
+import { NewIssueModal, type NewIssueDraft } from '@/components/NewIssueModal';
 import { FilterMenu } from '@/components/FilterMenu';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
@@ -464,26 +465,54 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (pick.kind === 'cycle') return [{ id: 'none', label: 'No cycle', checked: sel.every((x) => x.cycle_id === null) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: sel.every((x) => x.cycle_id === c.id) }))];
     return LABELS.map((l) => ({ id: l.id, label: l.name, badge: scopeBadge(l.scope), checked: sel.every((x) => x.label_ids.includes(l.id)), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
   }
-  // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
+  // C, the New issue button and the palette open the modal: an issue is only created from it, never untitled.
+  const [newIssue, setNewIssue] = useState<{ status?: Status } | null>(null);
+  const newOpen = useRef(false);
+  newOpen.current = newIssue !== null;
   function create(status?: Status) {
     if (readOnly) { setToast('Guests have read-only access.'); return; }
+    setNewIssue({ ...(typeof status === 'string' ? { status } : {}) });
+  }
+  // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
+  async function submitNew(d: NewIssueDraft): Promise<boolean> {
+    const extra: Record<string, unknown> = {};
+    if (d.description) extra.description = d.description;
+    if (d.priority !== 0) extra.priority = d.priority;
+    if (d.assignee_id) extra.assignee_id = d.assignee_id;
+    if (d.label_ids.length) extra.label_ids = d.label_ids;
+    if (d.project_id) extra.project_id = d.project_id;
+    let made: Issue | null | undefined;
+    let patchFailed = false;
     if (api) {
-      void apiCreate(api.slug, api.teamId, 'New issue').then((row) => {
-        if (!row) { setToast('Could not create the issue.'); return; }
-        versions.current.set(row.id, row.version);
-        store.current.upsert({ ...row, sort_key: String(Date.now()) });
-        if (status && row.status !== status) { store.current.update(row.id, { status }); push(row.id, { status }); }
-        sync();
-        if (view === 'cycles' || view === 'projects') setView('list');
-        setSelId(row.id);
-      });
-      return;
+      const row = await apiCreate(api.slug, api.teamId, d.title);
+      if (!row) { setToast('Could not create the issue.'); return false; }
+      versions.current.set(row.id, row.version);
+      store.current.upsert({ ...row, sort_key: String(Date.now()) });
+      const patch = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
+      if (Object.keys(patch).length) {
+        store.current.update(row.id, patch);
+        // Await the follow-up PATCH here (not push()) so a failure is reported instead of being overwritten by the "Created" toast.
+        const r = await apiPatch(api.slug, row, row.version, patch);
+        if (r.issue) {
+          versions.current.set(row.id, r.issue.version);
+          const local = store.current.list().find((x) => x.id === row.id);
+          store.current.upsert(r.kind === 'ok' && local ? { ...local, version: r.issue.version, identifier: r.issue.identifier } : { ...r.issue, sort_key: row.sort_key });
+        }
+        if (r.kind !== 'ok') patchFailed = true;
+      }
+      made = store.current.list().find((x) => x.id === row.id);
+    } else {
+      made = store.current.create({ title: d.title, description: d.description, status: d.status, priority: d.priority, assignee_id: d.assignee_id });
+      const rest = { ...(d.label_ids.length ? { label_ids: d.label_ids } : {}), ...(d.project_id ? { project_id: d.project_id } : {}) };
+      if (made && Object.keys(rest).length) store.current.update(made.id, rest);
+      made = made && store.current.list().find((x) => x.id === made!.id);
     }
-    const made = store.current.create({ title: 'New issue', ...(status ? { status } : {}) });
     sync();
     if (view === 'cycles' || view === 'projects') setView('list');
     if (made && activeCount(filters) > 0 && applyFilters([made], filters).length === 0) setFilters(emptyFilters());
     if (made) setSelId(made.id);
+    setToast(patchFailed ? `Created ${made?.identifier ?? d.title}, but some properties could not be saved.` : `Created ${made?.identifier ?? d.title}`);
+    return true;
   }
   // Mock mode: the current user is the first mock user. API mode needs the session user + members API (same gap as the A picker).
   function assignToMe() {
@@ -682,6 +711,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   useEffect(() => {
     const matcher = createMatcher();
     function onKey(e: KeyboardEvent) {
+      if (newOpen.current) return; // the New issue modal owns the keyboard
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault(); if (paletteOpen.current) actions.current.closePalette(); else actions.current.openPalette(); return;
       }
@@ -925,6 +955,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         </div>
       )}
+      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
       {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
       {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}

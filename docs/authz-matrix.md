@@ -104,8 +104,8 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `PUT /issues/{issue}/subscription` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 403 | 404 |
 | `DELETE /issues/{issue}/subscription` | 204 | 204 | 204 | 404 | 204 | 404 | 401 | 403 | 404 |
 | `GET /subscriptions` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 200 | 404 |
-| `PUT /subscriptions/{kind}/{project}` | 204 | 204 | 204 | 204 | 403 | 403 | 401 | 403 | 404 |
-| `DELETE /subscriptions/{kind}/{project}` | 204 | 204 | 204 | 204 | 403 | 403 | 401 | 403 | 404 |
+| `PUT /subscriptions/{kind}/{project}` | 204 | 204 | 204 | 404 | 403 | 403 | 401 | 403 | 404 |
+| `DELETE /subscriptions/{kind}/{project}` | 204 | 204 | 204 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `GET /issues/{issue}/presence` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 200 | 404 |
 | `POST /issues/{issue}/presence` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 403 | 404 |
 | `DELETE /issues/{issue}/presence` | 200 | 200 | 200 | 404 | 200 | 404 | 401 | 403 | 404 |

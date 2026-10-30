@@ -77,9 +77,10 @@ test.describe('Search on the server route', () => {
 
 test.describe('Inbox on real notifications', () => {
   test('lists, marks read, snoozes and archives through the API', async ({ page }) => {
+    // The inbox shows one row per issue, so three notifications need three issues (shared title prefix keeps the row filter simple).
     const title = `inbox-${Date.now()}`;
-    const issue = await apiCreateIssue(page, title);
-    await notify(issue.id, ['assigned', 'comment', 'status_change']);
+    for (const [i, type] of (['assigned', 'comment', 'status_change'] as const).entries())
+      await notify((await apiCreateIssue(page, `${title} ${i}`)).id, [type]);
     await page.goto('/?view=inbox'); await page.waitForSelector('html[data-ready]');
     const rows = page.getByRole('option').filter({ hasText: title });
     await expect(rows).toHaveCount(3);
