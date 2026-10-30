@@ -66,10 +66,14 @@ test.describe('API without a session (the proxy skips /api, the handlers must re
 
 test.describe('Create issue', () => {
   test.beforeEach(async ({ page, browser }) => { await withSession(browser, page); });
-  test('New issue creates and selects an issue', async ({ page }) => {
-    const before = await page.getByText('New issue', { exact: true }).count();
+  test('New issue opens the modal and creates and selects an issue', async ({ page }) => {
+    const t = `E2E modal ${Date.now()}`;
     await page.getByRole('button', { name: /^New issue/ }).click();
-    await expect(page.getByText('New issue', { exact: true })).toHaveCount(before + 1);
+    const d = page.getByRole('dialog', { name: 'New issue' });
+    await d.getByRole('textbox', { name: 'Issue title' }).fill(t);
+    await d.getByRole('button', { name: 'Create issue' }).click();
+    await expect(d).toBeHidden();
+    await expect(page.getByText(t, { exact: true }).first()).toBeVisible();
   });
   test('title with special characters is stored verbatim (no XSS)', async ({ page }) => {
     const t = `E2E <b>x</b> "q" & é ${Date.now()}`;
@@ -94,11 +98,14 @@ test.describe('Persistence after reload', () => {
     await expect(page.getByText(t, { exact: true })).toBeVisible();
   });
   test('issue created from the UI survives reload', async ({ page }) => {
-    const before = await page.getByText('New issue', { exact: true }).count();
+    const t = `E2E ui persist ${Date.now()}`;
     await page.getByRole('button', { name: /^New issue/ }).click();
-    await expect(page.getByText('New issue', { exact: true })).toHaveCount(before + 1);
+    const d = page.getByRole('dialog', { name: 'New issue' });
+    await d.getByRole('textbox', { name: 'Issue title' }).fill(t);
+    await d.getByRole('button', { name: 'Create issue' }).click();
+    await expect(page.getByText(t, { exact: true }).first()).toBeVisible();
     await page.reload();
-    await expect(page.getByText('New issue', { exact: true })).toHaveCount(before + 1);
+    await expect(page.getByText(t, { exact: true }).first()).toBeVisible();
   });
   test('issue survives a fresh session (new context, same user)', async ({ page, browser }) => {
     const t = `E2E fresh ${Date.now()}`;
