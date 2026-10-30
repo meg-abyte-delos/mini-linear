@@ -37,6 +37,8 @@ test('rendered feed shows names, never raw ids, for assignee/project/cycle/label
   v = await patch(req, it.id, v, { label_ids: [label.id] });
   await patch(req, it.id, v, { status: 'in_progress' });
 
+  // This file runs first in the full build-test suite (shared DB): leave no extra project/cycle/label/issue behind for dnd/projects specs.
+  try {
   await page.goto(`/w/demo/issue/${it.identifier}`);
   await page.waitForSelector('html[data-ready]');
   const feed = page.getByRole('list', { name: 'Activity' });
@@ -48,13 +50,20 @@ test('rendered feed shows names, never raw ids, for assignee/project/cycle/label
   const items = await feed.getByRole('listitem').allInnerTexts();
   expect(items.length).toBeGreaterThanOrEqual(5);
   for (const t of items) expect(t).not.toMatch(UUID);
+  } finally {
+    await req.delete(`/api/v1/w/demo/issues/${it.id}`);
+    await req.delete(`/api/v1/w/demo/projects/${project.id}`);
+    await req.delete(`/api/v1/w/demo/cycles/${cycle.id}`);
+    await req.delete(`/api/v1/w/demo/labels/${label.id}`);
+  }
 });
 
 test('feed refreshes after an edit without a reload: server wording replaces the optimistic entry', async ({ page }) => {
   const teams = (await (await page.request.get('/api/v1/w/demo/teams')).json()).items as { id: string }[];
   const old = `Feed refresh ${stamp}`;
   const created = await page.request.post('/api/v1/w/demo/issues', { data: { team_id: teams[0]!.id, title: old } });
-  const it = (await created.json()) as { identifier: string };
+  const it = (await created.json()) as { id: string; identifier: string };
+  try {
   await page.goto(`/w/demo/issue/${it.identifier}`);
   await page.waitForSelector('html[data-ready]');
   const t = page.getByLabel('Title', { exact: true });
@@ -65,4 +74,7 @@ test('feed refreshes after an edit without a reload: server wording replaces the
   const feed = page.getByRole('list', { name: 'Activity' });
   await expect(feed).toContainText(`changed title from ${old} to ${old} edited`, { timeout: 5000 });
   await expect(feed.getByText('changed the title', { exact: false })).toHaveCount(0);
+  } finally {
+    await page.request.delete(`/api/v1/w/demo/issues/${it.id}`);
+  }
 });
