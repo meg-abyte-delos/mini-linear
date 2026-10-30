@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { settled } from './helpers/settled';
 import { resetInbox } from './reset-inbox';
@@ -22,8 +22,8 @@ async function ready(page: Page, url: string, waitFor: () => Promise<unknown>) {
   await settled(page);
   await page.mouse.move(0, 0);
 }
-async function check(page: Page, name: string) {
-  await expect(page).toHaveScreenshot(`${name}-1280.png`, SHOT);
+async function check(page: Page, name: string, mask: Locator[] = []) {
+  await expect(page).toHaveScreenshot(`${name}-1280.png`, { ...SHOT, mask });
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(r.violations.map((v) => `${name}: ${v.id} x${v.nodes.length} ${v.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' | ')}`), `axe ${name}`).toEqual([]);
 }
@@ -68,6 +68,7 @@ test.describe('inbox', () => {
   test('visual: inbox', async ({ page }) => {
     await resetInbox();
     await ready(page, `/?view=inbox&${TODAY}`, () => expect(page.getByRole('option').first()).toBeVisible());
-    await check(page, 'inbox');
+    // Relative times and the absolute When value depend on seed time and timezone: masked, the rest is pixel-compared.
+    await check(page, 'inbox', [page.locator('.ntime'), page.locator("dt:has-text('When') + dd")]);
   });
 });
