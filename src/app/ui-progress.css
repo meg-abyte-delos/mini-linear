@@ -2,7 +2,7 @@
 /* Track at 24% fg (was 14%): an empty bar (0/3) must stay visible on the dark rows. */
 .cy-prog { display:block; height:4px; width:100%; max-width:128px; justify-self:start; border-radius:2px; overflow:hidden; background:color-mix(in srgb, var(--fg) 24%, transparent); }
 /* width is a CSS geometry property on <rect> (SVG 2): the transition comes from the stylesheet, so the CSP is untouched. Browsers without it just snap. */
-.cy-prog-fill { fill:var(--accent); transition:width .2s ease-out; }
+.cy-prog-fill { fill:var(--accent); transition:width var(--dur-slow) var(--ease-out); }
 .cycle[data-bucket='past'] .cy-prog-fill { fill:var(--muted); }
 @media (prefers-reduced-motion: reduce) { .cy-prog-fill { transition:none; } }
 

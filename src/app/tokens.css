@@ -7,7 +7,7 @@
 :root {
   --dur-instant:80ms;  /* hover, row background */
   --dur-fast:120ms;    /* color/border changes, chevrons, checkboxes */
-  --dur-base:160ms;    /* popovers, menus, tooltips, palette */
+  --dur-base:120ms;    /* popovers, menus, tooltips, palette, dialogs, view switches */
   --dur-slow:200ms;    /* panels, page transitions, progress */
   --ease-out:cubic-bezier(.16,1,.3,1);
   --ease-in-out:cubic-bezier(.65,0,.35,1);

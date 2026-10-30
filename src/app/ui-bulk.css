@@ -22,7 +22,7 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
   border:1px solid rgba(255,255,255,.10);
   box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 12px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4);
   color:var(--fg); font-size:13px; white-space:nowrap;
-  animation:bulk-in .16s ease-out;
+  animation:bulk-in var(--dur-base) var(--ease-out);
 }
 [data-theme='dark'] .selbar-count {
   display:inline-flex; align-items:center; gap:6px;
@@ -38,7 +38,7 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
   height:28px; padding:0 10px; border-radius:7px;
   background:transparent; border:1px solid transparent;
   color:var(--fg); font:inherit; cursor:pointer;
-  transition:background-color .12s ease, border-color .12s ease;
+  transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 [data-theme='dark'] .selbar > button:hover { background:var(--hover); border-color:var(--line); }
 [data-theme='dark'] .selbar > button[aria-expanded=true] { background:var(--sel); box-shadow:var(--accent-halo); }
@@ -58,7 +58,7 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
     border:1px solid rgba(255,255,255,.10);
     box-shadow:0 1px 0 rgba(255,255,255,.04) inset, 0 12px 32px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4);
     color:var(--fg); font-size:13px; white-space:nowrap;
-    animation:bulk-in .16s ease-out;
+    animation:bulk-in var(--dur-base) var(--ease-out);
   }
   html:not([data-theme]) .selbar-count {
     display:inline-flex; align-items:center; gap:6px;
@@ -74,7 +74,7 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
     height:28px; padding:0 10px; border-radius:7px;
     background:transparent; border:1px solid transparent;
     color:var(--fg); font:inherit; cursor:pointer;
-    transition:background-color .12s ease, border-color .12s ease;
+    transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
   }
   html:not([data-theme]) .selbar > button:hover { background:var(--hover); border-color:var(--line); }
   html:not([data-theme]) .selbar > button[aria-expanded=true] { background:var(--sel); box-shadow:var(--accent-halo); }

@@ -1,5 +1,6 @@
 'use client';
 import { EmptyState } from '@/components/ui';
+import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
@@ -255,7 +256,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [view, setViewState] = useState<View>(initialView);
   // The view lives in the URL too (?view=board|cycles; list is the default and drops the param).
   function setView(v: View) {
-    setViewState(v);
+    if (v !== view) withViewTransition(() => setViewState(v)); else setViewState(v);
     const sp = new URLSearchParams(window.location.search);
     if (v === 'list') sp.delete('view'); else sp.set('view', v);
     const qs = sp.toString().replace(/%2C/gi, ',');
