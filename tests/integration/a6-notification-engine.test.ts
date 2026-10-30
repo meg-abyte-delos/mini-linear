@@ -15,7 +15,7 @@ const haveDb = !!(process.env.DATABASE_URL && process.env.DATABASE_OWNER_URL);
 if (process.env.CI && !haveDb) throw new Error('CI=true but DB urls unset: integration tests must not skip');
 
 (haveDb ? describe : describe.skip)('A6 notification engine: producers, coalescing, entity subscriptions, bulk, cron, realtime', () => {
-  const owner = ownerSql(), app = appSql(); let seed: Seed; const team = randomUUID(), project = randomUUID(), label = randomUUID(); let current = '';
+  const owner = ownerSql(), app = appSql(); let seed: Seed; const team = randomUUID(), project = randomUUID(), label = randomUUID(), team2 = randomUUID(), hidden = randomUUID(); let current = '';
   const as = (u: string) => { current = u; };
   const req = (method: string, body?: unknown, headers: Record<string, string> = {}) => new Request('http://x/api', { method, headers: { 'content-type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
   const inbox = (u: string) => withWorkspace(app, seed.a.id, (tx) => tx`select id, type, issue_id, comment_id, actor_id, coalesced_count, meta, read_at from notifications order by id`, u);
@@ -37,6 +37,10 @@ if (process.env.CI && !haveDb) throw new Error('CI=true but DB urls unset: integ
       await tx`insert into teams (id, workspace_id, name, key) values (${team}, ${seed.a.id}, 'Eng', 'ENG')`;
       for (const u of [seed.a.member, seed.a.admin]) await tx`insert into team_memberships (workspace_id, team_id, user_id) values (${seed.a.id}, ${team}, ${u})`;
       await tx`insert into projects (id, workspace_id, name) values (${project}, ${seed.a.id}, 'P')`;
+      await tx`insert into project_teams (workspace_id, project_id, team_id) values (${seed.a.id}, ${project}, ${team})`;
+      await tx`insert into teams (id, workspace_id, name, key) values (${team2}, ${seed.a.id}, 'Ops', 'OPS')`;
+      await tx`insert into projects (id, workspace_id, name) values (${hidden}, ${seed.a.id}, 'Hidden')`;
+      await tx`insert into project_teams (workspace_id, project_id, team_id) values (${seed.a.id}, ${hidden}, ${team2})`;
       await tx`insert into labels (id, workspace_id, name) values (${label}, ${seed.a.id}, 'L')`;
     });
     setSessionResolver(async () => current);
@@ -111,6 +115,8 @@ if (process.env.CI && !haveDb) throw new Error('CI=true but DB urls unset: integ
     expect((await put('project', project)).status).toBe(204); // idempotent
     expect((await put('label', label)).status).toBe(204);
     expect((await put('project', randomUUID())).status).toBe(404);
+    expect((await put('project', hidden)).status).toBe(404); // project of a team the member is not in: same answer as GET (pvisible)
+    expect((await entitySubscription(req('DELETE'), seed.a.slug, 'project', hidden)).status).toBe(404);
     expect((await put('nope', project)).status).toBe(422);
     expect((await put('project', 'not-a-uuid')).status).toBe(422);
     const list = (await (await listEntitySubscriptions(req('GET'), seed.a.slug)).json()) as { items: { kind: string }[] };
