@@ -1,0 +1,46 @@
+/* Revue UI 19:00 (Meg, main 9843fb5): tokens only, visual only. */
+:root { --sidebar-w:244px; --side-item-r:8px; }
+
+/* 1. Board: bare 14px priority icon, no box. */
+.board .card-prio, .board .card-prio[data-none] { width:auto; height:auto; border:0; border-radius:0; background:none; }
+.board .card-prio svg { width:14px; height:14px; display:block; }
+
+/* 2. Display popover: 24px chips 12px/500, gap 8px, popover padding 12px, 11px/500 dim heading. */
+.tb-menu.display { padding:var(--sp-3); }
+.tb-menu.display .dp-h { padding:0 0 var(--sp-2); font-size:var(--fs-xs); font-weight:var(--fw-medium); color:var(--dim); }
+.tb-menu.display .dp-props { gap:var(--sp-2); padding:0 0 var(--sp-2); }
+.dp-chip { height:24px; padding:0 var(--sp-2); font-size:var(--fs-sm); font-weight:var(--fw-medium); color:var(--muted); border-color:var(--line-soft); background:none; }
+.dp-chip.on { background:var(--accent-soft); border-color:var(--accent); color:var(--fg); }
+.dp-chip.on:hover { background:color-mix(in srgb, var(--accent) 22%, transparent); }
+
+/* 3. Cmd+K: readable group labels and footer keycaps (12px, AA), quiet 12px ID, heavier title. */
+.palette li.pal-group { font-size:var(--fs-sm); color:var(--muted-strong); }
+.palette-foot { font-size:var(--fs-sm); color:var(--muted-strong); }
+.palette-foot kbd, .palette .pal-keys kbd { font-size:var(--fs-sm); color:var(--fg); background:color-mix(in srgb, var(--fg) 8%, transparent); border-color:var(--line); }
+.palette .hit-id { font-size:var(--fs-sm); font-weight:var(--fw-regular); color:var(--muted); }
+.palette .pal-label { color:var(--fg); font-weight:var(--fw-medium, 500); }
+
+/* 4. Cycles rings: solid accent arc proportional to %, 2px stroke, visible track. */
+.ring-track, .ring-arc { stroke-width:2px; }
+.ring-track { stroke:color-mix(in srgb, var(--fg) 22%, transparent); }
+.ring[data-tone='accent'] .ring-arc { stroke:var(--accent); }
+.ring[data-tone='done'] .ring-arc { stroke:var(--st-ok, #3fb950); }
+.ring[data-tone='muted'] .ring-arc { stroke:var(--muted-strong); }
+.cycle[data-bucket='past'] .ring-arc { stroke:var(--muted); }
+
+/* 5. Sidebar: 244px, 8px radius on items. */
+.side-link, .side-btn { border-radius:var(--side-item-r); }
+
+/* 6. Light list: visible 1px hairline between rows; selection distinct from hover. */
+[data-theme='light'] .row { border-bottom-color:var(--line); }
+[data-theme='light'] .row[aria-selected=true] { background:color-mix(in srgb, var(--accent) 12%, var(--bg)); box-shadow:inset 2px 0 0 var(--accent); }
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) .row { border-bottom-color:var(--line); }
+  html:not([data-theme]) .row[aria-selected=true] { background:color-mix(in srgb, var(--accent) 12%, var(--bg)); box-shadow:inset 2px 0 0 var(--accent); }
+}
+
+/* 7. Settings General: muted placeholders. */
+.set-input::placeholder { color:var(--muted); opacity:1; }
+
+/* 9. Typography: Inter Variable (@fontsource-variable/inter, bundled), tokens only, 450/500/600. */
+body { font-family:var(--font-sans); font-size:var(--fs-base); line-height:var(--lh-base); font-weight:var(--fw-regular); letter-spacing:-0.01em; text-rendering:optimizeLegibility; }
