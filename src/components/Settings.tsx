@@ -4,6 +4,7 @@ import * as S from '@/lib/settings-client';
 import { httpInboxClient, NOTIF_TYPES, TYPE_LABEL, type PrefMap, type NotifType } from '@/lib/inbox-client';
 import { nameFromEmail } from '@/lib/nl-people';
 import { ConfirmDialog, Select, UserAvatar } from '@/components/ui';
+import { RowMenu } from '@/components/RowMenu';
 import { SettingsShell } from '@/components/SettingsShell';
 
 const TEAM_ROLES = [{ id: 'admin', label: 'Admin' }, { id: 'member', label: 'Member' }, { id: 'guest', label: 'Guest (read-only)' }];
@@ -32,7 +33,7 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
                 <Select className='set-select' label={`Team role for ${r.email}`} value={r.role} disabled={!canAdmin} options={TEAM_ROLES}
                   onChange={(id) => run(S.setTeamRole(slug, team.id, r.user_id, id as S.TeamRole))} />
               </td>
-              <td className='set-end'>{canAdmin && <button type='button' className='btn' data-size='32' data-variant='ghost' data-tone='danger' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
+              <td className='set-end'>{canAdmin && <RowMenu label={`Actions for ${r.email}`} entries={[{ id: 'remove', label: 'Remove from team', destructive: true, onSelect: () => void run(S.removeTeamMember(slug, team.id, r.user_id)) }]} />}</td>
             </tr>
           ))}
         </tbody>

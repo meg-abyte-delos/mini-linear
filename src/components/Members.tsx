@@ -2,25 +2,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as S from '@/lib/settings-client';
 import { nameFromEmail } from '@/lib/nl-people';
-import { ConfirmDialog, Menu, Popover, UserAvatar, type MenuEntry } from '@/components/ui';
+import { ConfirmDialog, Popover, Select, UserAvatar, type MenuEntry } from '@/components/ui';
+import { RowMenu } from '@/components/RowMenu';
 import { SettingsShell } from '@/components/SettingsShell';
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const isAdmin = (r?: string) => r === 'owner' || r === 'admin';
 const dateFmt = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
-
-function RowMenu({ label, entries }: { label: string; entries: MenuEntry[] }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button ref={ref} type='button' className='set-icon-btn' aria-label={label} aria-haspopup='menu' aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <svg viewBox='0 0 16 16' width='16' height='16' fill='currentColor' aria-hidden='true' focusable='false'><circle cx='3' cy='8' r='1.3' /><circle cx='8' cy='8' r='1.3' /><circle cx='13' cy='8' r='1.3' /></svg>
-      </button>
-      <Menu open={open} anchorRef={ref} onClose={() => setOpen(false)} label={label} entries={entries} align='end' />
-    </>
-  );
-}
 
 function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: boolean; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void; roles: S.AssignableRole[]; onSend: (email: string, role: 'admin' | 'member' | 'guest') => Promise<string | null> }) {
   const [email, setEmail] = useState('');
@@ -145,10 +133,8 @@ export function Members({ slug }: { slug: string }) {
                     <td><span className='set-person'><UserAvatar userId={m.user_id} name={name} size='md' /><span className='set-person-text'>{name}{self && <span className='set-you'>you</span>}</span></span></td>
                     <td className='set-muted'>{m.email}</td>
                     <td>{admin && !self && S.canManageMember(role, m.role)
-                      ? <select className='set-select set-role-select' aria-label={`Role for ${name}`} value={m.role}
-                          onChange={(e) => void act(S.setMemberRole(slug, m.user_id, e.target.value as S.WorkspaceRole), `${name} is now ${e.target.value}`)}>
-                          {S.assignableRoles(role).map((r: S.AssignableRole) => <option key={r} value={r}>{cap(r)}</option>)}
-                        </select>
+                      ? <Select className='set-select set-role-select' label={`Role for ${name}`} value={m.role} options={S.assignableRoles(role).map((r: S.AssignableRole) => ({ id: r, label: cap(r) }))}
+                          onChange={(id) => void act(S.setMemberRole(slug, m.user_id, id as S.WorkspaceRole), `${name} is now ${id}`)} />
                       : <span className='set-role' data-role={m.role}>{m.role}</span>}</td>
                     <td><span className='set-state'>Active</span></td>
                     <td className='set-end'>{admin && !self && S.canManageMember(role, m.role) && <RowMenu label={`Actions for ${name}`} entries={entries} />}</td>

@@ -38,6 +38,19 @@ let seq = 0;
 const lid = (p: string) => `${p}-${Date.now().toString(36)}-${++seq}`;
 const now = () => new Date().toISOString();
 const fmtTime = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+/** Linear-style relative age ("now", "5m", "3h", "2d", "4w", then "Oct 1"). */
+export function relAge(iso: string, now: number): string {
+  const s = Math.max(0, (now - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'now'; if (s < 3600) return `${Math.floor(s / 60)}m`; if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  const d = Math.floor(s / 86400); if (d < 7) return `${d}d`; if (d < 35) return `${Math.floor(d / 7)}w`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+/** Relative time after mount (absolute on the server, so hydration matches); full date in the tooltip. */
+function Age({ iso }: { iso: string }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => { setNow(Date.now()); const t = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(t); }, []);
+  return <time className='ev-age' dateTime={iso} title={fmtTime(iso)}>{now == null ? fmtTime(iso) : relAge(iso, now)}</time>;
+}
 
 export function IssueDetail({ slug, initial, all, meta, api, today, viewer = null, teamId }: { teamId?: string; slug: string; initial: DetailIssue; all: DetailIssue[]; meta: Meta; api: boolean; today: string; viewer?: { userId: string | null; role: string } | null }) {
   const [nlPeople, setNlPeople] = useState<NlPeople>(EMPTY_PEOPLE);
@@ -465,7 +478,7 @@ function ActivityEvent({ at, actor }: { at: ActivityItem; actor: Person | undefi
   return (
     <li className='ev'>
       <span className='ev-lead' aria-hidden='true'>{actor ? <Avatar initials={actor.initials} hue={actor.hue} /> : <span className='dot' />}</span>
-      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && !/^created/.test(at.summary ?? at.action) && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action} <time dateTime={at.created_at}>{fmtTime(at.created_at)}</time></span>
+      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && !/^created/.test(at.summary ?? at.action) && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action}<span className='ev-sep' aria-hidden='true'> · </span><Age iso={at.created_at} /></span>
     </li>
   );
 }
