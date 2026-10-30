@@ -2,7 +2,7 @@
 export type TeamRole = 'admin' | 'member' | 'guest';
 export type WorkspaceSettings = { id: string; slug: string; name: string; logo_url: string | null; role: string };
 export type Team = { id: string; name: string; key: string };
-export type TeamMember = { user_id: string; email: string; role: TeamRole };
+export type TeamMember = { user_id: string; email: string; display_name?: string | null; role: TeamRole };
 export type Member = { user_id: string; email: string; role: string; display_name?: string | null };
 type Fetch = typeof fetch;
 export class SettingsError extends Error { constructor(public status: number, message: string) { super(message); } }
