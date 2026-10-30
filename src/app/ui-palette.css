@@ -6,16 +6,16 @@
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   border: 1px solid rgb(255 255 255 / 0.08);
   border-radius: 12px;
-  box-shadow: 0 24px 64px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(40 171 165 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.04);
-  animation: pal-in 140ms cubic-bezier(.2,.8,.2,1);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.5), 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.04);
+  animation: pal-in var(--dur-base) var(--ease-out);
 }
 .palette input { font-size: 15px; padding: 14px 16px; background: transparent; border: 0; border-bottom: 1px solid rgb(255 255 255 / 0.06); }
-.palette li[role='option'] { border-radius: 6px; margin: 0 6px; transition: background 80ms; }
-.palette li[aria-selected='true'] { background: rgb(40 171 165 / 0.14); box-shadow: inset 2px 0 0 #28aba5; }
-.palette li.nl-action::before { content: '✦'; color: #28aba5; margin-right: 8px; }
+.palette li[role='option'] { border-radius: 6px; margin: 0 6px; transition: background var(--dur-instant) var(--ease-out); }
+.palette li[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+.palette li.nl-action::before { content: '✦'; color: var(--accent); margin-right: 8px; }
 @keyframes pal-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
 /* Smooth view switches where supported (document.startViewTransition). */
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--dur-base); animation-timing-function: var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { .palette { animation: none; } ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
 [data-theme='light'] .palette { background: color-mix(in srgb, #fff 85%, transparent); border-color: rgb(0 0 0 / 0.08); }
 
@@ -37,7 +37,7 @@
 .palette li.pal-empty { justify-content: center; height: 72px; color: var(--muted); cursor: default; }
 .palette li.pal-empty .pal-ic { display: none; }
 .palette li.nl-action::before { content: none; }
-.palette li.nl-action .pal-ic { color: #28aba5; }
+.palette li.nl-action .pal-ic { color: var(--accent); }
 .palette-foot { gap: 16px; padding: 10px 20px; }
 .palette-foot > span { display: inline-flex; align-items: center; gap: 4px; }
 [data-theme='light'] .palette li[aria-selected='true'] { background: rgb(0 0 0 / 0.05); }

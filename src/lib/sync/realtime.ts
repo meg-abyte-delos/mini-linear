@@ -12,6 +12,8 @@ export type RealtimeOptions = {
   onResync: () => void | Promise<void>;
   onState?: (s: ConnState) => void;
   onReconnect?: () => void; // e.g. queue.online()
+  /** `presence` event: full viewer list of one issue (empty = nobody). */
+  onPresence?: (p: { issue_id: string; viewers: string[]; count: number }) => void;
   eventSource?: (url: string) => ES;
   fetch?: typeof fetch;
 };
@@ -38,6 +40,8 @@ export function connectRealtime(o: RealtimeOptions): { close(): void; handle(e: 
   let chain: Promise<void> = Promise.resolve();
   for (const t of EVENT_TYPES) es.addEventListener(t, (m) => { chain = chain.then(() => handle(JSON.parse(m.data) as FeedEvent)); });
   es.addEventListener('resync', () => { chain = chain.then(async () => { await o.onResync(); }); });
+  // through the same chain as resync: a snapshot sent right after a resync must land after its reset, never before
+  es.addEventListener('presence', (m) => { chain = chain.then(() => { try { o.onPresence?.(JSON.parse(m.data)); } catch { /* malformed frame */ } }); });
   es.addEventListener('auth', () => { closed = true; es.close(); o.onState?.('signed_out'); });
   es.onopen = () => { o.onState?.('live'); if (wasLive) o.onReconnect?.(); wasLive = true; };
   es.onerror = () => { if (!closed) o.onState?.('offline'); };

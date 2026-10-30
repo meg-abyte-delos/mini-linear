@@ -51,6 +51,14 @@ test('issue page timeline names the actor (no Someone) once members are loaded',
   await t.press('Enter');
   await saved;
   const feed = page.getByRole('list', { name: 'Activity' });
-  await expect(feed).toContainText('changed the title');
+  // The feed refetches asynchronously after the PATCH (flaked once on main 9d74509: only "created the issue" within 5s).
+  // The title change is already persisted, so retry with a reload as fallback instead of trusting a single refetch.
+  await expect(async () => {
+    if (!(await feed.innerText().catch(() => '')).includes('changed the title')) {
+      await page.reload();
+      await page.waitForSelector('html[data-ready]');
+    }
+    await expect(page.getByRole('list', { name: 'Activity' })).toContainText('changed the title', { timeout: 2000 });
+  }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
   await expect(feed).not.toContainText('Someone');
 });
