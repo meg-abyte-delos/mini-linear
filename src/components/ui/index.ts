@@ -7,3 +7,4 @@ export { Menu, type MenuEntry, type MenuItem } from './Menu';
 export { Tooltip } from './Tooltip';
 export { Combobox, type ComboOption } from './Combobox';
 export { ConfirmDialog } from './ConfirmDialog';
+export { EmptyState } from './EmptyState';

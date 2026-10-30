@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { StatusIcon } from '@/components/icons';
+import { EmptyState } from '@/components/ui';
 import { STATUSES, STATUS_LABEL, type Issue, type Status } from '@/lib/issues';
 import { MIN_QUERY, searchApi, searchLocal, snippetParts, type HitKind, type SearchHit } from '@/lib/search-client';
 
@@ -62,7 +63,7 @@ export function SearchView({ initialQuery, initialKind, slug, mockIssues }: { in
           {term.length < MIN_QUERY && <p className='col-empty'>Type at least {MIN_QUERY} characters to search.</p>}
           {term.length >= MIN_QUERY && state === 'error' && <p className='col-empty' role='alert'>Search failed. Try again.</p>}
           {term.length >= MIN_QUERY && state === 'loading' && items.length === 0 && <p className='col-empty'>Searching…</p>}
-          {term.length >= MIN_QUERY && state === 'idle' && items.length === 0 && <p className='col-empty'>No results for “{term}”</p>}
+          {term.length >= MIN_QUERY && state === 'idle' && items.length === 0 && <EmptyState compact icon='search' title={<>No results for “{term}”</>} hint='Check the spelling or try fewer words.' />}
           <ul className='search-list' aria-label='Results'>
             {items.map((h) => (
               <li key={`${h.kind}-${h.id}`} className='search-row row'>

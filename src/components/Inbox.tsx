@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EmptyState } from '@/components/ui';
 import { TABS, TYPE_LABEL, relTime, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
 
 /**
@@ -83,7 +84,7 @@ export function Inbox({ client, onUnread, onOpenIssue, refreshKey = 0 }: { clien
   );
   if (err) return <div className='state error' role='alert'><p>Could not load notifications.</p><button onClick={() => void load()}>Retry</button></div>;
   if (!items) return <div className='state' role='status'><p>Loading…</p></div>;
-  const emptyMsg = tab === 'all' ? 'Inbox zero. Nothing needs your attention.' : tab === 'unread' ? 'No unread notifications.' : tab === 'archived' ? 'Nothing archived.' : 'Nothing snoozed.';
+  const empty = tab === 'all' ? { t: 'Inbox zero', h: 'Nothing needs your attention. Notifications about issues you follow land here.' } : tab === 'unread' ? { t: 'No unread notifications', h: 'You are all caught up.' } : tab === 'archived' ? { t: 'Nothing archived', h: 'Archived notifications show up here.' } : { t: 'Nothing snoozed', h: 'Snoozed notifications come back when their time is up.' };
   return (
     <div className='inbox-wrap'>
       <div className='scroll inbox'>
@@ -108,7 +109,7 @@ export function Inbox({ client, onUnread, onOpenIssue, refreshKey = 0 }: { clien
           </div>
         )}
         {fail && <p role='alert' className='toast'>{fail}</p>}
-        {list.length === 0 ? <div className='state empty' role='status'><p>{emptyMsg}</p></div> : (
+        {list.length === 0 ? <EmptyState icon='inbox' title={empty.t} hint={empty.h} /> : (
           <ul role='listbox' aria-label='Notifications'>
             {list.map((n, i) => (
               <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>

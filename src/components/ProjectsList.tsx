@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, UnassignedIcon } from '@/components/icons';
+import { EmptyState } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { MOCK_PEOPLE, findPerson, type Person } from '@/lib/people';
 import { fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
@@ -39,7 +40,7 @@ export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, ca
       </div>
       <section className='group' aria-labelledby='pj-all'>
         <h2 id='pj-all'><span>All projects</span><span className='count'>{projects.length}</span></h2>
-        {sorted.length === 0 ? <p className='col-empty'>No projects</p> : mode === 'list' ? sorted.map((p) => {
+        {sorted.length === 0 ? <EmptyState compact icon='views' title='No projects' hint='Projects group issues around a shared goal and target date.' /> : mode === 'list' ? sorted.map((p) => {
           const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
           const late = isOverdue(p.target_date, p.status, today);
           return (
