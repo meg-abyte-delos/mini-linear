@@ -62,7 +62,7 @@
 .idp-sec h2 .sec-add:hover,.idp-sec h2 .sec-add:focus-visible{background:color-mix(in srgb,var(--fg) 6%,transparent);color:var(--fg)}
 .rel-add{margin-left:auto;position:relative;display:inline-flex}.rel-add .sec-add{margin-left:0}
 .sub-bar{display:inline-block;width:64px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--fg) 14%,transparent);overflow:hidden}
-.sub-bar span{display:block;height:100%;background:var(--accent)}
+.sub-bar span{display:block;height:100%;width:var(--fill,0);background:var(--accent)}
 .rel-group{margin-bottom:var(--sp-2)}.rel-type{font-size:var(--fs-sm);color:var(--muted);min-width:0;padding:0 8px}
 .idp-rows li{position:relative;height:32px;padding:0;gap:0}
 .idp-rows li:hover{background:color-mix(in srgb,var(--fg) 4%,transparent)}
