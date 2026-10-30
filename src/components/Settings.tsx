@@ -21,7 +21,6 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
     <section aria-labelledby={`team-${team.id}`} className='set-card set-team'>
       <div className='set-card-head'>
         <h3 id={`team-${team.id}`} className='set-card-title'>{team.name} <span className='set-key'>{team.key}</span></h3>
-        {canAdmin && <button type='button' className='btn' data-size='32' data-tone='danger' onClick={onDelete}>Delete {team.name}</button>}
       </div>
       <table className='set-table'>
         <thead><tr><th scope='col'>Member</th><th scope='col'>Team role</th><th scope='col'><span className='sr-only'>Actions</span></th></tr></thead>
@@ -44,6 +43,12 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
           <Select className='set-select' searchable label='Add member' value={add} placeholder='Choose…' options={outside.map((m) => ({ id: m.user_id, label: m.email }))} onChange={setAdd} />
           <button type='submit' className='btn' data-size='32' disabled={!add}>Add</button>
         </form>
+      )}
+      {canAdmin && (
+        <div className='set-danger' role='group' aria-label={`Danger zone for ${team.name}`}>
+          <div className='set-danger-text'><strong>Delete this team</strong><span>Permanently deletes {team.name} and all of its issues.</span></div>
+          <button type='button' className='btn' data-size='32' data-tone='danger' aria-label={`Delete team ${team.name}`} onClick={onDelete}>Delete team</button>
+        </div>
       )}
     </section>
   );

@@ -34,6 +34,7 @@ export const CYCLES = [
 export interface Issue {
   id: string; // mock: TEAMKEY-n. API mode: UUID (key); show `identifier`.
   identifier?: string; // API mode: "DEL-12"
+  team_id?: string; // API mode: owning team (absent on mock issues)
   title: string;
   description: string;
   status: Status;

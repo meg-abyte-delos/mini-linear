@@ -210,7 +210,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const toggleProp = (k: DisplayProp) => setHidden((h) => { const n = new Set(h); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
-  const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
+  // Team scope (API mode): the sidebar team picks which team's issues the list/board show. The API always returns team_id (asserted in review-2200-comp-api.spec); mock mode has no scope.
+  const [teamScope, setTeamScope] = useState<string | null>(api?.teamId ?? null);
+  const scopedIssues = useMemo(() => (api && teamScope ? allIssues.filter((i) => i.team_id === teamScope) : allIssues), [api, teamScope, allIssues]);
+  const issues = useMemo(() => applyFilters(scopedIssues, filters), [scopedIssues, filters]);
   const subStats = useMemo(() => subIssueStats(allIssues), [allIssues]);
   const subBadge = (i: Issue) => { const st = subStats.get(i.id); return st ? <span className='sub-prog' data-testid={`sub-${i.identifier ?? i.id}`} title={`${st.done} of ${st.total} sub-issues done`}><ProgressRing pct={st.pct} size={14} showPct={false} label={`${st.done} of ${st.total} sub-issues done`} /><span>{st.done}/{st.total}</span></span> : null; };
   // Filters live in the URL: replaceState keeps other params (seed, state) and does not refetch.
@@ -504,7 +507,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (api) {
       const row = await apiCreate(api.slug, d.team_id || api.teamId, d.title);
       if (!row) { setToast('Could not create the issue.'); return false; }
-      if (d.team_id && d.team_id !== api.teamId) {
+      if (d.team_id && d.team_id !== (teamScope ?? api.teamId)) {
         // Another team's issue does not belong in this team's store: apply the properties server-side, then just confirm.
         const other = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
         let failed = false;
@@ -641,6 +644,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     void listTeams(api.slug).then((ts) => { if (live) setTeamList(ts); const t = ts.find((x) => x.id === api.teamId) ?? ts[0]; if (live && t) setTeamName(t.name); }).catch(() => { /* keep fallback */ });
     return () => { live = false; };
   }, [api?.slug, api?.teamId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sideTeams: Team[] = teamList.length ? teamList : [{ id: api?.teamId ?? 'team', name: teamName, key: '' }];
   const hint = (id: string) => { const d = SHORTCUTS.find((x) => x.id === id); return d ? formatKeys(d.keys).replace(' then ', ' ') : undefined; };
   const commands: Cmd[] = [
     { id: 'help', label: 'Keyboard shortcuts', hint: '?', run: () => setHelp(true) },
@@ -844,11 +848,15 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </nav>
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
-          <TeamSection name={teamName}>
-          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span>{hint('go-issues') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-issues')}</kbd>}</a>
-          <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><SideIcon name='cycles' /><span>Cycles</span></a>
-          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span>{hint('go-projects') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-projects')}</kbd>}</a>
+          {sideTeams.map((t) => { const here = !api || teamScope === t.id; const home = !api || t.id === api.teamId; const onIssues = here && view !== 'cycles' && view !== 'projects' && view !== 'inbox'; return (
+          <TeamSection key={t.id} id={sideTeams.length > 1 ? `team-nav-${t.id}` : 'team-nav'} name={t.name}>
+          <a className={`side-link sub${onIssues ? ' active' : ''}`} aria-current={onIssues ? 'page' : undefined} href='#issues' data-team={t.id} onClick={(e) => { e.preventDefault(); setTeamScope(t.id); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span>{home && hint('go-issues') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-issues')}</kbd>}</a>
+          {home && (<>
+          <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setTeamScope(t.id); setView('cycles'); }}><SideIcon name='cycles' /><span>Cycles</span></a>
+          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setTeamScope(t.id); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span>{hint('go-projects') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-projects')}</kbd>}</a>
+          </>)}
           </TeamSection>
+          ); })}
         </nav>
       </aside>
       <main className='main' ref={mainRef} data-view={view}>
@@ -995,7 +1003,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         </div>
       )}
-      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} teams={teamList} teamId={api?.teamId ?? ''} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
+      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} teams={teamList} teamId={teamScope ?? api?.teamId ?? ''} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
       {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
       {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}
@@ -1031,7 +1039,6 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-search-error'>Search failed. Try again.</li>}
               {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true' className='pal-empty'>No matching command</li>}
             </ul>
-            <div className='palette-foot'><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>
           </div>
         </div>
       )}
