@@ -25,7 +25,14 @@ const blurSave = async (page: Page) => {
 };
 
 test.afterAll(async ({ request }) => {
-  for (const id of created) await request.delete('/api/v1/w/demo/issues/' + id).catch(() => undefined);
+  // DELETE needs If-Match (a bare DELETE gets a silent 428): read the version, then assert the delete really happened.
+  for (const id of created) {
+    const g = await request.get('/api/v1/w/demo/issues/' + id);
+    if (g.status() === 404) continue;
+    const v = (await g.json()).version;
+    const r = await request.delete('/api/v1/w/demo/issues/' + id, { headers: { 'If-Match': String(v) } });
+    expect(r.status()).toBeLessThan(300);
+  }
 });
 
 test.beforeAll(async ({ request }) => { teamId = (await (await request.get('/api/v1/w/demo/teams')).json()).items[0].id; });
