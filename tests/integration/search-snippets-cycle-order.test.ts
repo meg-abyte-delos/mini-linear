@@ -12,7 +12,7 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
 
 (haveDb ? describe : describe.skip)("search snippets are plain text; cycles list newest past first", { timeout: 60000 }, () => {
   const owner = ownerSql(); let seed: Seed; let team = "";
-  const issueId = randomUUID(), projId = randomUUID();
+  const issueId = randomUUID(), projId = randomUUID(), crlfId = randomUUID();
   const search = async (q: string) => {
     setSessionResolver(async () => seed.a.admin);
     const r = await searchWorkspace(new Request(`http://localhost/api/v1/w/${seed.a.slug}/search?q=${q}&limit=50`), seed.a.slug);
@@ -31,6 +31,8 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
       await tx`insert into teams (id, workspace_id, name, key) values (${team}, ${seed.a.id}, 'Alpha', 'ALP')`;
       const desc = "Retry by email.\n\n## Behaviour\n\n- 5 attempts per minute\n- **quokka** limit with `code` and [a link](https://x.test)\n\n```ts\nconst a = 1;\n```\n> quoted line";
       await tx`insert into issues (id, workspace_id, team_id, number, title, description, sort_key, created_by) values (${issueId}, ${seed.a.id}, ${team}, 1, 'Rate limit quokka', ${desc}, 'a1', ${seed.a.admin})`;
+      const crlf = "Intro.\r\n\r\n## Zebrafish heading\r\n\r\n- crlfneedle in a list item\r\n";
+      await tx`insert into issues (id, workspace_id, team_id, number, title, description, sort_key, created_by) values (${crlfId}, ${seed.a.id}, ${team}, 900, 'CRLF issue', ${crlf}, 'a2', ${seed.a.admin})`;
       await tx`insert into projects (id, workspace_id, name, description) values (${projId}, ${seed.a.id}, 'Quokka project', '# Heading\n\n- *bold* quokka plan')`;
       await tx`insert into project_teams (workspace_id, project_id, team_id) values (${seed.a.id}, ${projId}, ${team})`;
       await tx`insert into cycles (id, workspace_id, team_id, name, start_date, end_date) values
@@ -69,6 +71,13 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
     expect(p).toBe("Behaviour. 5 attempts per minute Scale: one to five Done. Note: marmoset only Solo. end");
     const h = (await search("marmoset")).find((x) => x.id === id)!;
     expect(h.snippet.replace(/<\/?mark>/g, "")).toContain("Note: ");
+  });
+
+  it("CRLF descriptions: headings are dropped like with LF", async () => {
+    const h = (await search("zebrafish")).find((x) => x.id === crlfId);
+    expect(h?.snippet.includes("Zebrafish") ?? false).toBe(false);
+    const c = (await search("crlfneedle")).find((x) => x.id === crlfId)!;
+    expect(c.snippet.replace(/<\/?mark>/g, "")).toBe("crlfneedle in a list item");
   });
 
   it("project snippet is plain description text", async () => {

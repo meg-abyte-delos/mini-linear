@@ -3,7 +3,7 @@
 -- matches (terms spread over several lines) the whole heading-free description is used. Same sentinel/escape pipeline as 0808.
 CREATE OR REPLACE FUNCTION search_snippet(src text, tq tsquery) RETURNS text LANGUAGE sql STABLE SET search_path = pg_catalog, public AS $$
   WITH body AS (
-    SELECT regexp_replace(coalesce(src, ''), '^[[:space:]]*#{1,6}([[:space:]][^\r\n]*)?$', '', 'ng') AS t
+    SELECT regexp_replace(replace(coalesce(src, ''), E'\r\n', E'\n'), '^[[:space:]]*#{1,6}([[:space:]][^\r\n]*)?$', '', 'ng') AS t
   ), pick AS (
     SELECT coalesce(
       (SELECT u.line FROM body, regexp_split_to_table(body.t, '[\r\n]+') WITH ORDINALITY AS u(line, ord)
