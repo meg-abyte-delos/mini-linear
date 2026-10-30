@@ -41,3 +41,15 @@
 .row .labels .chip.proj::before { background:var(--lb-project); }
 .row .labels { flex:none; max-width:none; overflow:visible; justify-content:flex-end; }
 .row .title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Wave B list: Linear measurements (44px rows, 36px group headers, IDs 13/450 -0.26px), motion on tokens. */
+.row { height:44px; gap:10px; transition:background-color var(--dur-instant, 80ms) var(--ease-out, cubic-bezier(.16,1,.3,1)); }
+.row .id { width:60px; font-size:13px; font-weight:450; letter-spacing:-0.26px; font-variant-numeric:normal; color:var(--muted); }
+.row .title { font-size:13px; font-weight:500; color:var(--fg); }
+.row .labels .chip { height:22px; color:var(--muted-strong); border-color:var(--line-soft); }
+.row .date, .row .av { opacity:.9; }
+.row .rowsel { transition:opacity var(--dur-instant, 80ms) var(--ease-out, cubic-bezier(.16,1,.3,1)); }
+.row[aria-selected=true] { box-shadow:inset 2px 0 0 var(--accent); }
+.group h2 { height:36px; position:sticky; top:0; z-index:2; }
+.group h2 .chev { transition:transform var(--dur-fast, 120ms) var(--ease-out, cubic-bezier(.16,1,.3,1)); }
+@media (prefers-reduced-motion: reduce) { .row, .row .rowsel, .group h2 .chev { transition:none; } }
