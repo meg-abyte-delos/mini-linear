@@ -3,11 +3,11 @@
 // read keys GET-only, webhooks/api-keys session-only, admin-only audit/members/invites/webhooks) and from the invariant
 // "a denied caller never gets a 2xx and never a 5xx". Rows marked 'adm?' are ASSUMED admin-only (spec silent): they are
 // reported separately so a failure is a spec question, not a verdict.
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { api, world, type U } from './helpers/world';
+import { api, world, ownerPool, type U } from './helpers/world';
 import { runIntegration } from './helpers/gate';
 
 type Pol = 'glob' | 'mem' | 'adm' | 'adm?';
@@ -318,6 +318,9 @@ describe.runIf(runIntegration)('every workspace member and admin: no 401 and no 
 });
 
 describe.runIf(runIntegration)('API keys (docs/API.md)', () => {
+  // Flake fix: bad-key attempts are rate limited per IP (30/min, api:badkey:<ip>) and every request here shares one IP.
+  // Reset the API limiter buckets before each test so earlier 401s (revoked/invalid keys) cannot trip a later 429.
+  beforeEach(async () => { await ownerPool.query("delete from rate_limits where key like 'api:%'"); });
   const mint = async (u: U, scope: string) => {
     const r = await api(u, 'POST', '/api/v1/w/w1/api-keys', { name: `matrix-${scope}`, scope });
     expect(r.status).toBe(201);
@@ -345,17 +348,20 @@ describe.runIf(runIntegration)('API keys (docs/API.md)', () => {
     const tm = await mint(W.M1, 'write');
     expect([403, 404]).toContain(await call(tm, 'GET', '/api/v1/w/w1/audit'));
   });
-  it('guest key (any scope) has no more power than the guest: no issue creation, foreign issue 404', async () => {
-    // NOTE (spec question): the API hands a guest a scope=write/admin key. It is harmless today (acts as the guest), but the label overstates it.
+  // Open until Ada's route fix lands; then switch it.fails back to it.
+  it.fails('guest can only mint a read key: write/admin scope is 403 (spec decision 2026-10-30)', async () => {
     for (const scope of ['write', 'admin']) {
       const r = await api(W.G1, 'POST', '/api/v1/w/w1/api-keys', { name: 'g-' + scope, scope });
-      if (r.status !== 201) { expect([403, 422]).toContain(r.status); continue; }
-      const tok = (await r.json()).token as string;
-      const h = { authorization: `Bearer ${tok}` };
-      expect(await status(null, 'POST', '/api/v1/w/w1/issues', h, { title: 'by guest key', team_id: W.t1 }), `${scope} key creates an issue`).toBe(403);
-      expect(await status(null, 'GET', `/api/v1/w/w1/issues/${W.i2}`, h)).toBe(404);
-      expect([403, 404]).toContain(await status(null, 'GET', '/api/v1/w/w1/audit', h));
+      expect(r.status, `guest ${scope} key`).toBe(403);
     }
+  });
+  it('guest read key has no more power than the guest: GET ok, no mutation, foreign issue 404, no audit', async () => {
+    const r = await api(W.G1, 'POST', '/api/v1/w/w1/api-keys', { name: 'g-read', scope: 'read' });
+    expect(r.status).toBe(201);
+    const h = { authorization: `Bearer ${(await r.json()).token as string}` };
+    expect(await status(null, 'POST', '/api/v1/w/w1/issues', h, { title: 'by guest key', team_id: W.t1 })).toBe(403);
+    expect(await status(null, 'GET', `/api/v1/w/w1/issues/${W.i2}`, h)).toBe(404);
+    expect([403, 404]).toContain(await status(null, 'GET', '/api/v1/w/w1/audit', h));
   });
   it('creating a key above your own role is refused', async () => {
     const r = await api(W.M1, 'POST', '/api/v1/w/w1/api-keys', { name: 'esc', scope: 'admin' });
