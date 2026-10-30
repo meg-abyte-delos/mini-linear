@@ -1,0 +1,81 @@
+/* tokens.css: single source of truth for color, type and motion (Wave A).
+   Imported last so it wins over theme.css / ui-night.css. Components must use
+   these variables only: no raw hex, no raw durations or easings.
+   Palette: Linear-like neutral grays (no blue tint), one indigo accent. Teal removed. */
+
+/* ---- Motion + type: theme independent ---- */
+:root {
+  --dur-instant:80ms;  /* hover, row background */
+  --dur-fast:120ms;    /* color/border changes, chevrons, checkboxes */
+  --dur-base:160ms;    /* popovers, menus, tooltips, palette */
+  --dur-slow:200ms;    /* panels, page transitions, progress */
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-in-out:cubic-bezier(.65,0,.35,1);
+  --ease-in:cubic-bezier(.4,0,1,1);
+  --enter-shift:4px; --enter-scale:.98;
+
+  --font-sans:'Inter Variable', Inter, system-ui, -apple-system, sans-serif;
+  --fs-xs:11px; --fs-sm:12px; --fs-base:13px; --fs-lg:15px; --fs-xl:18px;
+  --fw-regular:450; --fw-medium:500; --fw-semibold:600;
+  --lh-tight:1.25; --lh-base:1.45;
+  --tracking-id:-0.26px;
+  --row-h:44px; --group-h:36px; --side-item-h:28px;
+  --shadow-pop:0 4px 24px rgb(0 0 0 / .4), 0 0 0 1px var(--line);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-instant:0ms; --dur-fast:0ms; --dur-base:0ms; --dur-slow:0ms; --enter-shift:0px; --enter-scale:1; }
+  *, *::before, *::after { animation-duration:0ms !important; transition-duration:0ms !important; }
+}
+
+/* ---- Dark palette ---- */
+[data-theme='dark'] {
+  --n-bg:#08090a; --n-panel:#0f1011; --n-elev:#1c1d1f;
+  --bg:var(--n-bg); --side:#0b0c0d; --panel:var(--n-panel); --raised:var(--n-elev);
+  --line:#23252a; --line-soft:#1a1b1e; --hover:#141516; --sel:#1c1d22;
+  --fg:#f7f8f8; --muted-strong:#d0d6e0; --muted:#8a8f98; --dim:#7c818b;
+  --accent:#5e6ad2; --accent-hover:#6872d9; --accent-fg:#ffffff; --accent-text:#8d95ec;
+  --accent-soft:color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-glow:none; --accent-halo:none; --accent-bar-glow:none;
+  --accent-ring:0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  --s-review:#4cb782; --lb-project:#8d95ec;
+  --glass:rgb(8 9 10 / .85); --glass-blur:blur(12px);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    --n-bg:#08090a; --n-panel:#0f1011; --n-elev:#1c1d1f;
+    --bg:var(--n-bg); --side:#0b0c0d; --panel:var(--n-panel); --raised:var(--n-elev);
+    --line:#23252a; --line-soft:#1a1b1e; --hover:#141516; --sel:#1c1d22;
+    --fg:#f7f8f8; --muted-strong:#d0d6e0; --muted:#8a8f98; --dim:#7c818b;
+    --accent:#5e6ad2; --accent-hover:#6872d9; --accent-fg:#ffffff; --accent-text:#8d95ec;
+    --accent-soft:color-mix(in srgb, var(--accent) 16%, transparent);
+    --accent-glow:none; --accent-halo:none; --accent-bar-glow:none;
+    --accent-ring:0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+    --s-review:#4cb782; --lb-project:#8d95ec;
+    --glass:rgb(8 9 10 / .85); --glass-blur:blur(12px);
+  }
+}
+/* Light keeps its palette, only the accent changes */
+[data-theme='light'] { --accent:#5e6ad2; --accent-hover:#4f5bc4; --accent-fg:#ffffff; --accent-text:#4c56b8; --s-review:#2f8f5f; --lb-project:#4c56b8; }
+@media (prefers-color-scheme: light) { html:not([data-theme]) { --accent:#5e6ad2; --accent-hover:#4f5bc4; --accent-fg:#ffffff; --accent-text:#4c56b8; --s-review:#2f8f5f; --lb-project:#4c56b8; } }
+
+/* No ambient teal light: flat neutral background like Linear */
+[data-theme='dark'] body { background:var(--bg); }
+
+/* ---- Type scale applied ---- */
+body { font-family:var(--font-sans); font-size:var(--fs-base); line-height:var(--lh-base); }
+.row .title, .card-title { font-weight:var(--fw-medium); }
+.row .id, .card .id { font-weight:var(--fw-regular); letter-spacing:var(--tracking-id); font-variant-numeric:normal; color:var(--muted); }
+.group h2 { height:var(--group-h); }
+
+/* ---- Motion applied ---- */
+@keyframes pop-in { from { opacity:0; transform:translateY(calc(-1 * var(--enter-shift))) scale(var(--enter-scale)); } to { opacity:1; transform:none; } }
+@keyframes fade-in { from { opacity:0; } to { opacity:1; } }
+.tb-menu, .idh-menu, .ws-menu, .snooze-menu, [role=tooltip] { transform-origin:top right; animation:pop-in var(--dur-base) var(--ease-out); }
+.ws-menu { transform-origin:top left; }
+.palette { animation:pop-in var(--dur-base) var(--ease-out); }
+.row, .side-btn, .side-link, .tb-menu [role=menuitem], .idh-menu button, .palette li[role='option'] { transition:background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
+.row[aria-selected=true] { transition:background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
+.group h2 .chev, .team-toggle .sb-chev { transition:transform var(--dur-fast) var(--ease-out); }
+.card { transition:border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.card:hover { border-color:color-mix(in srgb, var(--fg) 14%, transparent); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration:var(--dur-slow); animation-timing-function:var(--ease-out); }

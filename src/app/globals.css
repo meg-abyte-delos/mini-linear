@@ -150,14 +150,14 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .nrow:hover, .nrow.sel { background:var(--hover); }
 .nrow.sel { outline:1px solid var(--sel); outline-offset:-1px; }
 .ndot { width:8px; height:8px; border-radius:50%; background:transparent; flex:none; }
-.nrow.unread .ndot { background:#28aba5; }
+.nrow.unread .ndot { background:var(--accent); }
 .nrow.unread .ntitle { font-weight:600; color:var(--fg); }
 .nid { color:var(--muted); font-size:12px; width:64px; flex:none; }
 .ntitle { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .nwho, .ntime { color:var(--muted); font-size:12px; white-space:nowrap; }
 .nrow .rowsel { cursor:pointer; }
 .inbox-detail-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
-.badge { margin-left:auto; min-width:18px; padding:0 5px; border-radius:9px; background:#28aba5; color:#fff; font-size:11px; line-height:18px; text-align:center; }
+.badge { margin-left:auto; min-width:18px; padding:0 5px; border-radius:9px; background:var(--accent); color:#fff; font-size:11px; line-height:18px; text-align:center; }
 .pdetail{padding:16px;display:flex;flex-direction:column;gap:16px}
 .pd-head{display:flex;align-items:center;gap:10px}
 .pd-head h2{margin:0;flex:1}

@@ -13,13 +13,13 @@
   --bg:var(--n-bg); --side:rgba(18,19,22,.72); --panel:var(--n-panel); --raised:var(--n-elev);
   /* 1px hairlines at 6% white (4% for soft); inputs get a real 3:1 border */
   --line:rgba(255,255,255,.06); --line-soft:rgba(255,255,255,.04); --line-input:#686b73;
-  --hover:rgba(255,255,255,.04); --sel:rgba(40,171,165,.12);
+  --hover:rgba(255,255,255,.04); --sel:color-mix(in srgb, var(--accent) 12%, transparent);
   /* accent + glow tokens */
-  --accent:#28aba5; --accent-soft:rgba(40,171,165,.16);
-  --accent-glow:0 0 0 1px rgba(40,171,165,.35), 0 0 16px rgba(40,171,165,.28);
-  --accent-halo:inset 0 0 0 1px rgba(40,171,165,.22), 0 0 14px rgba(40,171,165,.12);
-  --accent-bar-glow:0 0 8px rgba(40,171,165,.8);
-  --accent-ring:0 0 0 3px rgba(40,171,165,.25);
+  --accent:var(--accent); --accent-soft:color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-glow:0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 16px color-mix(in srgb, var(--accent) 28%, transparent);
+  --accent-halo:inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 14px color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-bar-glow:0 0 8px color-mix(in srgb, var(--accent) 80%, transparent);
+  --accent-ring:0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
   /* status colors (all usable as text, >= 4.5:1 on every surface) */
   --st-ok:#3fb950; --st-warn:#e0a43a; --st-danger:#f27474; --st-info:#7c85e0;
   --glass:rgba(11,12,14,.72); --glass-blur:saturate(160%) blur(14px);
@@ -29,12 +29,12 @@
     --n-bg:#0b0c0e; --n-panel:#121316; --n-elev:#1a1b1f;
     --bg:var(--n-bg); --side:rgba(18,19,22,.72); --panel:var(--n-panel); --raised:var(--n-elev);
     --line:rgba(255,255,255,.06); --line-soft:rgba(255,255,255,.04); --line-input:#686b73;
-    --hover:rgba(255,255,255,.04); --sel:rgba(40,171,165,.12);
-    --accent-soft:rgba(40,171,165,.16);
-    --accent-glow:0 0 0 1px rgba(40,171,165,.35), 0 0 16px rgba(40,171,165,.28);
-    --accent-halo:inset 0 0 0 1px rgba(40,171,165,.22), 0 0 14px rgba(40,171,165,.12);
-    --accent-bar-glow:0 0 8px rgba(40,171,165,.8);
-    --accent-ring:0 0 0 3px rgba(40,171,165,.25);
+    --hover:rgba(255,255,255,.04); --sel:color-mix(in srgb, var(--accent) 12%, transparent);
+    --accent-soft:color-mix(in srgb, var(--accent) 16%, transparent);
+    --accent-glow:0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 16px color-mix(in srgb, var(--accent) 28%, transparent);
+    --accent-halo:inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 14px color-mix(in srgb, var(--accent) 12%, transparent);
+    --accent-bar-glow:0 0 8px color-mix(in srgb, var(--accent) 80%, transparent);
+    --accent-ring:0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
     --st-ok:#3fb950; --st-warn:#e0a43a; --st-danger:#f27474; --st-info:#7c85e0;
     --glass:rgba(11,12,14,.72); --glass-blur:saturate(160%) blur(14px);
   }
@@ -59,7 +59,7 @@
 /* Subtle ambient light behind the app (dark only) */
 [data-theme='dark'] body {
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(40,171,165,.07), transparent 60%),
+    radial-gradient(1200px 600px at 10% -10%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
     var(--bg);
   background-attachment:fixed;
 }
@@ -89,7 +89,7 @@
   background:var(--glass);
   -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
 }
-[data-theme='dark'] .switch button[aria-pressed=true] { box-shadow:inset 0 0 0 1px rgba(40,171,165,.3); }
+[data-theme='dark'] .switch button[aria-pressed=true] { box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
 
 /* Inputs: 3:1 border (non-text contrast) */
 [data-theme='dark'] input:not([type=checkbox]):not([type=radio]),
