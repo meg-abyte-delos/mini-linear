@@ -7,8 +7,15 @@ import { INBOX_STATE } from './global-setup';
 // Visual regression at 1280x800, dark, on the seeded demo workspace with the fixed test clock (?today=2026-10-27).
 // File name starts with 00- so it runs first, before other specs add issues to the shared DB: the seed is the fixture.
 // Each screen: pixel baseline (tests/e2e/00-visual.spec.ts-snapshots/*-linux.png) + axe wcag2a/aa (contrast included).
-// Update baselines on purpose with: pnpm exec playwright test tests/e2e/00-visual.spec.ts --update-snapshots, and review the images in the PR.
+// Update baselines on purpose with: pnpm test:visual:update (fresh isolated DB, same 10-issue seed as CI), and review the images in the PR.
+// Never generate them on a long-lived local DB: extra issues change the list/board and the baselines then fail in CI.
 test.describe.configure({ mode: 'serial' });
+test.beforeAll(({}, testInfo) => {
+  // Guard: writing baselines outside a fresh DB (CI, or pnpm test:visual:update) bakes local data into the PNGs.
+  if (testInfo.config.updateSnapshots !== 'none' && process.env.E2E_ISOLATED !== '1' && !process.env.CI) {
+    throw new Error('Refusing to update visual baselines on a non-isolated DB. Run: pnpm test:visual:update');
+  }
+});
 test.use({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark', reducedMotion: 'reduce' });
 
 const TODAY = 'today=2026-10-27';
