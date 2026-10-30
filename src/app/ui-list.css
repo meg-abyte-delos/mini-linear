@@ -115,3 +115,12 @@
 .row .proj-col .prop-ic { flex:none; width:12px; height:12px; color:var(--lb-project); }
 .row .proj-col .proj-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .row .date { width:var(--list-date-w); text-align:right; }
+
+/* Labels column: whole pills only; overflow folds into a +N chip (tooltip lists the rest). A lone pill wider than the column ellipsizes. */
+.row .labels .chip { max-width:100%; overflow:hidden; }
+.row .labels .chip-more { justify-content:center; padding:0 6px; color:var(--muted-strong); cursor:default; }
+.row .labels .chip-more::before { content:none; }
+.row .labels .chip-more:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+
+/* Issue page: the feed's last row stays clear of the sticky composer. */
+.idp-sec[aria-labelledby=h-act] > .feed, .idp-sec[aria-labelledby=h-act] > .cmts { padding-bottom: var(--sp-3); }

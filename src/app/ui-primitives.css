@@ -122,5 +122,3 @@
 .btn[data-tone='danger'] { color:color-mix(in srgb, var(--danger) 65%, var(--fg)); background:transparent; border-color:color-mix(in srgb, var(--danger) 45%, transparent); }
 .btn[data-tone='danger']:hover:not(:disabled) { background:color-mix(in srgb, var(--danger) 14%, transparent); border-color:var(--danger); }
 .inbox-bar .btn:disabled { color:var(--muted); opacity:1; }
-.inbox-detail-actions .btn:first-child { margin-left:calc(var(--sp-3) * -1); }
-.inbox-detail-actions .btn:last-child { margin-left:auto; }

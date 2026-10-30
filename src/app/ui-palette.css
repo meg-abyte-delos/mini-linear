@@ -59,3 +59,8 @@
 
 /* No results: compact message line above the single Search all row */
 .palette li.pal-noresults { height: 56px; }
+
+/* Review 20:00: the scrolling list ends on whole rows above the footer. Height = top pad 4 + 2 group labels (30) + 7 rows (40) + bottom pad 8, so the default view stops exactly after the 3rd Navigation row; filtered lists keep the bottom pad and scroll-padding. */
+.palette { display:flex; flex-direction:column; }
+.palette ul { box-sizing:border-box; flex:0 1 auto; min-height:0; max-height:calc(4px + 2 * 30px + 7 * 40px + 8px); padding-bottom:8px; scroll-padding-bottom:8px; }
+.palette-foot { flex:none; }

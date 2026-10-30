@@ -2,6 +2,7 @@
 // WYSIWYG description editor (no Write/Preview split). contentEditable surface over the safe markdown subset: the DOM is built
 // from the parsed markdown with createElement only, edits are read back into blocks and written as markdown on blur.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import '@/app/ui-rich-editor.css';
 import { Tooltip } from '@/components/ui';
 import { parseMarkdown, safeHref } from '@/lib/detail/markdown';
 import { blocksToMarkdown } from '@/lib/detail/md-serialize';

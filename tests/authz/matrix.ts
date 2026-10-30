@@ -16,7 +16,9 @@ export type Row = {
 const IF1 = { 'if-match': '1' };
 let cyc = 0;
 export const nextCycle = () => { const d = new Date(Date.UTC(2060, 0, 1) + cyc++ * 20 * 86400000); const e = new Date(d.getTime() + 13 * 86400000); return { start_date: d.toISOString().slice(0, 10), end_date: e.toISOString().slice(0, 10) }; };
-export const letters = () => Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join('');
+let ltr = Math.floor(Math.random() * 26 ** 4);
+/** 4-letter team key: sequential from a random start (wraps), so one process never repeats a key. */
+export const letters = () => { let n = ltr++ % 26 ** 4; let k = ''; for (let i = 0; i < 4; i++) { k = String.fromCharCode(65 + (n % 26)) + k; n = Math.floor(n / 26); } return k; };
 const r = (m: Method, path: string, policy: PolicyName | Six, ok: number, o: Partial<Row> = {}): Row => ({ m, path, policy, ok, ...o });
 
 export const ROWS: Row[] = [
@@ -55,6 +57,7 @@ export const ROWS: Row[] = [
   r('PATCH', '/teams/{team}', 'teamAdmin', 200, { needs: ['team'], body: () => ({ name: 'Renamed' }) }),
   r('DELETE', '/teams/{team}', 'adminOnly', 204, { needs: ['team'] }),
   r('GET', '/teams/{team}/members', 'teamPublic', 200, { needs: ['team'] }),
+  r('GET', '/teams/{team}/estimate-scale', 'teamRoleRead', 200, { needs: ['team'] }),
   r('POST', '/teams/{team}/members/{target}', 'teamAdmin', 201, { needs: ['team', 'target'], body: () => ({}) }),
   r('PATCH', '/teams/{team}/members/{memberId}', 'teamAdmin', 200, { needs: ['team'], body: () => ({ role: 'admin' }) }),
   r('DELETE', '/teams/{team}/members/{target}', 'teamAdmin', 204, { needs: ['team', 'target'] }),
@@ -85,6 +88,7 @@ export const ROWS: Row[] = [
   r('POST', '/issues/{issue}/unarchive', 'issueWrite', 200, { needs: ['issue'] }),
   r('POST', '/issues/{trashed}/restore', 'issueWrite', 200, { needs: ['trashed'] }),
   r('GET', '/issues/{issue}/children', 'issueRead', 200, { needs: ['issue'] }),
+  r('GET', '/issues/{issue}/sub-issues', 'issueRead', 200, { needs: ['issue'] }),
   r('GET', '/issues/{issue}/attachments', 'issueRead', 200, { needs: ['issue'] }),
   r('POST', '/issues/{issue}/attachments', 'issueWrite', 201, { needs: ['issue'], body: () => ({ url: 'https://example.com/doc' }) }),
   r('DELETE', '/issues/{issue}/attachments/{attachment}', 'authorOrAdmin', 204, { needs: ['issue', 'attachment'] }),
@@ -103,8 +107,8 @@ export const ROWS: Row[] = [
   r('PUT', '/issues/{issue}/subscription', 'issueRead', 200, { needs: ['issue'] }),
   r('DELETE', '/issues/{issue}/subscription', 'issueRead', 204, { needs: ['issue'] }),
   r('GET', '/subscriptions', 'memberPlus', 200),
-  r('PUT', '/subscriptions/{kind}/{project}', 'projectWrite', 204, { needs: ['project'], over: { outsideTeam: 'ok' }, note: 'KNOWN GAP: assertVisible checks RLS only, so a member outside the project teams can subscribe to it (GET project is 404 for them)' }),
-  r('DELETE', '/subscriptions/{kind}/{project}', 'memberPlus', 204, { needs: ['project'] }),
+  r('PUT', '/subscriptions/{kind}/{project}', 'projectWrite', 204, { needs: ['project'], note: 'outsideTeam 404: same pvisible rule as GET /projects/{project}' }),
+  r('DELETE', '/subscriptions/{kind}/{project}', 'projectWrite', 204, { needs: ['project'], note: 'outsideTeam 404: same pvisible rule as GET /projects/{project}' }),
   r('GET', '/issues/{issue}/presence', 'issueRead', 200, { needs: ['issue'] }),
   r('POST', '/issues/{issue}/presence', 'issueRead', 200, { needs: ['issue'] }),
   r('DELETE', '/issues/{issue}/presence', 'issueRead', 200, { needs: ['issue'] }),
@@ -160,6 +164,12 @@ export const ROWS: Row[] = [
   r('GET', '/views/{view}', 'viewOwn', 200, { needs: ['view'] }),
   r('PATCH', '/views/{view}', 'viewOwn', 200, { needs: ['view'], body: () => ({ name: 'vv' }), headers: IF1 }),
   r('DELETE', '/views/{view}', 'viewOwn', 204, { needs: ['view'], headers: IF1 }),
+  r('GET', '/view-state', 'memberPlus', 200),
+  r('PUT', '/view-state', 'memberPlus', 200, { headers: { 'if-match': '0' }, body: () => ({ scope: 'all', layout: 'list', filters: { op: 'and', rules: [] }, display: {} }) }),
+  r('DELETE', '/view-state', 'memberPlus', 204, { query: 'scope=all' }),
+  r('GET', '/views/favorites', 'memberPlus', 200),
+  r('PUT', '/views/{view}/favorite', 'viewOwn', 200, { needs: ['view'] }),
+  r('DELETE', '/views/{view}/favorite', 'memberPlus', 204, { needs: ['view'] }),
   r('GET', '/search', 'everyone', 200, { query: 'q=seed' }),
   r('GET', '/search/recents', 'everyone', 200),
   r('POST', '/search/recents', 'everyone', 201, { body: () => ({ kind: 'query', query: 'q' + Math.random().toString(36).slice(2, 8) }), note: 'kind=query; a guest gets 403 for kind=project' }),

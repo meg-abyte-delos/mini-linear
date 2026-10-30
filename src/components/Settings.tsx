@@ -32,7 +32,7 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
                 <Select className='set-select' label={`Team role for ${r.email}`} value={r.role} disabled={!canAdmin} options={TEAM_ROLES}
                   onChange={(id) => run(S.setTeamRole(slug, team.id, r.user_id, id as S.TeamRole))} />
               </td>
-              <td className='set-end'>{canAdmin && <button type='button' className='btn' data-size='32' data-variant='ghost' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
+              <td className='set-end'>{canAdmin && <button type='button' className='btn' data-size='32' data-variant='ghost' data-tone='danger' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
             </tr>
           ))}
         </tbody>

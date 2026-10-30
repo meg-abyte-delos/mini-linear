@@ -133,6 +133,9 @@ try {
       on conflict (id) do update set actor_id = excluded.actor_id, type = excluded.type, issue_id = excluded.issue_id, comment_id = excluded.comment_id, read_at = excluded.read_at, archived_at = excluded.archived_at, created_at = excluded.created_at`,
       [id(5000 + k), W, uid.admin, nt.actor ? uid[nt.actor] : null, nt.type, issueId(issueByKey('DEM', nt.n)), nt.comment === undefined ? null : cid(nt.comment), read, nt.archived ? read : null, nt.at]);
   }
+  // One pending invitation so the Members page has an Invited row. The token hash is a fixed dummy (nobody holds the token, so it cannot be redeemed); expiry is refreshed on every run.
+  await c.query(`insert into invites (id, workspace_id, email, role, token_hash, invited_by, expires_at, created_at) values ($1,$2,'nora.lindqvist@example.test','member',$3,$4, now() + interval '7 days', now() - interval '1 day')
+    on conflict (id) do update set expires_at = excluded.expires_at, used_at = null, revoked_at = null`, [id(6000), W, 'seed-demo-rich-invite-0000000000000000000000000000000000000000000000', uid.admin]);
   await c.query('commit');
   console.log(`seed-demo-rich ok: ${RICH_ISSUES.length} issues, ${RICH_COMMENTS.length} comments, ${RICH_NOTIFS.length} notifications, ${ALL_LABELS.length} labels, ${RICH_USERS.length} extra users`);
 } catch (e) { await c.query('rollback'); throw e; } finally { c.release(); await pool.end(); }

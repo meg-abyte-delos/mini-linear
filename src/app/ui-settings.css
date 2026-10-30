@@ -59,7 +59,7 @@
 /* Tables */
 .set-table { width:100%; border-collapse:collapse; }
 .set-table th { padding:var(--sp-2) var(--sp-3); text-align:left; font-size:var(--fs-sm); font-weight:var(--fw-medium); color:var(--muted); border-bottom:1px solid var(--line-soft); white-space:nowrap; }
-.set-table td { padding:var(--sp-2) var(--sp-3); height:var(--row-h); box-sizing:border-box; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+.set-table td { padding:0 var(--sp-3); height:var(--row-h); box-sizing:border-box; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
 .set-table tbody tr:last-child td { border-bottom:0; }
 .set-table tbody tr { transition:background-color var(--dur-instant) var(--ease-out); }
 .set-table tbody tr:hover { background:var(--hover); }
@@ -90,9 +90,21 @@
   .set-nav-h { display:none; }
 }
 
+/* Role control: quiet Linear-like select, border only on hover/focus. */
+.set-role-select { width:auto; min-width:0; height:var(--chip-h); padding:0 var(--sp-5, 20px) 0 var(--sp-2); font-size:var(--fs-sm); color:var(--muted-strong); background-color:transparent; border-color:transparent; cursor:pointer; }
+.set-role-select:hover { background-color:var(--hover); border-color:var(--line); color:var(--fg); }
 /* Role segmented control (invite popover: a nested menu would close the popover on outside press) */
 .set-seg { display:flex; gap:var(--sp-1); padding:2px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--bg); }
 .set-seg-btn { flex:1; height:calc(var(--set-ctl-h) - 6px); padding:0 var(--sp-2); font:inherit; color:var(--muted-strong); background:none; border:0; border-radius:calc(var(--r-sm) - 2px); cursor:pointer; }
 .set-seg-btn:hover { background:var(--hover); }
 .set-seg-btn[aria-checked='true'] { background:var(--sel); color:var(--fg); font-weight:var(--fw-medium); }
 .set-seg-btn:focus-visible { outline:none; box-shadow:var(--accent-ring); }
+
+/* Review 20:00: Members and Pending invitations share one fixed column grid (Role/State land on the same x); pending email muted like member emails. */
+.set-table:has(.set-col-role) { table-layout:fixed; }
+.set-table .set-col-role { width:160px; }
+.set-table .set-col-state { width:140px; }
+.set-table .set-col-end { width:48px; }
+.set-table .set-col-email { width:auto; }
+.set-table:has(.set-col-name) .set-col-name { width:auto; }
+.set-table:has(.set-col-role) td { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

@@ -120,7 +120,16 @@ export class Fx {
         }); break;
       }
       case 'team': {
-        t.team = (await must(call(A, 'POST', `${P}/teams`, { name: 'fx' + rnd(), key: letters() }), 'team')).id;
+        // Team keys are unique per workspace: a random 4-letter key can collide with a team left by an earlier cell or run (409).
+        // Retry with a fresh key so the fixture is idempotent.
+        let made: { id: string } | null = null;
+        for (let attempt = 0; attempt < 8 && !made; attempt++) {
+          const r = await call(A, 'POST', `${P}/teams`, { name: 'fx' + rnd(), key: letters() });
+          if (r.status === 409) continue;
+          made = await must(Promise.resolve(r), 'team');
+        }
+        if (!made) throw new Error('fixture team: 409 on 8 distinct keys');
+        t.team = made.id;
         await must(call(A, 'POST', `${P}/teams/${t.team}/members/${W.M1.id}`, {}), 'team member', [200, 201, 204]);
         break;
       }
@@ -177,7 +186,9 @@ export async function runCell(W: World, row: Row, role: RoleName): Promise<Cell>
     if (row.prep === 'react') await call(who, 'POST', `${P}/comments/${fx.t.comment}/reactions`, { emoji: '\u{1F44D}' });
     const watch = want !== 'ok';
     const before = watch ? await fingerprint(W.w1) : '';
-    const res = await call(who, row.m, path, body, row.headers, row.stream);
+    let res = await call(who, row.m, path, body, row.headers, row.stream);
+    // POST /teams: a key can collide with a team left by another cell or run (409); retry with a fresh key.
+    for (let n = 0; n < 8 && res.status === 409 && row.m === 'POST' && row.path === '/teams' && want === 'ok'; n++) res = await call(who, row.m, path, row.body!(fx.t), row.headers, row.stream);
     const fpChanged = watch ? (await fingerprint(W.w1)) !== before : false;
     return { row, role, want, got: res.status, fpChanged };
   } finally { await fx.cleanup(); }

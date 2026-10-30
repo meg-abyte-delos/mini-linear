@@ -32,8 +32,10 @@ export function CyclesList({ cycles, issues, today, slug, onViewIssues }: Props)
   const toggle = (id: string) => setBurnOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   return (
     <div className='scroll cycles'>
+      {cycles.length === 0 && <div className='cy-empty'><CycleGlyph bucket='active' /><p className='col-empty'>No cycles yet</p><p className='cy-empty-hint'>Cycles are created from the team cycle settings.</p></div>}
       {BUCKETS.map((b) => {
         const cs = cycles.filter((c) => cycleBucket(c, today) === b.id);
+        if (cs.length === 0) return null; // Linear hides empty groups
         return (
           <section key={b.id} className='group' aria-labelledby={`cy-${b.id}`}>
             <h2 id={`cy-${b.id}`}><span>{b.title}</span><span className='count'>{cs.length}</span></h2>
@@ -54,7 +56,7 @@ export function CyclesList({ cycles, issues, today, slug, onViewIssues }: Props)
                       {b.id !== 'past' && <span className='cy-started' title='Started'>{s.started} started</span>}
                     </span>
                     <span className='cy-progress'>
-                      <ProgressRing pct={s.pct} size={16} showPct={false} tone={b.id === 'past' ? 'muted' : undefined} label={`${s.pct}% complete, ${s.done} of ${s.total} issues`} />
+                      <ProgressRing pct={s.pct} size={16} showPct={false} tone={b.id === 'past' && s.pct < 100 ? 'muted' : undefined} label={`${s.pct}% complete, ${s.done} of ${s.total} issues`} />
                       <span className='cy-pct'>{s.pct}%</span>
                       <span className='cy-count'>{s.done}/{s.total}</span>
                     </span>

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { withWorkspaceCtx, requireRole, type Ctx } from "../http/ctx";
 import { ApiError } from "../http/errors";
 import { ifMatchVersion, listQuery, parseId, parseJson, parseQuery, uuidSchema } from "../http/validate";
+import { decodeCursor, page } from "../http/cursor";
 import { diffOf } from "../audit";
 import { uuidv7 } from "../uuid7";
 import { type Row, stale, out, audit, listPage, afterId, teamVisible, assertTeamVisible } from "./common";
@@ -96,11 +97,20 @@ const getCycle = async (ctx: Ctx, id: string) => {
   return r[0];
 };
 const ordered = (s: string, e: string) => { if (e < s) throw new ApiError("validation_failed", "end_date before start_date"); };
+/** List order: running/upcoming cycles first (soonest start first), then past cycles most recent first (Linear).
+ *  Keyset on (sk, id); sk is an int derived from the dates, computed in SQL for the filter and in JS (same formula) for the cursor. */
+const CYCLE_SK = (t: Ctx["tx"]) => t`case when cycles.end_date >= current_date then cycles.start_date - date '2000-01-01' else 1000000 + (date '2100-01-01' - cycles.start_date) end`;
+const dayNum = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(b)) / 86400000);
 export const listCycles = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member"); // guests: no cycles (same as projects)
-  const q = parseQuery(req, listQuery.extend({ team_id: uuidSchema.optional() })), c = afterId(ctx, "cycles", q);
-  const rows = await ctx.tx<Row[]>`${CSEL(ctx)} where ${teamVisible(ctx, "team_id")} and ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} ${q.team_id ? ctx.tx`and team_id = ${q.team_id}` : ctx.tx``} order by id limit ${q.limit + 1}`;
-  return listPage(ctx, "cycles", q, rows);
+  const q = parseQuery(req, listQuery.extend({ team_id: uuidSchema.optional() })), cur = q.cursor ? decodeCursor(q.cursor, ctx.workspaceId, "cycles") : null;
+  if (cur && !Number.isFinite(Number(cur.k))) throw new ApiError("bad_request", "invalid cursor");
+  const today = (await ctx.tx<{ d: string }[]>`select current_date::text as d`)[0]!.d;
+  const rows = await ctx.tx<Row[]>`${CSEL(ctx)} where ${teamVisible(ctx, "team_id")}
+    ${cur ? ctx.tx`and ((${CYCLE_SK(ctx.tx)}), cycles.id) > (${Number(cur.k)}::int, ${cur.id}::uuid)` : ctx.tx``} ${q.team_id ? ctx.tx`and cycles.team_id = ${q.team_id}` : ctx.tx``}
+    order by (${CYCLE_SK(ctx.tx)}), cycles.id limit ${q.limit + 1}`;
+  const sk = (r: Row) => String((r.end_date as string) >= today ? dayNum(r.start_date as string, "2000-01-01") : 1000000 + dayNum("2100-01-01", r.start_date as string));
+  return Response.json(page(rows, q.limit, ctx.workspaceId, "cycles", (r) => ({ k: sk(r), id: r.id as string })));
 });
 export const createCycle = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "admin");

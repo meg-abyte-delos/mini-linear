@@ -42,8 +42,17 @@ function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: bool
         <div className='set-field' role='radiogroup' aria-label='Role'>
           <span className='set-label' aria-hidden='true'>Role</span>
           <div className='set-seg'>
-            {roles.map((r) => (
-              <button key={r} type='button' role='radio' aria-checked={role === r} className='set-seg-btn' onClick={() => setRole(r as 'admin' | 'member' | 'guest')}>{cap(r)}</button>
+            {roles.map((r, i) => (
+              <button key={r} type='button' role='radio' aria-checked={role === r} tabIndex={role === r ? 0 : -1} className='set-seg-btn'
+                onClick={() => setRole(r as 'admin' | 'member' | 'guest')}
+                onKeyDown={(e) => {
+                  const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+                  if (!d) return;
+                  e.preventDefault();
+                  const next = roles[(i + d + roles.length) % roles.length];
+                  setRole(next as 'admin' | 'member' | 'guest');
+                  (e.currentTarget.parentElement?.children[(i + d + roles.length) % roles.length] as HTMLElement | undefined)?.focus();
+                }}>{cap(r)}</button>
             ))}
           </div>
         </div>
@@ -121,7 +130,7 @@ export function Members({ slug }: { slug: string }) {
         <section aria-labelledby='mem-h' className='set-card set-flush'>
           <h2 id='mem-h' className='sr-only'>Members</h2>
           <table className='set-table'>
-            <thead><tr><th scope='col'>Name</th><th scope='col'>Email</th><th scope='col'>Role</th><th scope='col'>State</th><th scope='col'><span className='sr-only'>Actions</span></th></tr></thead>
+            <thead><tr><th scope='col' className='set-col-name'>Name</th><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th><th scope='col' className='set-col-state'>State</th><th scope='col' className='set-col-end'><span className='sr-only'>Actions</span></th></tr></thead>
             <tbody>
               {shown.map((m) => {
                 const name = nameFromEmail(m.email);
@@ -135,7 +144,12 @@ export function Members({ slug }: { slug: string }) {
                   <tr key={m.user_id} data-testid='member-row'>
                     <td><span className='set-person'><UserAvatar userId={m.user_id} name={name} size='md' /><span className='set-person-text'>{name}{self && <span className='set-you'>you</span>}</span></span></td>
                     <td className='set-muted'>{m.email}</td>
-                    <td><span className='set-role' data-role={m.role}>{m.role}</span></td>
+                    <td>{admin && !self && S.canManageMember(role, m.role)
+                      ? <select className='set-select set-role-select' aria-label={`Role for ${name}`} value={m.role}
+                          onChange={(e) => void act(S.setMemberRole(slug, m.user_id, e.target.value as S.WorkspaceRole), `${name} is now ${e.target.value}`)}>
+                          {S.assignableRoles(role).map((r: S.AssignableRole) => <option key={r} value={r}>{cap(r)}</option>)}
+                        </select>
+                      : <span className='set-role' data-role={m.role}>{m.role}</span>}</td>
                     <td><span className='set-state'>Active</span></td>
                     <td className='set-end'>{admin && !self && S.canManageMember(role, m.role) && <RowMenu label={`Actions for ${name}`} entries={entries} />}</td>
                   </tr>
@@ -150,11 +164,11 @@ export function Members({ slug }: { slug: string }) {
             <h2 id='inv-h' className='set-h2'>Pending invitations <span className='set-key'>{invites.length}</span></h2>
             <div className='set-card set-flush'>
               <table className='set-table'>
-                <thead><tr><th scope='col'>Email</th><th scope='col'>Role</th><th scope='col'>Expires</th><th scope='col'><span className='sr-only'>Actions</span></th></tr></thead>
+                <thead><tr><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th><th scope='col' className='set-col-state'>Expires</th><th scope='col' className='set-col-end'><span className='sr-only'>Actions</span></th></tr></thead>
                 <tbody>
                   {invites.map((i) => (
                     <tr key={i.id} data-testid='invite-row'>
-                      <td>{i.email}</td>
+                      <td className='set-muted'>{i.email}</td>
                       <td><span className='set-role' data-role={i.role}>{i.role}</span></td>
                       <td className='set-muted'>{dateFmt.format(new Date(i.expires_at))}</td>
                       <td className='set-end'><RowMenu label={`Actions for invitation to ${i.email}`} entries={[

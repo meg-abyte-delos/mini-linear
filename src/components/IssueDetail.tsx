@@ -465,7 +465,7 @@ function ActivityEvent({ at, actor }: { at: ActivityItem; actor: Person | undefi
   return (
     <li className='ev'>
       <span className='ev-lead' aria-hidden='true'>{actor ? <Avatar initials={actor.initials} hue={actor.hue} /> : <span className='dot' />}</span>
-      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action} <time dateTime={at.created_at}>{fmtTime(at.created_at)}</time></span>
+      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && !/^created/.test(at.summary ?? at.action) && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action} <time dateTime={at.created_at}>{fmtTime(at.created_at)}</time></span>
     </li>
   );
 }
@@ -505,6 +505,8 @@ function Composer({ label, onSubmit, onCancel, autoFocus, initial = '', submitLa
   const [caret, setCaret] = useState(initial.length);
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // Autosize fallback for browsers without CSS field-sizing (CSSOM writes are allowed by the strict CSP).
+  useEffect(() => { const el = ref.current; if (!el || CSS.supports('field-sizing', 'content')) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }, [text]);
   const at = activeMention(text, caret);
   const list = at ? suggest(mentionUsers(people), at.query) : [];
   const idx = Math.min(sel, Math.max(list.length - 1, 0));

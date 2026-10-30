@@ -31,15 +31,16 @@
 .inbox-bar .bulk { display:inline-flex; align-items:center; gap:6px; }
 
 /* Inbox polish (Pierre 18:46): each element inspected at 1280, dark + light. */
-/* Shell: 1fr is minmax(auto,1fr), so wide inbox content pushed the grid past the viewport and the page scrolled sideways (sidebar cut left, detail bleeding right). */
-.shell { grid-template-columns:232px minmax(0,1fr); }
 .side { min-width:0; }
 .inbox-wrap { display:flex; min-height:0; min-width:0; flex:1; overflow:hidden; }
 /* Rows: no checkbox at rest, actor avatar at the left. */
 .nrow .rowsel { flex:none; width:14px; height:14px; display:grid; place-items:center; font-size:12px; line-height:1; color:var(--muted); opacity:0; transition:opacity var(--dur-instant) var(--ease-out); }
 .nrow:hover .rowsel, .nrow:focus-within .rowsel, .nrow .rowsel.on, .inbox ul:has(.rowsel.on) .rowsel { opacity:1; }
 .nrow .ndot { flex:none; }
-.nrow .nav-av { flex:none; width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:600; background:#5e6ad2; color:#fff; text-transform:uppercase; }
+.nrow .nav-av { flex:none; width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:600; background:var(--accent); color:var(--accent-fg); text-transform:uppercase; }
+/* System notifications (kind=system, no actor): neutral glyph, not a fake "S" avatar. */
+.nrow .nav-av[data-kind=system] { background:color-mix(in srgb, var(--fg) 8%, transparent); color:var(--muted); }
+.nrow .nav-av svg { width:11px; height:11px; }
 .nrow .nid { width:48px; flex:none; color:var(--muted); font-size:var(--fs-sm); }
 .nrow .ntitle { flex:1 1 auto; color:var(--muted-strong); font-weight:400; min-width:0; }
 .nrow.unread .ntitle { color:var(--fg); font-weight:500; }
@@ -62,7 +63,22 @@
 .inbox-preview .md ul.tasks { list-style:none; padding-left:0; }
 .inbox-preview .md-empty { color:var(--muted); }
 /* Actions: Linear ghost buttons, 28px, text aligned on the content edge; Open issue keeps a hairline border. */
-.inbox-bar button { border-color:transparent; background:transparent; color:var(--muted-strong); }
-.inbox-bar button:hover:not(:disabled) { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; }
-@media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }
 .inbox-detail-actions { gap:4px; margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft); }
+/* Status pill in the detail grid (Linus #277 markup). */
+.inbox-detail .inbox-status { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border:1px solid var(--line); border-radius:11px; font-size:var(--fs-sm); color:var(--fg); vertical-align:middle; }
+.inbox-detail .inbox-status svg { width:12px; height:12px; flex:none; }
+@media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }
+
+/* Review 20:00: Linear inbox list ~360px, two-line rows: ID + title on top, excerpt below at full width. ID never wraps. */
+.inbox-wrap .inbox { flex:0 0 clamp(360px, 32%, 520px); width:clamp(360px, 32%, 520px); min-width:0; max-width:none; }
+/* Pierre 20:18: wide screens, detail content centred at a readable measure like Linear's issue view. */
+.inbox-detail > * { box-sizing:border-box; max-width:760px; margin-inline:auto; }
+.inbox-detail { padding:32px 40px; }
+.inbox-detail > h2 { margin:0 auto 16px; }
+.nrow { display:grid; grid-template-columns:14px 6px 18px auto minmax(0,1fr) auto; grid-template-rows:auto auto; grid-template-areas:'sel dot av id title time' 'sel dot av who who time'; align-items:center; column-gap:var(--sp-2); row-gap:2px; height:auto; min-height:52px; padding:var(--sp-2) var(--sp-4); }
+.nrow .rowsel { grid-area:sel; } .nrow .ndot { grid-area:dot; } .nrow .nav-av { grid-area:av; }
+.nrow .nid { grid-area:id; width:auto; white-space:nowrap; }
+.nrow .ntitle { grid-area:title; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nrow .nwho { grid-area:who; max-width:none; min-width:0; white-space:nowrap; }
+.nrow .ntime { grid-area:time; align-self:start; line-height:20px; }
+@media (max-width:900px) { .inbox-wrap .inbox { flex:1 1 100%; width:auto; } }

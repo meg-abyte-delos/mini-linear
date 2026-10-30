@@ -56,6 +56,11 @@
 /* Branch: one line, ellipsis, click copies */
 .idp-side dd .branch-btn{display:flex;flex-wrap:nowrap;align-items:center;overflow:hidden}
 .branch-btn .branch{display:block;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:normal;min-width:0}
+/* Comment composer: no native resize grip (Linear), grows with its content instead (field-sizing + JS fallback). */
+.composer textarea{resize:none;overflow:hidden;field-sizing:content;max-height:50vh}
+.composer textarea:not(:placeholder-shown){overflow-y:auto}
+/* Activity dots were --line (~1.1:1 on bg, invisible): use the muted text token in both themes. */
+.feed .ev .dot{background:var(--muted)}
 
 /* D9: activity entries lead with an avatar, status changes carry the status icon; branch row has a visible copy glyph */
 .feed .ev{display:flex;align-items:flex-start;gap:var(--sp-2);padding-left:0}
