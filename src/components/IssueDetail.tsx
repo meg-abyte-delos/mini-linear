@@ -1,10 +1,13 @@
 'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { USERS, STATUSES, STATUS_LABEL, PRIORITY_LABEL, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
 import { Picker, type PickOption } from '@/components/Picker';
 import { Markdown } from '@/components/Markdown';
+import { RichEditor } from '@/components/RichEditor';
+import { ConfirmDialog, type MenuEntry } from '@/components/ui';
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
 import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
@@ -33,12 +36,6 @@ const lid = (p: string) => `${p}-${Date.now().toString(36)}-${++seq}`;
 const now = () => new Date().toISOString();
 const fmtTime = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
 
-function wrapSel(el: HTMLTextAreaElement, before: string, after = before, placeholder = 'text'): string {
-  const { selectionStart: s, selectionEnd: e, value } = el;
-  const sel = value.slice(s, e) || placeholder;
-  return value.slice(0, s) + before + sel + after + value.slice(e);
-}
-
 export function IssueDetail({ slug, initial, all, meta, api, today, viewer = null, teamId }: { teamId?: string; slug: string; initial: DetailIssue; all: DetailIssue[]; meta: Meta; api: boolean; today: string; viewer?: { userId: string | null; role: string } | null }) {
   const [nlPeople, setNlPeople] = useState<NlPeople>(EMPTY_PEOPLE);
   useEffect(() => {
@@ -58,8 +55,6 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [others, setOthers] = useState<DetailIssue[]>(all.filter((i) => i.id !== initial.id));
   const [title, setTitle] = useState(initial.title);
   const viewers = usePresence(slug, initial.id, viewer?.userId, api);
-  const [desc, setDesc] = useState(initial.description);
-  const [tab, setTab] = useState<'write' | 'preview'>(initial.description ? 'preview' : 'write');
   const [pick, setPick] = useState<{ kind: PickKind; rect: DOMRect | null; relType?: Relation['type'] } | null>(null);
   const [relations, setRelations] = useState<Relation[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -71,7 +66,11 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [linkForm, setLinkForm] = useState<{ url: string; title: string } | null>(null);
   const [relMenu, setRelMenu] = useState(false);
   const [adding, setAdding] = useState(false);
-  const descRef = useRef<HTMLTextAreaElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const router = useRouter();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
+  const [busy, setBusy] = useState(false);
   const version = useRef(initial.version);
   const client = useMemo(() => (api ? detailApi(slug) : null), [api, slug]);
   const ident = identifierOf(issue);
@@ -87,6 +86,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     void client.attachments(issue.id).then((r) => r.ok && setAttachments(r.data.items));
     void client.comments(issue.id).then((r) => r.ok && setComments(r.data.items));
     void client.activity(issue.id).then((r) => r.ok && r.data.items.length && setActivity(r.data.items));
+    void client.subscription(issue.id).then((r) => r.ok && setSubscribed(!!r.data.subscribed));
   }, [client, issue.id]);
 
   useEffect(() => { document.documentElement.dataset.ready = '1'; }, []);
@@ -116,6 +116,38 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const copyLink = () => copy(issue.url || issueUrl(window.location.origin, slug, ident), 'issue URL');
   const copyBranch = () => copy(branch, 'branch name');
 
+  async function toggleSubscribe() {
+    const on = !subscribed;
+    const r = client ? await client.subscribe(issue.id, on) : null;
+    if (r && !r.ok && !r.unsupported) { setToast(`Could not ${on ? 'subscribe to' : 'unsubscribe from'} ${ident}`); return; }
+    if (r && !r.ok && r.unsupported) { setToast('Subscriptions are not available here'); return; } // nothing was saved: no success toast
+    setSubscribed(on);
+    setToast(on ? `Subscribed to ${ident}` : `Unsubscribed from ${ident}`);
+  }
+  async function makeCopy() {
+    const team = (issue as { team_id?: string }).team_id ?? teamId;
+    if (!api || !team) { setToast('Cannot copy the issue: no team selected'); return; }
+    if (busy) return;
+    setBusy(true);
+    try {
+      const row = await createIssue(slug, team, `Copy of ${issue.title}`.slice(0, 255));
+      if (!row) { setToast('Could not copy the issue'); return; }
+      const carry: Record<string, unknown> = {};
+      if (issue.description) carry.description = issue.description;
+      if (issue.priority) carry.priority = issue.priority;
+      if (issue.assignee_id) carry.assignee_id = issue.assignee_id;
+      if (issue.label_ids.length) carry.label_ids = issue.label_ids;
+      if (issue.project_id) carry.project_id = issue.project_id;
+      if (issue.cycle_id) carry.cycle_id = issue.cycle_id;
+      if (issue.parent_id) carry.parent_id = issue.parent_id;
+      if (issue.estimate != null) carry.estimate = issue.estimate;
+      if (issue.due_date) carry.due_date = issue.due_date;
+      if (Object.keys(carry).length) { const r = await patchIssue(slug, row, row.version, carry); if (r.kind !== 'ok') setToast(`Copied as ${identifierOf(row)}, but some fields could not be carried over`); }
+      log(`copied to ${identifierOf(row)}`);
+      router.push(`/w/${slug}/issue/${identifierOf(row)}`);
+    } finally { setBusy(false); }
+  }
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.key !== '.' && e.key !== '>') return;
@@ -131,12 +163,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     if (!t) { setTitle(issue.title); setToast('Title cannot be empty'); return; }
     if (t !== issue.title) void update({ title: t.slice(0, 255) }, 'changed the title');
   }
-  function saveDesc() { if (desc !== issue.description) void update({ description: desc }, 'updated the description'); }
-  function tool(kind: 'b' | 'i' | 'code' | 'link' | 'ul' | 'task') {
-    const el = descRef.current; if (!el) return;
-    const v = kind === 'b' ? wrapSel(el, '**') : kind === 'i' ? wrapSel(el, '_') : kind === 'code' ? wrapSel(el, '`') : kind === 'link' ? wrapSel(el, '[', '](https://)', 'link') : kind === 'ul' ? wrapSel(el, '\n- ', '', 'item') : wrapSel(el, '\n- [ ] ', '', 'task');
-    setDesc(v); el.focus();
-  }
+  const saveDesc = (md: string) => { if (md !== issue.description) void update({ description: md }, 'updated the description'); };
 
   function options(kind: PickKind): PickOption[] {
     switch (kind) {
@@ -283,6 +310,23 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     const href = (i: DetailIssue | undefined) => (i ? `/w/${slug}/issue/${identifierOf(i)}` : null);
     return { index: at, total: seq.length, prev: href(seq[at - 1]), next: href(seq[at + 1]) };
   }, [all, issue, slug]);
+
+  const mi = (d: string) => (<svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true' focusable='false'><path d={d} /></svg>);
+  const menuEntries: MenuEntry[] = [
+    { id: 'copy-id', label: 'Copy ID', icon: mi('M5.5 2.5h7v8h-7zM3.5 5.5v8h7'), onSelect: () => void copy(ident, 'issue ID') },
+    { id: 'copy-title', label: 'Copy title', icon: mi('M3 4V2.8h10V4M8 2.8v10.4M6 13.2h4'), onSelect: () => void copy(issue.title, 'issue title') },
+    { id: 'copy-link', label: 'Copy link', icon: mi('M6.8 9.2a2.5 2.5 0 0 0 3.5 0l2.2-2.2a2.5 2.5 0 0 0-3.5-3.5l-.6.6M9.2 6.8a2.5 2.5 0 0 0-3.5 0L3.5 9a2.5 2.5 0 0 0 3.5 3.5l.6-.6'), shortcut: ['⌘', '.'], onSelect: () => void copyLink() },
+    { id: 'copy-branch', label: 'Copy branch name', icon: mi('M4.5 2.5v9M4.5 11.5a1.5 1.5 0 1 0 0 .01M9.5 4a1.5 1.5 0 1 0 0 .01M9.5 5.5c0 2.5-5 2-5 4.5'), shortcut: ['⌘', '⇧', '.'], onSelect: () => void copyBranch() },
+    ...(readOnly ? [] : [
+      { type: 'separator' } as const,
+      { id: 'subscribe', label: subscribed ? 'Unsubscribe' : 'Subscribe', icon: mi('M8 2.5a3.5 3.5 0 0 0-3.5 3.5c0 3-1.5 4-1.5 4h10s-1.5-1-1.5-4A3.5 3.5 0 0 0 8 2.5ZM6.8 12.5a1.3 1.3 0 0 0 2.4 0'), onSelect: () => void toggleSubscribe() },
+      { id: 'move', label: 'Move to project…', icon: mi('M2.5 4.5h3.2l1.3 1.5h6.5v6.5h-11zM8 8.2h3M9.8 7l1.2 1.2L9.8 9.4'), onSelect: () => { const r = moreRef.current?.getBoundingClientRect() ?? null; setPick({ kind: 'project', rect: r }); } },
+      { id: 'copy', label: 'Make a copy', icon: mi('M5.5 5.5h7v7h-7zM3.5 10.5v-8h8'), disabled: busy, onSelect: () => void makeCopy() },
+      { id: 'archive', label: issue.archived_at ? 'Unarchive' : 'Archive', icon: mi('M2.5 3.5h11v3h-11zM3.5 6.5v6h9v-6M6.5 9h3'), onSelect: () => void lifecycle(issue.archived_at ? 'unarchive' : 'archive') },
+      { type: 'separator' } as const,
+      { id: 'delete', label: 'Delete', icon: mi('M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5M7 7v4M9 7v4'), destructive: true, onSelect: () => setConfirmDelete(true) },
+    ]),
+  ];
   const dueLabel = issue.due_date ? new Date(`${issue.due_date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : 'Set due date';
 
   return (
@@ -290,8 +334,9 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
       <main className='idp-main' aria-label={`Issue ${ident}`}>
         <header className='idp-head'>
           <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>Issues</Link><span className='sep' aria-hidden='true'>/</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>/</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
+          <button className='idh-status' disabled={readOnly} onClick={open('status')} aria-haspopup='dialog' aria-label={`Status: ${STATUS_LABEL[issue.status]}. Change status`}><StatusIcon status={issue.status} /><span>{STATUS_LABEL[issue.status]}</span></button>
           <PresenceStack presence={viewers} size='md' />
-          <IssueHeaderBar ident={ident} nav={nav} archived={!!issue.archived_at} readOnly={readOnly} onCopyLink={() => void copyLink()} onCopyBranch={() => void copyBranch()} onArchive={() => void lifecycle('archive')} onUnarchive={() => void lifecycle('unarchive')} onDelete={() => { if (window.confirm(`Delete ${ident}? You can restore it from the trash.`)) void lifecycle('delete'); }} onRestore={() => void lifecycle('restore')} />
+          <IssueHeaderBar ident={ident} nav={nav} readOnly={readOnly} entries={menuEntries} moreRef={moreRef} onRestore={() => void lifecycle('restore')} />
         </header>
         {(issue.archived_at || issue.deleted_at) && <p className='idp-banner' role='status'>{issue.deleted_at ? 'This issue is in the trash. Restore it to edit.' : `Archived ${fmtDate(issue.archived_at as string)}.`}</p>}
         {parent && <Link className='parent-crumb' href={`/w/${slug}/issue/${identifierOf(parent)}`}><span className='id'>{identifierOf(parent)}</span> {parent.title}</Link>}
@@ -299,25 +344,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         <input id='idp-title' className='idp-title' value={title} maxLength={255} readOnly={readOnly} onChange={(e) => setTitle(e.target.value)} onBlur={saveTitle} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } if (e.key === 'Escape') { setTitle(issue.title); e.currentTarget.blur(); } }} />
 
         <section className='idp-desc' aria-label='Description'>
-          <div className='md-bar' role='toolbar' aria-label='Description editor'>
-            <div className='md-tabs' role='tablist' aria-label='Editor mode'>
-              <button role='tab' id='tab-write' aria-selected={tab === 'write'} aria-controls='desc-panel' onClick={() => setTab('write')}>Write</button>
-              <button role='tab' id='tab-preview' aria-selected={tab === 'preview'} aria-controls='desc-panel' onClick={() => { saveDesc(); setTab('preview'); }}>Preview</button>
-            </div>
-            {tab === 'write' && !readOnly && <div className='md-tools'>
-              <button aria-label='Bold' onMouseDown={(e) => e.preventDefault()} onClick={() => tool('b')}><b>B</b></button>
-              <button aria-label='Italic' onMouseDown={(e) => e.preventDefault()} onClick={() => tool('i')}><i>I</i></button>
-              <button aria-label='Inline code' onMouseDown={(e) => e.preventDefault()} onClick={() => tool('code')}>{'</>'}</button>
-              <button aria-label='Link' onMouseDown={(e) => e.preventDefault()} onClick={() => tool('link')}>Link</button>
-              <button aria-label='Bulleted list' onMouseDown={(e) => e.preventDefault()} onClick={() => tool('ul')}>• List</button>
-              <button aria-label='Checklist' onMouseDown={(e) => e.preventDefault()} onClick={() => tool('task')}>☐ Task</button>
-            </div>}
-          </div>
-          <div id='desc-panel' role='tabpanel' aria-labelledby={tab === 'write' ? 'tab-write' : 'tab-preview'}>
-            {tab === 'write' && !readOnly
-              ? <textarea ref={descRef} aria-label='Description (markdown)' className='md-input' value={desc} placeholder='Add description… (markdown)' onChange={(e) => setDesc(e.target.value)} onBlur={saveDesc} rows={8} />
-              : <div className='md-view' onDoubleClick={() => !readOnly && setTab('write')}><Markdown source={desc} /></div>}
-          </div>
+          <RichEditor value={issue.description} readOnly={readOnly} onCommit={saveDesc} />
         </section>
 
         <section className='idp-sec' aria-labelledby='h-sub'>
@@ -359,20 +386,41 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
       </main>
 
       <aside className='idp-side' aria-label='Properties'>
-        <dl>
+        <section className='side-group' aria-labelledby='sg-props'>
+          <h3 id='sg-props' className='side-h'>Properties</h3>
+          <dl>
           <dt>Status</dt><dd><button disabled={readOnly} onClick={open('status')} aria-haspopup='dialog'><StatusIcon status={issue.status} />{STATUS_LABEL[issue.status]}</button></dd>
           <dt>Priority</dt><dd><button disabled={readOnly} onClick={open('priority')} aria-haspopup='dialog'><PriorityIcon priority={issue.priority} />{PRIORITY_LABEL[issue.priority]}</button></dd>
           <dt>Assignee</dt><dd><button disabled={readOnly} onClick={open('assignee')} aria-haspopup='dialog'>{assignee ? <Avatar initials={assignee.initials} hue={assignee.hue} /> : <PropIcon name='user' />}<span className={assignee ? undefined : 'prop-empty'}>{assignee?.name ?? 'Unassigned'}</span></button></dd>
           <dt>Labels</dt><dd><button disabled={readOnly} onClick={open('labels')} aria-haspopup='dialog'>{issue.label_ids.length ? issue.label_ids.map((l) => { const m = meta.labels.find((x) => x.id === l); return <span key={l} className={`chip ${m?.hue ?? ''}`}>{m?.name ?? l}</span>; }) : <><PropIcon name='label' /><span className='prop-empty'>Add label</span></>}</button></dd>
+          </dl>
+        </section>
+        <section className='side-group' aria-labelledby='sg-plan'>
+          <h3 id='sg-plan' className='side-h'>Planning</h3>
+          <dl>
           <dt><label htmlFor='prop-est'>Estimate</label></dt><dd className='prop-native'><span className='prop-pill' aria-hidden='true'><PropIcon name='estimate' /><span className={issue.estimate == null ? 'prop-empty' : undefined}>{issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}</span></span><select id='prop-est' disabled={readOnly} value={issue.estimate ?? ''} onChange={(e) => void update({ estimate: e.target.value === '' ? null : Number(e.target.value) }, e.target.value === '' ? 'removed the estimate' : `set estimate to ${e.target.value}`)}><option value=''>No estimate</option>{ESTIMATES.map((n) => <option key={n} value={n}>{n} pt{n === 1 ? '' : 's'}</option>)}</select></dd>
           <dt><label htmlFor='prop-due'>Due date</label></dt><dd className='prop-native'><span className={`prop-pill due-${due}`} aria-hidden='true'><PropIcon name='due' /><span className={issue.due_date ? undefined : 'prop-empty'}>{dueLabel}</span>{due === 'overdue' && <span className='due-flag'>Overdue</span>}</span><input id='prop-due' type='date' disabled={readOnly} value={issue.due_date ?? ''} onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* not supported */ } }} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} /></dd>
+          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
+          </dl>
+        </section>
+        <section className='side-group' aria-labelledby='sg-org'>
+          <h3 id='sg-org' className='side-h'>Organization</h3>
+          <dl>
           <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'><PropIcon name='parent' /><span className={parent ? 'prop-trunc' : 'prop-empty'}>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</span></button></dd>
           <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'><PropIcon name='project' /><span className={project ? 'prop-trunc' : 'prop-empty'}>{project?.name ?? 'Add to project'}</span></button></dd>
-          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
+          </dl>
+        </section>
+        <section className='side-group' aria-labelledby='sg-git'>
+          <h3 id='sg-git' className='side-h'>Git</h3>
+          <dl>
           <dt>Branch</dt><dd><button className='branch-btn' onClick={() => void copyBranch()} title={`${branch} (click to copy)`} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code></button></dd>
-        </dl>
+          </dl>
+        </section>
       </aside>
       {pick && <Picker title={pickTitle[pick.kind]} multi={pick.kind === 'labels'} anchor={pick.rect} options={options(pick.kind)} onPick={(id) => void onPick(id)} onClose={() => setPick(null)} />}
+      <ConfirmDialog open={confirmDelete} title={`Delete ${ident}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void lifecycle('delete'); }}>
+        <p>{issue.title}</p><p>The issue moves to the trash. You can restore it from there.</p>
+      </ConfirmDialog>
       {toast && <div className='toast' role='status'>{toast}</div>}
     </div>
   );
