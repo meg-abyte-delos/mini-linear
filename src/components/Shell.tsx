@@ -1,4 +1,5 @@
 'use client';
+import { EmptyState } from '@/components/ui';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
@@ -748,10 +749,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             <button onClick={() => router.refresh()}>Retry</button>
           </div>
         ) : allIssues.length === 0 ? (
-          <div className='state empty' role='status'>
-            <p>No issues yet.</p>
-            {!readOnly && <button onClick={() => create()}>Create issue <kbd>C</kbd></button>}
-          </div>
+          <EmptyState icon='issues' title='No issues yet' hint='Issues track the work your team is doing. Create one to get started.'
+            action={!readOnly && <button className='primary' onClick={() => create()}>Create issue <kbd>C</kbd></button>} />
         ) : view === 'inbox' ? (
           <Inbox client={inboxClient} refreshKey={rtTick} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
@@ -764,10 +763,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : view === 'cycles' ? (
           <CyclesList cycles={CYCLES} issues={allIssues} today={today} slug={api?.slug ?? null} onViewIssues={(id) => { setFilters({ ...emptyFilters(), cycle: [id] }); setView('list'); }} />
         ) : issues.length === 0 ? (
-          <div className='state empty' role='status'>
-            <p>No issues match these filters.</p>
-            <button onClick={() => setFilters(emptyFilters())}>Clear filters</button>
-          </div>
+          <EmptyState icon='filter' title='No issues match these filters.' hint='Try removing a filter or broadening your search.'
+            action={<button onClick={() => setFilters(emptyFilters())}>Clear filters</button>} />
         ) : view === 'list' ? (
           <div className='scroll'>
             {groups.map(({ key, status, items }) => {
