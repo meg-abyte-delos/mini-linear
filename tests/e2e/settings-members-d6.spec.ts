@@ -41,7 +41,7 @@ test('members page: search filters, invite sends and lists a pending invite, rev
   await expect(rows).toHaveCount(total);
 
   const email = `d6-${Date.now()}@example.test`;
-  await page.getByRole('button', { name: 'Invite' }).click();
+  await page.getByRole('button', { name: 'Invite', exact: true }).click();
   const form = page.getByRole('dialog', { name: 'Invite people' });
   await form.getByLabel('Email').fill(email);
   await form.getByRole('button', { name: 'Send invite' }).click();
