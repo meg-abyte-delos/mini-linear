@@ -1,11 +1,12 @@
 'use client';
-import { EmptyState } from '@/components/ui';
+import { EmptyState, Menu, type MenuEntry } from '@/components/ui';
 import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
+import { PropIcon } from '@/components/PropIcons';
 import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -52,7 +53,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }
     return () => ro.disconnect();
   }, []);
   // Keep the selected card inside the rendered window (J/K moves selection through off-screen cards).
-  const heights = useMemo(() => items.map((i) => cardHeight(i.label_ids.length)), [items]);
+  const heights = useMemo(() => items.map((i) => cardHeight(i.label_ids.length, i.title.length)), [items]);
   const selIdx = selectedId ? items.findIndex((i) => i.id === selectedId) : -1;
   useEffect(() => {
     const el = ref.current; if (!el || selIdx < 0) return;
@@ -60,11 +61,20 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }
     if (next !== el.scrollTop) { el.scrollTop = next; setTop(next); }
   }, [selIdx, vh, heights]);
   const w = visibleWindowVar(heights, top, vh);
+  const [menu, setMenu] = useState(false);
+  const [folded, setFolded] = useState(false);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const entries: MenuEntry[] = [
+    ...(onAdd ? [{ id: 'add', label: 'Add issue', onSelect: () => onAdd(status) }] : []),
+    { id: 'fold', label: folded ? 'Expand column' : 'Collapse column', onSelect: () => setFolded((f) => !f) },
+  ];
   return (
-    <section className={`col${overZone ? ' over-zone' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
+    <section className={`col${overZone ? ' over-zone' : ''}${folded ? ' folded' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
       <div className='col-head'>
         <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
+        <button type='button' ref={moreRef} className='col-act' aria-label={`${STATUS_LABEL[status]} column options`} title='Column options' aria-haspopup='menu' aria-expanded={menu} onClick={() => setMenu((m) => !m)}><Icon name='more' /></button>
         {onAdd && <button type='button' className='col-act' aria-label={`Add issue to ${STATUS_LABEL[status]}`} title='Add issue' onClick={() => onAdd(status)}><Icon name='plus' /></button>}
+        <Menu open={menu} anchorRef={moreRef} onClose={() => setMenu(false)} label={`${STATUS_LABEL[status]} column`} entries={entries} align='end' />
       </div>
       <div className='col-scroll' ref={ref} onScroll={(e) => setTop(e.currentTarget.scrollTop)} data-testid={`col-${status}`}>
         <div role='listbox' aria-labelledby={`c-${status}`} style={{ paddingTop: w.padTop, paddingBottom: w.padBottom }}>
@@ -728,7 +738,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       {shown('status') && <StatusIcon status={i.status} />}
       <span className='title'>{i.title}</span>
       {subBadge(i)}
-      <span className='labels'>{shown('labels') && i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{shown('project') && (() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
+      {shown('labels') && <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</span>}
+      {shown('project') && <span className='proj-col'>{(() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj' title={pj.name}><PropIcon name='project' /><span className='proj-name'>{pj.name}</span></span> : null; })()}</span>}
       {shown('created') && <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>}
       {shown('assignee') && assignee(i)}
     </div>
@@ -775,7 +786,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
           <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
-          {view !== 'inbox' && (
+          {(view === 'list' || view === 'board') && (
             <div className='switch' role='group' aria-label='View'>
               <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
               <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>

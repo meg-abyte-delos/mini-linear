@@ -15,15 +15,10 @@ export function initialsOf(name: string): string {
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1]![0] : '')).toUpperCase() || '?';
 }
 
-/** Linear-style contextual date: "Today", "Yesterday", "3d ago" within a week, "Oct 29" this year, "Oct 29, 2025" otherwise. */
+/** Linear list date: one short format on every row ("Oct 29"; "Oct 29, 2025" for another year), so the column scans evenly. */
 export function relDate(iso: string, now: Date = new Date()): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const day = (x: Date) => Date.UTC(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
-  const diff = Math.round((day(now) - day(d)) / 86400000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
-  if (diff > 1 && diff < 7) return `${diff}d ago`;
   const sameYear = d.getUTCFullYear() === now.getUTCFullYear();
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }), timeZone: 'UTC' });
 }
