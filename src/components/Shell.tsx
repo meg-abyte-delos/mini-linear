@@ -13,7 +13,7 @@ import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, t
 import { CyclesList } from '@/components/CyclesList';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
-import { GROUPING_LABEL, ORDERING_LABEL, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
+import { DISPLAY_PROP_LABEL, GROUPING_LABEL, ORDERING_LABEL, type DisplayProp, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
@@ -161,6 +161,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [tbMenu, setTbMenu] = useState<'filter' | 'display' | null>(null);
   const [grouping, setGrouping] = useState<Grouping>('status');
   const [ordering, setOrdering] = useState<Ordering>('manual');
+  const [showEmpty, setShowEmpty] = useState(false);
+  const [hidden, setHidden] = useState<ReadonlySet<DisplayProp>>(new Set());
+  const shown = (k: DisplayProp) => !hidden.has(k);
+  const toggleProp = (k: DisplayProp) => setHidden((h) => { const n = new Set(h); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
@@ -284,7 +288,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   useEffect(() => { document.documentElement.dataset.ready = '1'; return () => { delete document.documentElement.dataset.ready; }; }, []);
 
   // Same grouping, ordering and collapsed state as the list render, so j/k never lands on a hidden row.
-  const groups = useMemo(() => listGroups(issues, STATUSES, grouping, ordering), [issues, grouping, ordering]);
+  const groups = useMemo(() => listGroups(issues, STATUSES, grouping, ordering, showEmpty), [issues, grouping, ordering, showEmpty]);
   const ordered = useMemo(
     () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.flatMap((s) => issues.filter((i) => i.status === s))),
     [view, groups, collapsed, issues],
@@ -628,13 +632,13 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const row = (i: Issue) => (
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       {!readOnly && <span className={`rowsel${multi.includes(i.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${i.identifier ?? i.id}`} onClick={(e) => { e.stopPropagation(); toggleSelect(i.id); }}>{multi.includes(i.id) ? '☑' : '☐'}</span>}
-      <PriorityIcon priority={i.priority} />
-      <span className='id'>{i.identifier ?? i.id}</span>
-      <StatusIcon status={i.status} />
+      {shown('priority') && <PriorityIcon priority={i.priority} />}
+      {shown('id') && <span className='id'>{i.identifier ?? i.id}</span>}
+      {shown('status') && <StatusIcon status={i.status} />}
       <span className='title'>{i.title}</span>
-      <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{(() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
-      <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>
-      {assignee(i)}
+      <span className='labels'>{shown('labels') && i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{shown('project') && (() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
+      {shown('created') && <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>}
+      {shown('assignee') && assignee(i)}
     </div>
   );
   const card = (i: Issue, pos?: number, size?: number) => (
@@ -715,8 +719,13 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                 <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></button>
                 {tbMenu === 'display' && (
                   <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
-                    <label>Grouping<select autoFocus value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>{(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => <option key={g} value={g}>{GROUPING_LABEL[g]}</option>)}</select></label>
-                    <label>Ordering<select value={ordering} onChange={(e) => setOrdering(e.target.value as Ordering)}>{(Object.keys(ORDERING_LABEL) as Ordering[]).map((o) => <option key={o} value={o}>{ORDERING_LABEL[o]}</option>)}</select></label>
+                    <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><select aria-label='Grouping' autoFocus value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>{(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => <option key={g} value={g}>{GROUPING_LABEL[g]}</option>)}</select></div>
+                    <div className='dp-row'><span className='dp-k'><Icon name='views' />Ordering</span><select aria-label='Ordering' value={ordering} onChange={(e) => setOrdering(e.target.value as Ordering)}>{(Object.keys(ORDERING_LABEL) as Ordering[]).map((o) => <option key={o} value={o}>{ORDERING_LABEL[o]}</option>)}</select></div>
+                    <div className='dp-sep' role='separator' />
+                    <label className='dp-row dp-switch'><span className='dp-k'>Show empty groups</span><input type='checkbox' role='switch' checked={showEmpty} disabled={grouping === 'none'} onChange={(e) => setShowEmpty(e.target.checked)} /><i aria-hidden='true' /></label>
+                    <div className='dp-sep' role='separator' />
+                    <div className='dp-h' id='dp-props'>Display properties</div>
+                    <div className='dp-props' role='group' aria-labelledby='dp-props'>{(Object.keys(DISPLAY_PROP_LABEL) as DisplayProp[]).map((k) => <button key={k} type='button' className={`dp-chip${shown(k) ? ' on' : ''}`} aria-pressed={shown(k)} onClick={() => toggleProp(k)}>{DISPLAY_PROP_LABEL[k]}</button>)}</div>
                   </div>
                 )}
               </div>
