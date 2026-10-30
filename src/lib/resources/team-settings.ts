@@ -4,7 +4,7 @@ import { ApiError } from "../http/errors";
 import { ifMatchVersion, listQuery, parseId, parseJson, parseQuery, uuidSchema } from "../http/validate";
 import { diffOf } from "../audit";
 import { uuidv7 } from "../uuid7";
-import { ESTIMATE_SCALES, HEX } from "../team-config";
+import { ESTIMATE_SCALES, HEX, estimateValues, type EstimateScale } from "../team-config";
 import { type Row, stale, out, audit, listPage, afterId, assertTeamVisible, assertTeamAdmin } from "./common";
 
 // Permissions: reading a team's configuration needs team visibility (admins: all teams; members: their teams; guests:
@@ -33,6 +33,13 @@ const getSettingsRow = async (ctx: Ctx, team: string) => {
 };
 export const getSettings = (req: Request, slug: string, rawTeam: string) => withWorkspaceCtx(req, slug, async (ctx) =>
   out(await getSettingsRow(ctx, await teamFor(ctx, rawTeam, false))));
+/** A4: GET /teams/:id/estimate-scale. `values` is what assertEstimate accepts; scale "none" restricts nothing (values []). */
+export const getEstimateScale = (req: Request, slug: string, rawTeam: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  if (ctx.role === "guest") throw new ApiError("forbidden"); // contract A4: guests 403 (admin+ always pass; others must be team members, else 404)
+  const r = await getSettingsRow(ctx, await teamFor(ctx, rawTeam, false));
+  const scale = r.estimate_scale as EstimateScale, allow = !!r.estimate_allow_zero;
+  return Response.json({ scale, allow_zero: allow, values: estimateValues(scale, allow) });
+});
 export const patchSettings = (req: Request, slug: string, rawTeam: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const team = await teamFor(ctx, rawTeam, true);
   const want = ifMatchVersion(req), b = await parseJson(req, settingsBody), before = await getSettingsRow(ctx, team);

@@ -27,7 +27,20 @@ Same endpoints as the app, so the API is always at parity:
 | Attachments | `GET/POST /issues/<id>/attachments` (links), `DELETE /issues/<id>/attachments/<aid>`, file uploads below |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/<id>` (field `priority`: 0 none, 1 urgent .. 4 low, default 0) |
 | Teams | `GET/POST /teams`, `GET/PATCH/DELETE /teams/<id>`, `/teams/<id>/members` |
+| Saved views | `GET/POST /views`, `GET/PATCH/DELETE /views/<id>` (PATCH/DELETE need `If-Match`) |
+| View state | `GET/PUT/DELETE /view-state` per user and scope |
+| Favourite views | `GET /views/favorites`, `PUT/DELETE /views/<id>/favorite` |
 | Also | `/cycles`, `/labels`, `/members`, `/audit` |
+
+### View state and favourite views (A5, member+; guests get 403)
+
+- `scope`: `all`, `my-issues`, `team:<uuid>`, `project:<uuid>`, `cycle:<uuid>`, `view:<uuid>`; anything else is 422. A team/project/cycle/view scope the caller cannot see is 404.
+- `GET /view-state?scope=S` returns `{ scope, layout, filters, display, version, updated_at }`; with nothing stored it is 200 with defaults (`layout: "list"`, `filters: {op:"and",rules:[]}`, `display: {}`, `version: 0`). Without `scope`: `{ items: [...] }` (yours only, max 100).
+- `PUT /view-state` body `{ scope, layout, filters, display }` (strict; same `filters`/`display` schemas as `/views`; filters max 32 KB, display max 8 KB, else 422), header `If-Match: <version>` (`0` to create). 200 with the new row; 412 stale, 428 missing header. Ids inside filters are not validated.
+- `DELETE /view-state?scope=S` resets to defaults: 204, idempotent. `scope` is required (422).
+- `GET /views/favorites` returns `{ items: [{ view_id, position, view }] }` ordered by position; views no longer visible to the caller are omitted.
+- `PUT /views/<id>/favorite` body `{ position?: int >= 0 }` (default: end) returns 200 `{ view_id, position }`, idempotent; 404 if the view is not visible; the 51st favourite is 422. `DELETE /views/<id>/favorite`: 204, idempotent.
+- State and favourites are personal (RLS `own_rows`: even admins cannot read another user's rows) and not audited.
 
 **Pagination**: `?limit=1..100` (default 50) and `?cursor=<next_cursor>`; responses are `{ "items": [...], "next_cursor": string | null }`. Cursors are signed and bound to the workspace and list.
 **Concurrency**: PATCH needs `If-Match: <version>` (the `ETag` of the GET); missing: 428, stale: 412.
@@ -55,9 +68,10 @@ Rights: list/download follow the issue's visibility (other-team member 404, gues
 | Endpoint | Notes |
 |---|---|
 | `GET /notifications` | items add `coalesced_count`, `last_event_at`, `meta` (`{from,to}` for `status_change`, `{child_id}` for `sub_issue`, `{reason:"followed_<kind>"}`, `{relation_type,related_issue_id}`, `{due_date}`); reply carries `unread_count` |
+| `GET /notifications` (kind) | every item carries `kind`: `"system"` when it has no actor (`actor_id` and `actor` are null, always the case for `due_soon`), `"user"` otherwise. A client renders a system item as "Due soon", never as "Someone"; `status` stays the raw enum (the UI formats it) |
 | `POST /notifications/bulk` | `{ids (1..100), action: read\|unread\|archive\|unarchive}` strict. `200 { updated, results:[{id,status:"ok"\|"not_found"}], unread_count }`. Foreign, hidden and unknown ids are `not_found`, never an error |
 | `GET /subscriptions?kind=project\|cycle\|team\|label` | caller's own entity subscriptions `{ items:[{kind,entity_id,created_at}] }`. Guests: 403, bad kind: 422 |
-| `PUT/DELETE /subscriptions/<kind>/<entityId>` | 204, idempotent. Unknown or invisible entity: 404, entityId not a uuid: 422, more than 200: 422 |
+| `PUT/DELETE /subscriptions/<kind>/<entityId>` | 204, idempotent. Unknown or invisible entity (for a project: not visible to the caller, same rule as `GET /projects/:id`): 404 on PUT and, for projects, on DELETE; entityId not a uuid: 422, more than 200: 422 |
 | `/notification-preferences` | now 8 types: assigned, mention, comment, status_change, due_soon, reply, sub_issue, relation |
 
 Types: a reply in a thread you wrote or follow is `reply`; a child added to an issue you follow is `sub_issue`; a relation involving an issue you follow is `relation`. An unread notification of the same `(user, issue, type)` is updated instead of duplicated (`coalesced_count`, `last_event_at`); `mention` and `assigned` never coalesce, a read or archived one is never reused. Issues created in or moved into a followed project/cycle/team, or labelled with a followed label, notify as `sub_issue` with `meta.reason`.
@@ -101,6 +115,18 @@ Delivery: 2xx = success (redirects are not followed). Otherwise retried with bac
 
 **Payload / retention**: `payload` is the row as JSON (`to_jsonb(row)`) minus the internal `tsv` column. Deliveries older than 30 days are purged by the dispatcher (`purge_webhook_deliveries`).
 
+## Sub-issues, relations, estimates (A4, migration 0801)
+
+Contract: `docs/contracts/A4-subissues-relations-estimates.md`. All routes under `/api/v1/w/<slug>`.
+
+- **Issue DTO** (single and list): `sub_issues: { total, done, in_progress }` (direct, non-deleted children; `in_progress` = state category `started`), `estimate_rollup: { own, children, total }` (`children` = sum of the non-null child estimates, null when none; `total = (own ?? 0) + (children ?? 0)`), `parent: { id, identifier, title } | null`.
+- **Parent rules** (POST and PATCH `parent_id`): the parent must be a live issue the caller sees and must be in the child's team, else 422 `validation_failed` (unknown, foreign, soft-deleted and hidden parents share one message; team mismatch: "sub-issue must be in the parent's team"). Cycles and depth > 5 are 422 (DB trigger). `team_id` is not patchable (strict body, 422), so a parent or child cannot be moved out of its team.
+- `GET /issues?parent_id=<uuid>|none` (`none` = top-level only).
+- `GET /issues/:id/sub-issues?limit&cursor&include=children|descendants`: issue DTOs ordered `(sort_key, id)`; `descendants` flattens the visible subtree with `depth` 1..4. 404 when the parent is not visible. The older `GET /issues/:id/children` (no pagination, max 500) stays.
+- **Reorder**: `PATCH /issues/:id { move: { before_id } | { after_id } }` (If-Match as usual). The target must be another issue with the same parent, else 422. Only `sort_key` and `version` change (not audited).
+- **Relations**: items and the POST 201 body carry `related_issue { id, identifier, title, status, priority, assignee_id, team_id }`. Duplicate pair: 409 `conflict` with `details { relation_id, type }` (type as seen from the requested issue). `POST` accepts `cancel_source` (boolean). **Deviation from the contract text**: default `true`, because main already cancels the source on `duplicate` (test `a1-relations`); `false` skips it.
+- **Bulk** `POST /issues/bulk` (existing, max 250 ids): patch gains `estimate` (validated against the team scale, per issue) and `add_label_ids` / `remove_label_ids` (aliases of `label_ids_add` / `label_ids_remove`); optional `versions: { <issue_id>: <version> }` is a per-issue If-Match (stale: that id fails with `precondition_failed`, `details.current_version`). Failed items may carry `details`. Actions `delete` / `restore` / `archive` / `unarchive` bump versions; team-guests fail per issue with `forbidden`.
+- `GET /teams/:id/estimate-scale` -> `{ scale, allow_zero, values }` (`values` empty for `none`). Admin+ always; other callers must be team members (404 otherwise); guests 403.
 ## Search (A7)
 
 `GET /api/v1/w/:slug/search?q&kind&...` full-text search (config `simple`, prefix match on the last token, websearch syntax; `DEM-12` ranks that issue first).

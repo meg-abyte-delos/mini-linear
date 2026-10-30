@@ -15,6 +15,8 @@ import './ui-rings.css';
 import './ui-burndown.css';
 import './ui-bulk.css';
 import './ui-sidebar.css';
+import './ui-viewbar.css';
+import './ui-new-issue.css';
 import './tokens.css';
 import './ui-light.css';
 import './ui-review-1900.css';

@@ -103,8 +103,8 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     await mk(seed.a.member, { team_id: teamA, title: "grandchild", parent_id: c1.id });
     const ch = await (await call(R.listChildren as never, seed.a.member, {}, seed.a.slug, p.id)).json();
     expect(ch.items.map((i: { title: string }) => i.title).sort()).toEqual(["c1", "c2"]);
-    expect((await get(p.id)).sub_issues).toEqual({ total: 2, done: 1 });
-    expect(p.sub_issues).toEqual({ total: 0, done: 0 });
+    expect((await get(p.id)).sub_issues).toEqual({ total: 2, done: 1, in_progress: 0 });
+    expect(p.sub_issues).toEqual({ total: 0, done: 0, in_progress: 0 });
     expect((await call(R.listChildren as never, seed.b.member, {}, seed.a.slug, p.id)).status).toBe(404);
   });
 });

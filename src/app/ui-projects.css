@@ -18,7 +18,7 @@
 .pd-issues button { color:var(--fg); cursor:pointer; }
 .pd-issues button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 /* D1: Projects as a Linear table. Fixed columns shared by header and rows, actions on hover only. */
-.pj-table { --pj-cols:minmax(220px,1fr) 112px 64px 152px 96px 64px 200px; }
+.pj-table { --pj-cols:minmax(200px,1fr) 112px 64px 132px 96px 64px 104px 128px; }
 .pj-head, .cycles .project.pj-row { display:grid; grid-template-columns:var(--pj-cols); align-items:center; gap:var(--sp-3); padding:0 var(--sp-4) 0 var(--sp-4); }
 .pj-head { height:32px; border-bottom:1px solid var(--line-soft); color:var(--muted-strong); font-size:var(--fs-xs); font-weight:500; }
 .cycles .project.pj-row { min-height:40px; font-size:var(--fs-sm); color:var(--muted-strong); transition:background .12s; }
@@ -45,11 +45,22 @@
 .pj-date, .pj-issues, .cycles .project.pj-row .cy-count { font-variant-numeric:tabular-nums; }
 .cycles .project.pj-row .pj-late { color:var(--danger); font-weight:500; }
 .pj-none { color:var(--muted-strong); }
-.pj-prog .pj-status { flex:none; width:78px; overflow:hidden; text-overflow:ellipsis; color:var(--muted-strong); }
+.pj-stat .pj-status { overflow:hidden; text-overflow:ellipsis; color:var(--muted-strong); }
+/* Project status glyphs: distinct shape per status (Linear), state tokens for color. */
+.psi { flex:none; stroke:var(--s-todo); }
+.psi .fill { fill:var(--s-todo); stroke:none; }
+.psi-backlog { stroke:var(--s-backlog); }
+.psi-planned { stroke:var(--muted-strong); }
+.psi-in_progress { stroke:var(--s-progress); } .psi-in_progress .fill { fill:var(--s-progress); }
+.psi-paused { stroke:var(--s-review); }
+.psi-completed .fill { fill:var(--accent); }
+.psi-canceled .fill { fill:var(--s-canceled); }
 .pj-bar { flex:1; min-width:0; height:4px; }
 .pj-track { fill:var(--line); }
 .pj-fill { fill:var(--accent); }
 .pj-fill[data-done] { fill:var(--s-done); }
 .cycles .project.pj-row .cy-count { min-width:32px; text-align:right; justify-content:flex-end; }
-@media (max-width:900px) { .pj-table { --pj-cols:minmax(180px,1fr) 96px 120px 160px; } .pj-head > :nth-child(3), .pj-head > :nth-child(4), .pj-head > :nth-child(6), .pj-row > .pj-prio, .pj-row > .pj-lead, .pj-row > .pj-issues { display:none !important; } }
+@media (max-width:900px) { .pj-table { --pj-cols:minmax(180px,1fr) 96px 120px 160px; } .pj-head > :nth-child(3), .pj-head > :nth-child(4), .pj-head > :nth-child(6), .pj-head > :nth-child(8), .pj-row > .pj-prog, .pj-row > .pj-prio, .pj-row > .pj-lead, .pj-row > .pj-issues { display:none !important; } }
 @media (prefers-reduced-motion: reduce) { .cycles .project.pj-row, .cycles .project.pj-row .pj-actions { transition:none; } }
+[data-theme='light'] .pj-track { fill:color-mix(in srgb, var(--fg) 14%, transparent); }
+@media (prefers-color-scheme: light) { html:not([data-theme]) .pj-track { fill:color-mix(in srgb, var(--fg) 14%, transparent); } }

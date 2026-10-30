@@ -16,6 +16,22 @@ export function StatusIcon({ status }: { status: Status }) {
   );
 }
 
+// Project status (Linear): backlog dotted, planned dashed, in progress half pie, paused two bars,
+// completed filled check, canceled filled x. Colors in ui-projects.css (.psi-*), tokens only.
+export function ProjectStatusIcon({ status }: { status?: string | null }) {
+  const s = status ?? 'backlog';
+  return (
+    <svg className={`psi psi-${s}`} width='14' height='14' viewBox='0 0 14 14' aria-hidden='true' focusable='false'>
+      {s === 'backlog' && <circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' strokeDasharray='1.4 1.75' />}
+      {s === 'planned' && <circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' strokeDasharray='3.2 1.6' />}
+      {s === 'in_progress' && (<><circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' /><path d={pie(0.5)} className='fill' /></>)}
+      {s === 'paused' && (<><circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' /><path d='M5.6 5v4M8.4 5v4' fill='none' strokeWidth='1.5' strokeLinecap='round' /></>)}
+      {s === 'completed' && (<><circle cx='7' cy='7' r='6.75' className='fill' stroke='none' /><path d='M4.5 7.1 6.3 8.9 9.6 5.4' fill='none' stroke='var(--bg)' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' /></>)}
+      {s === 'canceled' && (<><circle cx='7' cy='7' r='6.75' className='fill' stroke='none' /><path d='M5 5 9 9M9 5 5 9' fill='none' stroke='var(--bg)' strokeWidth='1.5' strokeLinecap='round' /></>)}
+    </svg>
+  );
+}
+
 // Priority: Linear bars (3 x 3px, heights 4/7/10, baseline 12), urgent = rounded square with "!".
 export function PriorityIcon({ priority }: { priority: Issue['priority'] }) {
   if (priority === 0) return (<svg className='pi' width='14' height='14' viewBox='0 0 14 14' aria-hidden='true' focusable='false'><g className='dimfill'><rect x='1.5' y='6.25' width='2.5' height='1.5' rx='.5' /><rect x='5.75' y='6.25' width='2.5' height='1.5' rx='.5' /><rect x='10' y='6.25' width='2.5' height='1.5' rx='.5' /></g></svg>);
@@ -40,6 +56,7 @@ const PATHS = {
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
   board: 'M3 3h7v18H3ZM14 3h7v11h-7Z',
   plus: 'M12 5v14M5 12h14',
+  x: 'M18 6 6 18M6 6l12 12',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   search: 'M11 3a8 8 0 1 0 0 16 8 8 0 0 0 0-16ZM21 21l-4.35-4.35',
   team: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z',
