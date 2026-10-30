@@ -37,10 +37,27 @@ export function searchLocal(issues: Issue[], q: string, kind?: HitKind, limit = 
   }
   scored.sort((a, b) => a.s - b.s);
   const items = scored.slice(0, limit).map(({ i, s }): SearchHit => ({
-    kind: 'issue', id: i.id, issue_id: i.id, identifier: i.identifier ?? i.id, title: i.title, snippet: i.title, rank: 3 - s,
+    kind: 'issue', id: i.id, issue_id: i.id, identifier: i.identifier ?? i.id, title: i.title, snippet: s === 2 ? excerpt(i.description ?? '', needle) : i.title, rank: 3 - s,
     status: i.status, team_id: null, project_id: null, assignee_id: null,
   }));
   return { items, next_cursor: null };
+}
+
+/** Mock mode: ~80 chars of text around the first match, with the match wrapped in <mark> like the server's ts_headline. */
+function excerpt(text: string, needle: string): string {
+  const flat = text.replace(/\s+/g, ' ');
+  const at = flat.toLowerCase().indexOf(needle);
+  if (at < 0) return flat.slice(0, 80);
+  const from = Math.max(0, at - 30); const to = Math.min(flat.length, at + needle.length + 50);
+  return `${from > 0 ? '…' : ''}${flat.slice(from, at)}<mark>${flat.slice(at, at + needle.length)}</mark>${flat.slice(at + needle.length, to)}${to < flat.length ? '…' : ''}`;
+}
+
+/** Client-side highlight of every case-insensitive occurrence of the query's words in a plain text (titles carry no server marks). */
+export function highlightParts(text: string, q: string): { text: string; mark: boolean }[] {
+  const words = [...new Set(q.trim().split(/\s+/).filter((w) => w.length >= 2))].map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!words.length) return [{ text, mark: false }];
+  const re = new RegExp(`(${words.join('|')})`, 'gi');
+  return text.split(re).map((t, i) => ({ text: t, mark: i % 2 === 1 })).filter((p) => p.text);
 }
 
 /** A snippet from the server carries <mark>..</mark>; turn it into segments so React renders it without innerHTML. */

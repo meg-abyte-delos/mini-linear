@@ -34,6 +34,7 @@ import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilter
 import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
 import { listTeams } from '@/lib/settings-client';
 import { DisplayPick } from '@/components/DisplayPick';
+import { FilterMenu } from '@/components/FilterMenu';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 // Linear-like view tabs above the list: each one is a status filter set (A5 saved views stay in the sidebar).
@@ -818,11 +819,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             ))}
             <div className='fwrap'>
               <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></button>
-              {tbMenu === 'filter' && (
-                <div className='tb-menu' role='menu' aria-label='Filter by' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-add')?.focus(); } }}>
-                  {FILTER_KEYS.map((k, n) => <button key={k} id={`fb-${filters[k].length ? 'm-' : ''}${k}`} role='menuitem' autoFocus={n === 0} onClick={() => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }}>{FILTER_LABEL[k]}</button>)}
-                </div>
-              )}
+              {tbMenu === 'filter' && <FilterMenu filters={filters} onClose={() => { setTbMenu(null); document.getElementById('fb-add')?.focus(); }} onPick={(k) => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }} />}
             </div>
             {activeCount(filters) > 0 && <button className='fclear' onClick={() => setFilters(emptyFilters())}>Clear filters</button>}
             {activeCount(filters) > 0 && !readOnly && !activeViewId && !saving && <button className='fchip save-view' onClick={() => setSaving({ name: '', shared: false, err: false })}>Save view</button>}
