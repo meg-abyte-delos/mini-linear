@@ -1,11 +1,15 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, UnassignedIcon } from '@/components/icons';
+import { Avatar, PriorityIcon, UnassignedIcon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { MOCK_PEOPLE, findPerson, type Person } from '@/lib/people';
 import { fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
 import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, timelineWidth, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
+
+type Row = ProjectMeta & { health?: 'on_track' | 'at_risk' | 'off_track' | null; priority?: 0 | 1 | 2 | 3 | 4 };
+const HEALTH: Record<string, string> = { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' };
+const PRIO = ['No priority', 'Urgent', 'High', 'Medium', 'Low'];
 
 interface Props { people?: readonly Person[]; projects: readonly ProjectMeta[]; issues: readonly Issue[]; today: string; canOpen: boolean; onOpen: (id: string) => void; onViewIssues: (id: string) => void }
 
@@ -40,23 +44,40 @@ export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, ca
       </div>
       <section className='group' aria-labelledby='pj-all'>
         <h2 id='pj-all'><span>All projects</span><span className='count'>{projects.length}</span></h2>
-        {sorted.length === 0 ? <EmptyState compact icon='views' title='No projects' hint='Projects group issues around a shared goal and target date.' /> : mode === 'list' ? sorted.map((p) => {
-          const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
-          const late = isOverdue(p.target_date, p.status, today);
-          return (
-            <div key={p.id} className='cycle project pj-row' data-project={p.id}>
-              <span className='cy-name'>{p.name}</span>
-              <span className='pj-status' data-status={p.status ?? 'backlog'}>{statusLabel(p.status)}</span>
-              <span className='cy-dates pj-lead'>{lead(p.lead_id)}</span>
-              <span className={`cy-dates${late ? ' pj-late' : ''}`} data-testid={`target-${p.id}`}>{p.target_date ? `Target ${fmtDate(p.target_date)}${late ? ' (overdue)' : ''}` : 'No target date'}</span>
-              {/* Ring geometry is SVG attributes only (pathLength + dasharray): survives the strict CSP. */}
-              <ProgressRing pct={pr.pct} size={18} showPct={false} label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`} />
-              <span className='cy-count'>{pr.pct}%</span>
-              {/* One grid cell for both actions: 8 children in a 7-column grid wrapped 'View issues' onto a second line. */}
-              <span className='pj-actions'>{canOpen && <button onClick={() => onOpen(p.id)}>Open</button>}<button onClick={() => onViewIssues(p.id)}>View issues</button></span>
+        {sorted.length === 0 ? <EmptyState compact icon='views' title='No projects' hint='Projects group issues around a shared goal and target date.' /> : mode === 'list' ? (
+          <div className='pj-table' role='table' aria-label='Projects'>
+            <div className='pj-head' role='row'>
+              {['Name', 'Health', 'Priority', 'Lead', 'Target date', 'Issues', 'Status'].map((h) => <span key={h} role='columnheader'>{h}</span>)}
             </div>
-          );
-        }) : (
+            {sorted.map((p0) => {
+              const p = p0 as Row;
+              const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
+              const late = isOverdue(p.target_date, p.status, today);
+              const u = findPerson(people, p.lead_id);
+              const prio = p.priority ?? 0;
+              return (
+                <div key={p.id} className='cycle project pj-row' role='row' data-project={p.id}>
+                  <span className='cy-name' role='cell'>
+                    <ProgressRing pct={pr.pct} size={14} showPct={false} label={`${pr.pct}% complete, ${pr.done} of ${pr.total} issues`} />
+                    {canOpen ? <button className='pj-name' onClick={() => onOpen(p.id)}>{p.name}</button> : <span className='pj-name'>{p.name}</span>}
+                    <span className='pj-actions'><button onClick={() => onViewIssues(p.id)}>View issues</button></span>
+                  </span>
+                  <span className='pj-health' role='cell' data-health={p.health ?? 'none'}><span className='pj-dot' aria-hidden='true' />{p.health ? HEALTH[p.health] : 'No updates'}</span>
+                  <span className='pj-prio' role='cell' title={PRIO[prio]}><PriorityIcon priority={prio} /><span className='sr-only'>{PRIO[prio]}</span></span>
+                  <span className='pj-lead' role='cell' title={lead(p.lead_id)}>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av-wrap'><UnassignedIcon /></span>}<span className='pj-lead-t'>{u ? u.name : 'No lead'}</span></span>
+                  <span className={`pj-date${late ? ' pj-late' : ''}`} role='cell' data-testid={`target-${p.id}`}>{p.target_date ? <><span className='sr-only'>Target </span>{fmtDate(p.target_date)}{late ? <span className='sr-only'> (overdue)</span> : null}</> : <span className='pj-none'>No date</span>}</span>
+                  <span className='pj-issues' role='cell'>{pr.done}/{pr.total}</span>
+                  <span className='pj-prog' role='cell'>
+                    <span className='pj-status' data-status={p.status ?? 'backlog'}>{statusLabel(p.status)}</span>
+                    {/* SVG attributes, not inline style: the strict CSP drops style attributes. */}
+                    <svg className='pj-bar' height='4' aria-hidden='true' focusable='false'><rect className='pj-track' width='100%' height='4' rx='2' /><rect className='pj-fill' data-done={pr.pct >= 100 || undefined} width={`${pr.pct}%`} height='4' rx='2' /></svg>
+                    <span className='cy-count'>{pr.pct}%</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
           <div className='rm' data-testid='roadmap'>
             {!range ? (
               <div className='rm-empty'>
