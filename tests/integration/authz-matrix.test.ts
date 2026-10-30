@@ -112,6 +112,12 @@ const ROUTES: [string, string, Pol][] = [
   ['POST', 'w/[slug]/notifications/read-all', 'mem'],
   ['GET', 'w/[slug]/notifications', 'mem'],
   ['GET', 'w/[slug]/notifications/unread-count', 'mem'],
+  ['GET', 'w/[slug]/view-state', 'mem'],
+  ['PUT', 'w/[slug]/view-state', 'mem'],
+  ['DELETE', 'w/[slug]/view-state', 'mem'],
+  ['GET', 'w/[slug]/views/favorites', 'mem'],
+  ['PUT', 'w/[slug]/views/[id]/favorite', 'mem'],
+  ['DELETE', 'w/[slug]/views/[id]/favorite', 'mem'],
   ['GET', 'w/[slug]/project-milestones/[id]', 'mem'],
   ['PATCH', 'w/[slug]/project-milestones/[id]', 'mem'],
   ['DELETE', 'w/[slug]/project-milestones/[id]', 'mem'],
@@ -273,7 +279,7 @@ describe.runIf(runIntegration)('tenant boundary: non-member and other-tenant cal
 
 describe.runIf(runIntegration)('guest G1: never mutates, never reaches admin routes', () => {
   // comments on a shared issue are allowed for guests by the spec (T2): excluded from the "no mutation" rule.
-  const selfScoped = (r: string) => /\/(notifications|notification-preferences)|\/subscription$/.test(r); // own inbox/subscription: allowed for any member
+  const selfScoped = (r: string) => /\/(notifications|notification-preferences|view-state|search\/recents|subscriptions)|\/subscription$|\/views\/\[id\]\/favorite$/.test(r); // own inbox/subscription: allowed for any member
   const guestOk = new Set(['POST w/[slug]/api-keys', 'POST w/[slug]/issues/[id]/comments', 'POST w/[slug]/comments/[id]/reactions', 'DELETE w/[slug]/comments/[id]/reactions']);
   it.each(wRoutes.filter(([m, r, p]) => (isMut(m) || p === 'adm') && !guestOk.has(`${m} ${r}`) && !selfScoped(r)).map(([m, r]) => [m, r]))('%s /%s is 403/404', async (m, r) => {
     const s = await status(W.G1, m, pathFor(r, 'w1', true));
