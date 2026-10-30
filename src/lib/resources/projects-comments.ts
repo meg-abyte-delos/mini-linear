@@ -24,7 +24,7 @@ export const pvisible = (ctx: Ctx) => atLeast(ctx.role, "admin") ? ctx.tx`true`
       where pt.project_id = p.id and tm.user_id = ${ctx.userId})`;
 /** Counts are per issue VISIBLE to the caller (teamVisible), so a member of team A never learns the size of team B's share of a cross-team project.
  *  issue_count/issues_total = non-canceled, non-deleted; progress_pct = done / issue_count (0 when empty); progress_by_estimate = done estimate / total estimate (null when no estimates).
- *  health = latest posted update; health_computed = derived from target_date vs progress (src/lib/project-health.ts). */
+ *  health = latest posted update (null while the project is planned); health_computed = derived from target_date vs progress (src/lib/project-health.ts). */
 const PSEL = (ctx: Ctx) => ctx.tx`select p.id, p.name, p.description, p.icon, p.color, p.lead_id, p.status, p.priority, p.start_date::text as start_date, p.target_date::text as target_date,
   p.version, p.created_at, p.updated_at,
   coalesce((select array_agg(team_id order by team_id) from project_teams where project_id = p.id), '{}') as team_ids,
@@ -32,7 +32,7 @@ const PSEL = (ctx: Ctx) => ctx.tx`select p.id, p.name, p.description, p.icon, p.
   st.total as issue_count, st.done as done_count, st.total as issues_total, st.done as issues_done, st.in_progress as issues_in_progress, st.canceled as issues_canceled,
   case when st.total = 0 then 0 else round(100.0 * st.done / st.total)::int end as progress_pct,
   case when st.est_total > 0 then round(100.0 * st.est_done / st.est_total)::int else null end as progress_by_estimate,
-  (select health from project_updates u where u.project_id = p.id order by u.created_at desc, u.id desc limit 1) as health from projects p
+  case when p.status = 'planned' then null else (select health from project_updates u where u.project_id = p.id order by u.created_at desc, u.id desc limit 1) end as health from projects p
   cross join lateral (select count(*) filter (where i.status <> 'canceled')::int as total, count(*) filter (where i.status = 'done')::int as done,
       count(*) filter (where i.status in ('in_progress','in_review'))::int as in_progress, count(*) filter (where i.status = 'canceled')::int as canceled,
       coalesce(sum(i.estimate) filter (where i.status <> 'canceled'), 0)::int as est_total, coalesce(sum(i.estimate) filter (where i.status = 'done'), 0)::int as est_done

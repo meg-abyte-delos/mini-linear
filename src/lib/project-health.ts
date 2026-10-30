@@ -1,5 +1,5 @@
 // Derived project health (A1). Pure, so the rule is unit-tested and documented in docs/API.md.
-// health_computed is null when the project is finished (completed/canceled), has no target_date, or has no countable issue.
+// health_computed is null when the project is planned or finished (completed/canceled), has no target_date, or has no countable issue.
 // Otherwise: expected% = share of the [start, target] window elapsed today (start = start_date, else created day);
 //   progress 100% => on_track; past target and not 100% => off_track;
 //   gap = expected% - progress_pct; gap <= 10 on_track, <= 25 at_risk, else off_track.
@@ -8,7 +8,7 @@ export interface HealthInput { status: string; start_date: string | null; target
 const day = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
 
 export function computeHealth(p: HealthInput, today: string): ComputedHealth | null {
-  if (p.status === 'completed' || p.status === 'canceled' || !p.target_date || p.issue_count === 0) return null;
+  if (p.status === 'planned' || p.status === 'completed' || p.status === 'canceled' || !p.target_date || p.issue_count === 0) return null;
   const target = day(p.target_date), now = day(today);
   if (p.progress_pct >= 100) return 'on_track';
   if (now > target) return 'off_track';

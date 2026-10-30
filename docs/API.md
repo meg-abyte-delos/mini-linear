@@ -156,10 +156,10 @@ One rule for every surface (API, project list, project page, roadmap rings, cycl
 | `issues_canceled` | status `canceled` (informational, not in the total) |
 | `progress_pct` | `round(100 * done / total)`, 0 when empty |
 | `progress_by_estimate` | `round(100 * done estimate / total estimate)` over non-canceled issues; `null` when no issue has an estimate |
-| `health` | health of the latest posted project update, or `null` |
+| `health` | health of the latest posted project update, or `null` (always `null` while the project is `planned`) |
 | `health_computed` | derived, see below |
 
-`health_computed` is `on_track`, `at_risk`, `off_track` or `null`. `null` if the project is `completed` or `canceled`, has no `target_date`, or has no issue. Else `on_track` at 100%; `off_track` when today is past `target_date`; otherwise `gap = elapsed% - progress_pct`, where `elapsed%` is the share of the window `start_date` (or creation day) to `target_date` already elapsed: gap up to 10 is on_track, up to 25 at_risk, else off_track. Pure function in `src/lib/project-health.ts`.
+`health_computed` is `on_track`, `at_risk`, `off_track` or `null`. `null` if the project is `planned`, `completed` or `canceled`, has no `target_date`, or has no issue. Else `on_track` at 100%; `off_track` when today is past `target_date`; otherwise `gap = elapsed% - progress_pct`, where `elapsed%` is the share of the window `start_date` (or creation day) to `target_date` already elapsed: gap up to 10 is on_track, up to 25 at_risk, else off_track. Pure function in `src/lib/project-health.ts`.
 
 `GET /cycles` and `GET /cycles/<id>` also return `scope` (non-canceled), `started` (`in_progress` or `in_review`), `completed` (`done`), `canceled`, `percent_complete` (`round(100 * completed / scope)`, 0 when empty). Identical to `GET /cycles/<id>/stats`.
 
