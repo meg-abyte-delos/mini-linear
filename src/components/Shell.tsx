@@ -28,6 +28,7 @@ import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilters, type FilterKey, type Filters } from '@/lib/filters';
 import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
+import { listTeams } from '@/lib/settings-client';
 import { DisplayPick } from '@/components/DisplayPick';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
@@ -495,6 +496,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     setMulti((m) => Array.from(new Set([...m, list[idx]!.id, list[n]!.id])));
     setSelId(list[n]!.id);
   }
+  // Sidebar team row shows the real team (e.g. "Demo"), not the workspace name again.
+  const [teamName, setTeamName] = useState('Team');
+  useEffect(() => {
+    if (!api) return;
+    let live = true;
+    void listTeams(api.slug).then((ts) => { const t = ts.find((x) => x.id === api.teamId) ?? ts[0]; if (live && t) setTeamName(t.name); }).catch(() => { /* keep fallback */ });
+    return () => { live = false; };
+  }, [api?.slug, api?.teamId]); // eslint-disable-line react-hooks/exhaustive-deps
   const hint = (id: string) => { const d = SHORTCUTS.find((x) => x.id === id); return d ? formatKeys(d.keys).replace(' then ', ' ') : undefined; };
   const commands: Cmd[] = [
     { id: 'help', label: 'Keyboard shortcuts', hint: '?', run: () => setHelp(true) },
@@ -689,10 +698,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </nav>
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
-          <TeamSection name='Delos'>
-          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span></a>
+          <TeamSection name={teamName}>
+          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span>{hint('go-issues') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-issues')}</kbd>}</a>
           <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><SideIcon name='cycles' /><span>Cycles</span></a>
-          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span></a>
+          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span>{hint('go-projects') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-projects')}</kbd>}</a>
           </TeamSection>
         </nav>
       </aside>
