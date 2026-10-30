@@ -25,8 +25,11 @@
 
 /* Description editor */
 .re { position:relative; }
-.re-bar { position:relative; display:flex; align-items:center; gap:2px; min-height:var(--re-bar-h); margin-bottom:var(--sp-1); opacity:0; transition:opacity var(--dur-fast) var(--ease-out); }
-.re:focus-within .re-bar, .re-bar:hover { opacity:1; }
+/* Linear: no reserved toolbar row between title and description. The bar floats above the editor's top-right
+   corner while the editor has focus, so the description sits right under the title (was a 32px blank strip). */
+.re-bar { position:absolute; z-index:2; right:0; bottom:calc(100% + var(--sp-1)); display:flex; align-items:center; gap:2px; min-height:var(--re-bar-h); padding:0 2px; background:var(--raised); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); opacity:0; visibility:hidden; transition:opacity var(--dur-fast) var(--ease-out), visibility 0s linear var(--dur-fast); }
+.re:focus-within .re-bar { opacity:1; visibility:visible; transition:opacity var(--dur-fast) var(--ease-out), visibility 0s; }
+.re[data-readonly] .re-bar { display:none; }
 .idp .re-btn { display:inline-grid; place-items:center; width:var(--re-btn); height:var(--re-btn); padding:0; border:0; border-radius:var(--r-sm); color:var(--muted-strong); transition:background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
 .idp .re-btn:hover { background:var(--hover); color:var(--fg); }
 .idp .re-btn[aria-pressed='true'] { background:var(--sel); color:var(--fg); }
@@ -59,4 +62,4 @@
 .re-surface:focus-visible { outline:none; }
 
 @media (max-width:860px) { .idp { grid-template-columns:1fr; } }
-@media (prefers-reduced-motion: reduce) { .re-bar, .re-link, .idh-btn, .idh-status, .re-btn, .re-surface ul[data-tasks] > li::before { transition:none; animation:none; } .re-bar { opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .re-bar, .re-link, .idh-btn, .idh-status, .re-btn, .re-surface ul[data-tasks] > li::before { transition:none; animation:none; } }
