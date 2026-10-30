@@ -297,10 +297,10 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   ].sort((a, b) => a.ts - b.ts);
   const pr = progress(children);
   const due = dueState(issue.due_date, today);
-  const pickTitle: Record<PickKind, string> = { status: 'Change status', priority: 'Set priority', assignee: 'Assign to', labels: 'Change labels', project: 'Move to project', cycle: 'Move to cycle', parent: 'Set parent issue', relation: `Add relation: ${lastPick.current?.relType ? REL_LABEL[lastPick.current.relType] : ''}` };
   // The Combobox stays mounted so it can animate out; it keeps the last kind while closed.
   if (pick) lastPick.current = pick;
   const shown = pick ?? lastPick.current ?? { kind: 'status' as PickKind, el: null };
+  const pickTitle: Record<PickKind, string> = { status: 'Change status', priority: 'Set priority', assignee: 'Assign to', labels: 'Change labels', project: 'Move to project', cycle: 'Move to cycle', parent: 'Set parent issue', relation: `Add relation: ${lastPick.current?.relType ? REL_LABEL[lastPick.current.relType] : ''}` };
   pickAnchor.current = pick?.el ?? null;
   const open = (kind: PickKind) => (e: React.MouseEvent<HTMLButtonElement>) => setPick({ kind, el: e.currentTarget });
   const assignee = who(issue.assignee_id);
