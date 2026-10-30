@@ -27,3 +27,22 @@ DO $$ DECLARE t text; BEGIN
   END LOOP;
 END $$;
 GRANT SELECT, INSERT, UPDATE, DELETE ON user_view_state, view_favorites TO app_user;
+-- Deleting a saved view also drops every user's view:<id> state. app_user cannot see other users' rows (own_rows), so this is
+-- SECURITY DEFINER (owned by `definer`, BYPASSRLS). Scoped to the caller's workspace, and only once the view is gone.
+CREATE FUNCTION purge_view_state(p_view uuid) RETURNS integer LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  WITH del AS (
+    DELETE FROM public.user_view_state s
+    WHERE s.workspace_id = nullif(current_setting('app.workspace_id', true), '')::uuid AND s.scope = 'view:' || p_view::text
+      AND NOT EXISTS (SELECT 1 FROM public.saved_views v WHERE v.id = p_view AND v.workspace_id = s.workspace_id)
+    RETURNING 1)
+  SELECT count(*)::int FROM del $$;
+-- OWNER TO needs CREATE on the schema for the new owner: grant it only if missing and revoke only what we granted (same pattern as 0803).
+DO $do$ DECLARE had boolean := has_schema_privilege('definer', 'public', 'CREATE'); BEGIN
+  IF NOT had THEN GRANT CREATE ON SCHEMA public TO definer; END IF;
+  ALTER FUNCTION purge_view_state(uuid) OWNER TO definer;
+  IF NOT had THEN REVOKE CREATE ON SCHEMA public FROM definer; END IF;
+END $do$;
+GRANT SELECT, DELETE ON user_view_state TO definer;
+GRANT SELECT ON saved_views TO definer;
+REVOKE ALL ON FUNCTION purge_view_state(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION purge_view_state(uuid) TO app_user;
