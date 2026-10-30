@@ -113,6 +113,8 @@ if (process.env.CI && !haveDb) throw new Error('CI=true but DB urls unset: integ
     expect((await raw('{')).status).toBe(400);
     expect((await raw('not json')).status).toBe(400);
     expect((await raw('x'.repeat(5000))).status).toBe(422);
+    const big = await S.putFavorite(new Request('http://x/api', { method: 'PUT', body: '{}', headers: { 'x-u': seed.a.owner, 'content-length': '5000' } }), slug(), v.id);
+    expect(big.status).toBe(422);
     expect((await raw('')).status).toBe(200);
   });
 

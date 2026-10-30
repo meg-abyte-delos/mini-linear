@@ -98,7 +98,9 @@ export const listFavorites = (req: Request, slug: string) => withWorkspaceCtx(re
 
 export const putFavorite = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, 'member');
-  const id = parseId(rawId), raw = await req.text();
+  const id = parseId(rawId); const cl = Number(req.headers.get('content-length') ?? 0);
+  if (cl > 1024) throw bad('body too large');
+  const raw = await req.text();
   if (raw.length > 1024) throw bad('body too large');
   let parsed: unknown = {};
   if (raw.trim()) { try { parsed = JSON.parse(raw); } catch { throw new ApiError('bad_request', 'body must be JSON'); } }
