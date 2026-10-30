@@ -1,0 +1,63 @@
+/* UI primitives (Menu, Popover, Tooltip, Combobox, Chip, Avatar, Kbd). Variables from tokens.css (#187) only: color, type, motion.
+   Enter/exit use --dur-base, --ease-out / --ease-in, --enter-shift, --enter-scale. Reduced motion is handled by tokens.css (durations go to 0). */
+
+.pop { position:fixed; z-index:60; min-width:180px; max-width:min(360px, calc(100vw - 16px)); background:var(--raised); color:var(--fg); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); font-size:var(--fs-base); outline:none; transform-origin:top left; }
+.pop[data-side='top'] { transform-origin:bottom left; }
+.pop[data-state='open'] { animation:prim-in var(--dur-base) var(--ease-out); }
+.pop[data-state='closed'] { animation:prim-out var(--dur-fast) var(--ease-in) forwards; pointer-events:none; }
+@keyframes prim-in { from { opacity:0; transform:translateY(calc(-1 * var(--enter-shift))) scale(var(--enter-scale)); } to { opacity:1; transform:none; } }
+@keyframes prim-out { from { opacity:1; transform:none; } to { opacity:0; transform:scale(var(--enter-scale)); } }
+
+/* Menu */
+.menu { padding:var(--sp-1); display:flex; flex-direction:column; }
+.menu-item { display:flex; align-items:center; gap:var(--sp-2); min-height:var(--side-item-h); padding:0 var(--sp-2); border-radius:var(--r-sm); cursor:pointer; outline:none; }
+.menu-item[data-active='true'], .menu-item:focus-visible { background:var(--hover); }
+.menu-item:focus-visible { box-shadow:inset 0 0 0 1px var(--accent); }
+.menu-item[aria-disabled='true'] { color:var(--dim); cursor:default; }
+.menu-item[data-destructive='true'] { color:var(--danger); }
+.menu-ic { width:16px; display:inline-flex; justify-content:center; color:var(--muted); }
+.menu-item[data-destructive='true'] .menu-ic { color:inherit; }
+.menu-label { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.menu-sep { height:1px; margin:var(--sp-1) 0; background:var(--line-soft); }
+
+/* Kbd */
+.kbd-group { display:inline-flex; gap:2px; margin-left:auto; }
+.kbd { min-width:18px; padding:0 4px; text-align:center; font:inherit; font-size:var(--fs-xs); line-height:var(--lh-base); color:var(--muted-strong); background:var(--panel); border:1px solid var(--line); border-radius:var(--r-sm); }
+
+/* Tooltip */
+.tip { position:fixed; z-index:70; transform:translateX(-50%); display:inline-flex; align-items:center; gap:var(--sp-2); padding:4px var(--sp-2); font-size:var(--fs-sm); color:var(--fg); background:var(--raised); border:1px solid var(--line); border-radius:var(--r-sm); box-shadow:var(--shadow-pop); pointer-events:none; white-space:nowrap; }
+.tip[data-state='open'] { animation:prim-fade-in var(--dur-base) var(--ease-out); }
+.tip[data-state='closed'] { animation:prim-fade-out var(--dur-fast) var(--ease-in) forwards; }
+@keyframes prim-fade-in { from { opacity:0; } to { opacity:1; } }
+@keyframes prim-fade-out { from { opacity:1; } to { opacity:0; } }
+
+/* Combobox */
+.combo-input { width:100%; box-sizing:border-box; height:32px; padding:0 var(--sp-3); color:var(--fg); background:transparent; border:0; border-bottom:1px solid var(--line-soft); outline:none; font:inherit; }
+.combo-input:focus-visible { box-shadow:inset 0 -1px 0 var(--accent); }
+.combo-list { list-style:none; margin:0; padding:var(--sp-1); max-height:260px; overflow:auto; }
+.combo-opt { display:flex; align-items:center; gap:var(--sp-2); min-height:var(--side-item-h); padding:0 var(--sp-2); border-radius:var(--r-sm); cursor:pointer; }
+.combo-opt[data-active='true'] { background:var(--hover); }
+.combo-opt[aria-disabled='true'], .combo-empty { color:var(--dim); cursor:default; }
+.combo-empty { padding:var(--sp-2); list-style:none; }
+.combo-label { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.combo-opt .tick { color:var(--accent-text); width:14px; text-align:center; }
+
+/* Chip */
+.chip { display:inline-flex; align-items:center; gap:var(--sp-1); height:calc(var(--sp-4) + var(--sp-2) - 2px); padding:0 var(--sp-2); font-size:var(--fs-sm); color:var(--muted-strong); background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg); max-width:100%; }
+.chip[data-tone='accent'] { color:var(--accent-text); border-color:var(--accent); }
+.chip[data-tone='danger'] { color:var(--danger); border-color:var(--danger); }
+.chip-main, .chip-x { all:unset; display:inline-flex; align-items:center; gap:var(--sp-1); cursor:pointer; border-radius:var(--r-sm); }
+.chip-main:focus-visible, .chip-x:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.chip-x { padding:0 2px; color:var(--muted); }
+.chip-x:hover { color:var(--fg); }
+.chip-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Avatar: one color per user, 8 slots from existing tokens. */
+.uav { display:inline-flex; align-items:center; justify-content:center; flex:none; border-radius:50%; font-weight:var(--fw-semibold); color:var(--fg); user-select:none; }
+.uav-sm { width:20px; height:20px; font-size:var(--fs-xs); }
+.uav-md { width:24px; height:24px; font-size:var(--fs-xs); }
+.uav-lg { width:32px; height:32px; font-size:var(--fs-sm); }
+.uav-c0 { --av:var(--lb-purple); } .uav-c1 { --av:var(--lb-blue); } .uav-c2 { --av:var(--lb-project); } .uav-c3 { --av:var(--s-done); }
+.uav-c4 { --av:var(--s-review); } .uav-c5 { --av:var(--warn); } .uav-c6 { --av:var(--danger); } .uav-c7 { --av:var(--s-progress); }
+.uav[class*='uav-c'] { background:color-mix(in srgb, var(--av) 30%, var(--panel)); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--av) 60%, transparent); }
+.uav-none { color:var(--dim); background:transparent; border:1px dashed var(--dim); box-sizing:border-box; }
