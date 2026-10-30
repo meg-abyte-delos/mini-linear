@@ -1,0 +1,5 @@
+{
+  "_doc": "Max median EXPLAIN ANALYZE execution time (ms) per listIssues shape at 5000 issues, app_user + RLS. Measured medians 0.9-9 ms on the embedded PG 18 CI-like box; limits are ~10x headroom (default 25ms) to catch plan regressions (seq scans, lost index) not noise.",
+  "default_ms": 25,
+  "shapes": { "admin_label": 40, "admin_page_deep": 80 }
+}
