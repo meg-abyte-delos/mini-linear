@@ -1,16 +1,16 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PROJECT_STATUSES, statusLabel, byTarget, HEALTH_LABEL, newestFirst, projectClient, type Health, type Milestone, type ProjectDetail as Detail, type ProjectUpdate } from '@/lib/project-client';
 import { ProgressRing } from '@/components/ProgressRing';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 
 export interface PdIssue { id: string; identifier: string; title: string; done: boolean }
-interface Props { issues?: PdIssue[]; leadName?: string | null; onOpenIssue?: (id: string) => void; slug: string; projectId: string; canWrite: boolean; onBack: () => void; onViewIssues: (id: string) => void }
+interface Props { refreshKey?: number; issues?: PdIssue[]; leadName?: string | null; onOpenIssue?: (id: string) => void; slug: string; projectId: string; canWrite: boolean; onBack: () => void; onViewIssues: (id: string) => void }
 
 // Project detail: progress, milestones and status updates, on the project endpoints (API mode only).
 // Lead: proj.lead_id is a workspace member UUID, resolved via GET /me + /members (same source as Cmd+K and ProjectsList).
 // The leadName prop (mock who()) is only a fallback when the member is not found.
-export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues, issues = [], leadName = null, onOpenIssue }: Props) {
+export function ProjectDetail({ refreshKey = 0, slug, projectId, canWrite, onBack, onViewIssues, issues = [], leadName = null, onOpenIssue }: Props) {
   const client = useMemo(() => projectClient(slug, projectId), [slug, projectId]);
   const [proj, setProj] = useState<Detail | null>(null);
   const [ms, setMs] = useState<Milestone[]>([]);
@@ -35,6 +35,13 @@ export function ProjectDetail({ slug, projectId, canWrite, onBack, onViewIssues,
     catch (e) { setErr(e instanceof Error ? e.message : 'Could not load the project'); }
   }
   useEffect(() => { void load(); }, [client]);
+  // Realtime: an issue event (progress counts) bumps refreshKey; refetch quietly, coalescing bursts.
+  const firstKey = useRef(refreshKey);
+  useEffect(() => {
+    if (refreshKey === firstKey.current) return;
+    const t = setTimeout(() => { void load(); }, 300);
+    return () => clearTimeout(t);
+  }, [refreshKey]);
 
   async function run(f: () => Promise<unknown>) {
     setBusy(true);
