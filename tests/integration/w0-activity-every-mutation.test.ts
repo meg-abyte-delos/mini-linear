@@ -35,7 +35,7 @@ describe.runIf(runIntegration)('activity feed: one entry per mutation', () => {
   });
 
   it.each([
-    ['status', { status: 'in_progress' }, 'status', /status from backlog to in progress/],
+    ['status', { status: 'in_progress' }, 'status', /status from Backlog to In Progress/],
     ['priority', { priority: 4 }, 'priority', /priority from No priority to /],
     ['title', { title: 'renamed' }, 'title', /title from/],
     ['assignee set', { assignee_id: 'M1' }, 'assignee_id', /set assignee to/],
@@ -71,11 +71,11 @@ describe.runIf(runIntegration)('activity feed: one entry per mutation', () => {
 
   it('adding and removing labels is recorded with counts', async () => {
     const { id, etag } = await mk();
-    const lab = (await inWs(W.w1, (c) => c.query('select id from labels where workspace_id = $1 limit 1', [W.w1]))).rows[0].id as string;
+    const lab = (await inWs(W.w1, (c) => c.query('select id, name from labels where workspace_id = $1 limit 1', [W.w1]))).rows[0].id as string; const labName = (await inWs(W.w1, (c) => c.query('select name from labels where id = $1', [lab]))).rows[0].name as string;
     const e2 = await patch(id, etag, { label_ids: [lab] });
-    expect(newestUpdate(await feed(id)).summary).toBe('added 1 label');
+    expect(newestUpdate(await feed(id)).summary).toBe('added ' + labName);
     await patch(id, e2, { label_ids: [] });
-    expect(newestUpdate(await feed(id)).summary).toBe('removed 1 label');
+    expect(newestUpdate(await feed(id)).summary).toBe('removed ' + labName);
   });
 
   it('a no-op PATCH (same value) does not invent a change on the field', async () => {
@@ -130,7 +130,7 @@ describe.runIf(runIntegration)('activity feed: one entry per mutation', () => {
     for (const id of [a, b]) {
       const u = newestUpdate(await feed(id));
       expect(u, id).toBeTruthy();
-      expect(u.summary).toMatch(/status from backlog to todo/);
+      expect(u.summary).toMatch(/status from Backlog to Todo/);
       expect(u.actor_id).toBe(W.M1.id);
     }
   });
