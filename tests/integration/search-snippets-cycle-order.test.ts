@@ -51,7 +51,11 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
     expect(plain).not.toMatch(/[#*`>\[\]\n]|\(https|```/);
     expect(plain.startsWith("Rate limit quokka")).toBe(false);
     const all = (await search("retry")).find((x) => x.id === issueId)!.snippet;
-    expect(all).toMatch(/^<mark>Retry<\/mark> by email\. Behaviour\. 5 attempts per minute/);
+    expect(all).toMatch(/^<mark>Retry<\/mark> by email/);
+    expect(all).not.toContain("Behaviour"); // the heading is never glued into the sentence
+    const att = (await search("attempts")).find((x) => x.id === issueId)!.snippet.replace(/<\/?mark>/g, "");
+    expect(att).toMatch(/^attempts per minute/); // comes from the list item that holds the match, not from the heading before it
+    expect(att).not.toContain("Behaviour");
   });
 
   it("a stripped heading or bold label keeps a separator (. or :), without doubling existing punctuation", async () => {
@@ -69,7 +73,7 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
 
   it("project snippet is plain description text", async () => {
     const h = (await search("quokka")).find((x) => x.id === projId)!;
-    expect(h.snippet.replace(/<\/?mark>/g, "")).toBe("Heading. bold quokka plan");
+    expect(h.snippet.replace(/<\/?mark>/g, "")).toBe("bold quokka plan");
   });
 
   it("cycles: upcoming soonest first, then past cycles most recent first, cursor pages consistently", async () => {
