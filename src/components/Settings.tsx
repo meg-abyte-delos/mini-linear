@@ -33,7 +33,7 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
                   <option value='admin'>Admin</option><option value='member'>Member</option><option value='guest'>Guest (read-only)</option>
                 </select>
               </td>
-              <td className='set-end'>{canAdmin && <button type='button' className='set-btn' data-variant='ghost' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
+              <td className='set-end'>{canAdmin && <button type='button' className='set-btn' data-variant='ghost' data-tone='danger' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
             </tr>
           ))}
         </tbody>
