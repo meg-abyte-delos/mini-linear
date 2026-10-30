@@ -170,12 +170,12 @@ test('pills: Estimate with 1 point is singular ("1 pt")', async ({ page }) => {
   await expect(page.locator('dd.prop-native .prop-pill').first()).toHaveText('1 pt');
 });
 
-test('branch: single button, copies on click, full name in title, one line with ellipsis', async ({ page, context }) => {
+test('branch: single button, copies on click, full name in aria-label (tooltip: issue-page-d9), one line with ellipsis', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await open(page, A);
   const b = page.getByRole('button', { name: /^Copy branch name / });
   const full = `demo/${A.toLowerCase()}-hdr-a-${stamp}`;
-  await expect(b).toHaveAttribute('title', new RegExp(full.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  await expect(b).toHaveAttribute('aria-label', `Copy branch name ${full}`);
   const box = await b.locator('code.branch').boundingBox();
   const lh = await b.locator('code.branch').evaluate((e) => parseFloat(getComputedStyle(e).lineHeight) || 20);
   expect(box!.height).toBeLessThanOrEqual(lh * 1.6);

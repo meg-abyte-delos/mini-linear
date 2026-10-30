@@ -12,7 +12,7 @@ const GLYPH: Record<BulkKind, string> = {
   cycle: 'M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.5h-2.5',
 };
 const ACTIONS: { kind: BulkKind; label: string; key?: string }[] = [
-  { kind: 'status', label: 'Status' }, { kind: 'priority', label: 'Priority', key: 'P' }, { kind: 'assignee', label: 'Assignee', key: 'A' },
+  { kind: 'status', label: 'Status', key: 'S' }, { kind: 'priority', label: 'Priority', key: 'P' }, { kind: 'assignee', label: 'Assignee', key: 'A' },
   { kind: 'label', label: 'Labels', key: 'L' }, { kind: 'project', label: 'Project' }, { kind: 'cycle', label: 'Cycle' },
 ];
 
@@ -22,7 +22,7 @@ function Glyph({ d }: { d: string }) {
 
 // Shown while 2+ issues are selected. Each button opens the matching picker, applied to the whole selection.
 // openKind: the picker currently open from this bar (drives aria-expanded); optional so callers can omit it.
-export function SelectionBar({ count, canUndo, openKind = null, onAction, onUndo, onClear }: { count: number; canUndo: boolean; openKind?: BulkKind | null; onAction: (k: BulkKind, rect: DOMRect) => void; onUndo: () => void; onClear: () => void }) {
+export function SelectionBar({ count, canUndo, openKind = null, onAction, onUndo, onClear, onDelete }: { count: number; canUndo: boolean; openKind?: BulkKind | null; onAction: (k: BulkKind, rect: DOMRect) => void; onUndo: () => void; onClear: () => void; onDelete?: () => void }) {
   return (
     <div className='selbar' role='toolbar' aria-label={`Bulk actions for ${count} selected issues`}>
       <span className='selbar-count' aria-live='polite'>{count} selected</span>
@@ -37,6 +37,7 @@ export function SelectionBar({ count, canUndo, openKind = null, onAction, onUndo
           <Glyph d={GLYPH[a.kind]} /><span>{a.label}</span>{a.key && <kbd aria-hidden='true'>{a.key}</kbd>}
         </button>
       ))}
+      {onDelete && <><span className='selbar-sep' aria-hidden='true' /><button className='selbar-del' id='sb-delete' aria-haspopup='dialog' aria-keyshortcuts='Delete' title='Delete (#)' onClick={onDelete}><span>Delete</span><kbd aria-hidden='true'>#</kbd></button></>}
       {canUndo && <><span className='selbar-sep' aria-hidden='true' /><button className='selbar-undo' aria-keyshortcuts='Control+Z' onClick={onUndo}>Undo</button></>}
     </div>
   );

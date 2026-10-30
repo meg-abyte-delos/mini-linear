@@ -7,7 +7,7 @@
 .board .col-head { height: 36px; min-height: 36px; display: flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 0; }
 .board .col-head h2 { flex: 1; min-width: 0; height: 36px; padding: 0 var(--sp-2); gap: var(--sp-2); font-size: var(--fs-base); font-weight: 500; background: none; border: 0; }
 .board .col-head h2 .count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
-.board .col-act { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity .12s ease, background-color .12s ease; }
+.board .col-act { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
 .board .col:hover .col-act, .board .col-act:focus-visible { opacity: 1; }
 .board .col-act:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); }
 .board .col-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -22,7 +22,7 @@
   background: var(--raised);
   border: 1px solid color-mix(in srgb, var(--fg) 6%, transparent);
   box-shadow: 0 1px 2px color-mix(in srgb, #000 25%, transparent);
-  transition: border-color .12s ease, background-color .12s ease;
+  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
 }
 .board .card:hover { border-color: color-mix(in srgb, var(--fg) 14%, transparent); background: color-mix(in srgb, var(--fg) 3%, var(--raised)); }
 .board .card[aria-selected=true] { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: var(--sel); }
@@ -44,7 +44,7 @@
 [data-theme='dark'] .board .card, .board .card { box-shadow: 0 1px 1px color-mix(in srgb, #000 20%, transparent); }
 .board .card-title { color: color-mix(in srgb, var(--fg) 88%, var(--bg)); }
 .board .card-prio[data-none] { border-color: transparent; color: var(--muted); }
-.board .card { position: relative; transition: border-color .12s ease, background-color .12s ease, opacity .12s ease; }
+.board .card { position: relative; transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
 
 /* Drag source stays in place as a quiet slot (the browser drag image is the moving copy). */
 .board .card.dragging { transform: none; opacity: 1; background: transparent; border: 1px dashed color-mix(in srgb, var(--fg) 16%, transparent); box-shadow: none; }
@@ -55,6 +55,12 @@
 .board .card.over { box-shadow: 0 1px 1px color-mix(in srgb, #000 20%, transparent); }
 
 /* Column hovered while dragging: soft accent tint, no dashed outline. */
-.board .col.over-zone { outline: 0; background: color-mix(in srgb, var(--accent) 6%, transparent); transition: background-color .12s ease; }
+.board .col.over-zone { outline: 0; background: color-mix(in srgb, var(--accent) 6%, transparent); transition: background-color var(--dur-fast) var(--ease-out); }
 
-@media (prefers-reduced-motion: reduce) { .board .card, .board .col, .board .col-act { transition: none; } }
+/* I6 motion: drop line grows in, dragged slot settles, drop zone tint fades; all on tokens. */
+.board .card.over::before { animation: drop-line-in var(--dur-fast) var(--ease-out); transform-origin: left center; }
+.board .card.dragging { transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.board .card.dragging > * { transition: opacity var(--dur-fast) var(--ease-out); }
+.board .col { transition: background-color var(--dur-fast) var(--ease-out); }
+@keyframes drop-line-in { from { opacity: 0; transform: scaleX(.6); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .board .card, .board .col, .board .col-act, .board .card.dragging > * { transition: none; } .board .card.over::before { animation: none; } }
