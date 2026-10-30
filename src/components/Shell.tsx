@@ -9,7 +9,7 @@ import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/sim-store';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
-import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
+import { MIN_QUERY, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { CyclesList } from '@/components/CyclesList';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
@@ -538,8 +538,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const matched = fuzzyFilter(commands, q, (c) => c.label);
   const hitCmds: Cmd[] = hits.map((h) => ({ id: `hit-${h.kind}-${h.id}`, label: `${h.identifier ? `${h.identifier} ` : ''}${h.title}`, hint: h.kind === 'issue' ? undefined : h.kind, run: () => openHit(h), hit: h }));
   const allCmd: Cmd[] = q.trim().length >= MIN_QUERY ? [{ id: 'search-all', label: `Search all for “${q.trim()}”`, run: () => router.push(`/search?q=${encodeURIComponent(q.trim())}`) }] : [];
-  // An identifier-looking query (DEL-12) puts the hits first; otherwise commands keep priority.
-  const baseResults: Cmd[] = looksLikeIdentifier(q) ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...hitCmds, ...allCmd];
+  // Like Linear: once the query matches issues, hits come first; an empty query keeps actions on top.
+  const baseResults: Cmd[] = hitCmds.length ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...allCmd];
   // Natural-language action: an extra row next to the search results, never a replacement.
   const nl = q.trim().length >= 4 && !readOnly ? (api ? parseNlCommand(q, nlPeople.users, LABELS, nlPeople.me, { peopleLoading: !nlPeopleLoaded }) : parseNlCommand(q, USERS, LABELS, USERS[0]!.id)) : null;
   // A status-only phrase is already covered by the built-in 'Move to …' commands: no duplicate NL row.
@@ -564,6 +564,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const results: Cmd[] = nlFirst && !nl?.blocked ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
   // Keep the active row visible while arrowing through a long, sectioned list.
   const activeId = results[pi]?.id;
+  // No hit and no command: one 'No results' line with the single 'Search all' row under it (no separate group).
+  const noResults = api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0;
   useEffect(() => { if (palette && activeId) document.getElementById(`pc-${activeId}`)?.scrollIntoView({ block: 'nearest' }); }, [palette, activeId]);
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
@@ -839,13 +841,13 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               }}
             />
             <ul id='palette-list' role='listbox' aria-label='Commands'>
+              {noResults && <li role='presentation' data-testid='palette-no-results' className='pal-empty pal-noresults'>No results for “{q.trim()}”</li>}
               {results.map((c, idx) => (
-                <Fragment key={c.id}>{(idx === 0 || paletteGroup(results[idx - 1]!.id) !== paletteGroup(c.id)) && <li role='presentation' className='pal-group'>{paletteGroup(c.id)}</li>}
+                <Fragment key={c.id}>{!(noResults && c.id === 'search-all') && (idx === 0 || paletteGroup(results[idx - 1]!.id) !== paletteGroup(c.id)) && <li role='presentation' className='pal-group'>{paletteGroup(c.id)}</li>}
                 <li id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span className='pal-ic' aria-hidden='true'>{c.hit?.kind === 'issue' && c.hit.status && (STATUSES as readonly string[]).includes(c.hit.status) ? <StatusIcon status={c.hit.status as Status} /> : paletteIcon(c.id)}</span><span className='pal-label'>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : markTerm(c.hit.title, q)}</> : c.label}</span>{c.hint && <span className='pal-keys'>{c.hint.split(' ').map((k, j) => <kbd key={j}>{k}</kbd>)}</span>}</li></Fragment>
               ))}
               {api && q.trim().length >= MIN_QUERY && searchState === 'loading' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-searching'>Searching…</li>}
               {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-search-error'>Search failed. Try again.</li>}
-              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-no-results' className='pal-empty'>No results for “{q.trim()}”</li>}
               {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true' className='pal-empty'>No matching command</li>}
             </ul>
             <div className='palette-foot'><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>

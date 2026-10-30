@@ -53,6 +53,10 @@ test.describe('Search on the server route', () => {
     await expect(page.getByTestId('palette-searching')).toBeVisible();
     release();
     await expect(page.getByTestId('palette-no-results')).toHaveText(/No results for/);
+    // One message plus exactly one Search all row under it, no separate entries.
+    const opts = page.getByRole('listbox', { name: 'Commands' }).getByRole('option');
+    await expect(opts).toHaveCount(1);
+    await expect(opts.first()).toHaveText(/Search all for/);
     await expect(page.getByTestId('palette-searching')).toHaveCount(0);
     // error
     await page.unroute('**/search?*');

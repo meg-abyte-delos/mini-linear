@@ -56,3 +56,6 @@
 .palette-foot { color: var(--muted); }
 .palette-foot kbd { color: var(--muted-strong); }
 .palette li.pal-empty { font-size: var(--fs-base, 13px); }
+
+/* No results: compact message line above the single Search all row */
+.palette li.pal-noresults { height: 56px; }
