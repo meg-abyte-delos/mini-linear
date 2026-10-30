@@ -4,7 +4,7 @@
 .bd-svg { width:100%; max-width:640px; height:auto; display:block; }
 .bd-grid { stroke:var(--line); stroke-width:1; }
 .bd-tick { fill:var(--muted-strong); font-size:10px; }
-.bd-line { stroke:var(--accent); stroke-width:2; filter:drop-shadow(0 0 4px rgba(40,171,165,.45)); }
+.bd-line { stroke:var(--accent); stroke-width:2; filter:drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 45%, transparent)); }
 .bd-dot { fill:var(--accent); }
 .bd-ideal { stroke:var(--muted-strong); stroke-width:1.25; }
 .bd-scope { stroke:var(--st-info); stroke-width:1; opacity:.55; }

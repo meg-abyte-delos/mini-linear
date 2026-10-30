@@ -11,8 +11,8 @@
 .ring-pct { font-size:12px; line-height:1; color:var(--fg); min-width:3ch; text-align:right; }
 .ring[data-size='lg'] .ring-pct { font-size:13px; font-weight:500; }
 /* Soft glow on the arc, dark only */
-[data-theme='dark'] .ring[data-tone='accent'] .ring-svg { filter:drop-shadow(0 0 3px rgba(40,171,165,.45)); }
-@media (prefers-color-scheme: dark) { html:not([data-theme]) .ring[data-tone='accent'] .ring-svg { filter:drop-shadow(0 0 3px rgba(40,171,165,.45)); } }
+[data-theme='dark'] .ring[data-tone='accent'] .ring-svg { filter:drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 45%, transparent)); }
+@media (prefers-color-scheme: dark) { html:not([data-theme]) .ring[data-tone='accent'] .ring-svg { filter:drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 45%, transparent)); } }
 .rm-name .ring { margin-left:auto; }
 .cycle[data-bucket='past'] .ring-s0, .cycle[data-bucket='past'] .ring-s1 { stop-color:var(--muted); }
 /* Cycles / Projects rows: the ring took the old bar's 1fr grid cell and sat at its start, ~300-530px away from
