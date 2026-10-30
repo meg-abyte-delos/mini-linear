@@ -121,3 +121,38 @@ test('shell: the List/Board toggle is hidden on Inbox, Cycles and Projects', asy
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('group', { name: 'View', exact: true })).toBeVisible();
 });
+
+test('inbox: detail shows a status pill, a short date, a primary Open issue, and titles carry a tooltip', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('option').first()).toBeVisible();
+  const detail = page.getByRole('complementary', { name: 'Notification detail' });
+  // never the raw snake_case enum
+  const pill = detail.locator('.inbox-status');
+  await expect(pill).toBeVisible();
+  await expect(pill.locator('svg.si')).toHaveCount(1);
+  await expect(pill).not.toContainText('_');
+  await expect(pill).toHaveText(/^(Backlog|Todo|In progress|In review|Done|Canceled)$/i);
+  // short date, not toLocaleString (30/10/2026, 10:00:00)
+  const when = await detail.getByText('When', { exact: true }).locator('xpath=following-sibling::dd[1]').textContent();
+  expect(when).toMatch(/^(just now|\d+[mh] ago|[A-Z][a-z]{2} \d{1,2}(, \d{4})?, \d{2}:\d{2})$/);
+  // Open issue is the first, primary action
+  const first = detail.getByRole('toolbar', { name: 'Notification actions' }).getByRole('button').first();
+  await expect(first).toHaveText('Open issue');
+  await expect(first).toHaveClass(/primary/);
+  // truncated text keeps a tooltip with the full value
+  const row = page.getByRole('option').first();
+  await expect(row.locator('.ntitle')).toHaveAttribute('title', /.+/);
+  await expect(row.locator('.nwho')).toHaveAttribute('title', /.+/);
+});
+
+test('inbox: the unread counter equals the number of unread dots', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('option').first()).toBeVisible();
+  const dots = await page.locator('li.nrow[data-unread=true]').count();
+  await expect(page.getByText(`${dots} unread`, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Mark all as read' }).click();
+  await expect(page.getByText('0 unread', { exact: true })).toBeVisible();
+  await expect(page.locator('li.nrow[data-unread=true]')).toHaveCount(0);
+});
