@@ -3,10 +3,10 @@ import { hueOfId, initialsOf, listGroups, orderIssues, relDate, visibleOrder } f
 
 const now = new Date('2026-10-29T15:00:00Z');
 describe('list-ui', () => {
-  it('relDate is contextual', () => {
-    expect(relDate('2026-10-29T01:00:00Z', now)).toBe('Today');
-    expect(relDate('2026-10-28T23:00:00Z', now)).toBe('Yesterday');
-    expect(relDate('2026-10-25T10:00:00Z', now)).toBe('4d ago');
+  it('relDate is one short format', () => {
+    expect(relDate('2026-10-29T01:00:00Z', now)).toBe('Oct 29');
+    expect(relDate('2026-10-28T23:00:00Z', now)).toBe('Oct 28');
+    expect(relDate('2026-10-25T10:00:00Z', now)).toBe('Oct 25');
     expect(relDate('2026-09-02T10:00:00Z', now)).toBe('Sep 2');
     expect(relDate('2025-12-31T10:00:00Z', now)).toBe('Dec 31, 2025');
     expect(relDate('nope', now)).toBe('');
