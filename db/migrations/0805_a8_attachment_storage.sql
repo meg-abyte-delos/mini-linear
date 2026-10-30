@@ -15,14 +15,14 @@ CREATE UNIQUE INDEX issue_attachments_storage_uq ON issue_attachments (workspace
 CREATE INDEX issue_attachments_gc_idx ON issue_attachments (workspace_id, created_at) WHERE upload_status <> 'ready' OR deleted_at IS NOT NULL;
 GRANT UPDATE (upload_status, upload_started_at, sha256, size_bytes, deleted_at) ON issue_attachments TO app_user;
 
--- GC for uploads: pending rows older than 1 h, 'uploading' rows stuck for more than 10 min (a crashed PUT) and soft-deleted rows older than 10 min are removed and their storage keys handed
+-- GC for uploads: pending rows older than 1 h, 'uploading' rows stuck for more than 15 min (a crashed PUT) and soft-deleted rows older than 10 min are removed and their storage keys handed
 -- back to the caller (the app deletes the bytes). SECURITY DEFINER: app_user cannot see other tenants' rows.
 CREATE FUNCTION attachments_gc_claim(lim integer DEFAULT 200) RETURNS TABLE (workspace_id uuid, storage_key text)
 LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
   DELETE FROM public.issue_attachments a WHERE a.id IN (
     SELECT g.id FROM public.issue_attachments g WHERE g.storage_key IS NOT NULL
       AND ((g.upload_status = 'pending' AND g.created_at < now() - interval '1 hour')
-        OR (g.upload_status = 'uploading' AND g.upload_started_at < now() - interval '10 minutes')
+        OR (g.upload_status = 'uploading' AND g.upload_started_at < now() - interval '15 minutes')
         OR g.deleted_at < now() - interval '10 minutes')
     LIMIT greatest(1, least(lim, 1000)) FOR UPDATE SKIP LOCKED)
   RETURNING a.workspace_id, a.storage_key $$;

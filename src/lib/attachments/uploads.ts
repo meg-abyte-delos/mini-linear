@@ -139,8 +139,10 @@ export async function putContent(req: Request, slug: string, rawIssue: string, r
     let claim: Claim | undefined;
     const first = await withWorkspaceCtx(req, slug, async (ctx) => {
       requireRole(ctx, "member");
-      if ((byUser.get(ctx.userId) ?? 0) >= perUserPuts()) throw new ApiError("rate_limited", "too many uploads in progress for this user, retry shortly");
-      byUser.set(ctx.userId, (byUser.get(ctx.userId) ?? 0) + 1); counted = ctx.userId; // check and increment are synchronous: no race between PUTs
+      if (!counted) { // withWorkspaceCtx may replay this callback (40P01): count the PUT once, or the single decrement in finally leaks a slot
+        if ((byUser.get(ctx.userId) ?? 0) >= perUserPuts()) throw new ApiError("rate_limited", "too many uploads in progress for this user, retry shortly");
+        byUser.set(ctx.userId, (byUser.get(ctx.userId) ?? 0) + 1); counted = ctx.userId; // check and increment are synchronous: no race between PUTs
+      }
       const issueId = parseId(rawIssue), id = parseId(rawId);
       await load(ctx, issueId);
       const rows = await ctx.tx<Row[]>`select storage_key, upload_status, mime_type, size_bytes, created_by, extract(epoch from now() - created_at) * 1000 as age_ms
@@ -196,7 +198,7 @@ export async function putContent(req: Request, slug: string, rawIssue: string, r
   }
 }
 
-/** Puts a claimed row back to pending after a failed transfer (best effort: the GC reclaims a stuck 'uploading' row after 10 min). */
+/** Puts a claimed row back to pending after a failed transfer (best effort: the GC reclaims a stuck 'uploading' row after 15 min). */
 async function release(req: Request, slug: string, id: string): Promise<void> {
   await withWorkspaceCtx(req, slug, async (ctx) => {
     await ctx.tx`update issue_attachments set upload_status = 'pending', upload_started_at = null where id = ${id} and upload_status = 'uploading'`;
