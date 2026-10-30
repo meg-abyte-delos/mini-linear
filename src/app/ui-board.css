@@ -99,3 +99,27 @@
 .board .card .chip { gap: 5px; border: 1px solid var(--pill-line, var(--line)); background: none; color: var(--muted); }
 .board .card .chip.lb1::before, .board .card .chip.lb2::before, .board .card .chip.lb3::before { content: ''; width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .board .card .chip.lb1::before { background: var(--lb-red); } .board .card .chip.lb2::before { background: var(--lb-purple); } .board .card .chip.lb3::before { background: var(--lb-blue); }
+
+/* 19h review: touch / no-hover devices have no column hover, so header actions stay visible. */
+@media (hover: none) { .board .col-act { opacity: 1; } }
+
+/* Board column + card tokens. Dark keeps transparent columns; light gets Linear's tinted
+   column well and a readable card border so white cards separate from the near-white canvas. */
+:root { --board-col-bg: transparent; --board-card-line: rgb(255 255 255 / .06); --board-card-line-hover: rgb(255 255 255 / .10); }
+[data-theme='light'] { --board-col-bg: #f4f4f6; --board-card-line: rgb(0 0 0 / .08); --board-card-line-hover: rgb(0 0 0 / .14); }
+@media (prefers-color-scheme: light) { html:not([data-theme]) { --board-col-bg: #f4f4f6; --board-card-line: rgb(0 0 0 / .08); --board-card-line-hover: rgb(0 0 0 / .14); } }
+.board .col { background: var(--board-col-bg); }
+.board .card { border-color: var(--board-card-line); }
+.board .card:hover { border-color: var(--board-card-line-hover); }
+[data-theme='light'] .board .col:hover { background: color-mix(in srgb, var(--fg) 2%, var(--board-col-bg)); }
+[data-theme='light'] .board .card, [data-theme='light'] .board .card.over { box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+
+/* Pierre + Rex 18:19: no coloured outline on cards at rest, hover or selection. Selected = subtle accent tint
+   + low-alpha accent ring; keyboard focus = thin inset ring. Never a solid indigo border. */
+/* ui-night/ui-bulk/ui-light paint a solid var(--accent) border + glow on selected cards at (0,4,0); on the board
+   that reads as a bright line (Pierre 18:18). :not(#_) lifts this board-only override above them without !important. */
+.board .card[aria-selected=true]:not(#_) { border-color: var(--board-card-line-hover); background: color-mix(in srgb, var(--accent) 7%, var(--raised)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
+.board .card[aria-selected=true]:not(#_):hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--board-card-line-hover)); }
+.board .card:not(#_):focus-visible { box-shadow: none; }
+.board .card:focus { outline: none; }
+.board .card:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -2px; }

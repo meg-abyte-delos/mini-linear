@@ -1,5 +1,7 @@
-.shell:has(> .search-page) { grid-template-columns:1fr; }
 .search-page .search-bar { padding-inline:max(16px, calc((100% - 768px) / 2)); }
 .search-page .scroll { padding-inline:max(0px, calc((100% - 768px) / 2)); }
 .search-page .search-bar input { height:36px; }
-.search-page .search-link { min-height:36px; }
+.search-page .search-link { min-height:36px; flex-wrap:wrap; row-gap:0; }
+/* The snippet takes its own line under the title, aligned with it, never clipped to a sliver. */
+.search-page .search-snippet { order:9; flex:0 0 100%; max-width:none; margin:0 0 var(--sp-1) 24px; font-size:var(--fs-sm); color:var(--muted); }
+

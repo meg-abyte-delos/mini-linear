@@ -8,3 +8,4 @@ export { Tooltip } from './Tooltip';
 export { Combobox, type ComboOption } from './Combobox';
 export { ConfirmDialog } from './ConfirmDialog';
 export { EmptyState } from './EmptyState';
+export { Select, type SelectOption } from './Select';

@@ -6,6 +6,7 @@ Base URL: `https://<host>/api/v1/w/<workspace-slug>/...`. JSON in, JSON out. Err
 
 Create a key in a signed-in session: `POST /api/v1/w/<slug>/api-keys` `{ "name": "CI bot", "scope": "read" | "write", "expires_in_days"?: 1..3650 }`.
 The response carries `token` (`mlk_<prefix>_<secret>`) **once**; only its sha256 is stored. The 8-char `prefix` is shown in listings.
+**Guests** may only create `read`-scope keys. `scope` defaults to `write`, so omitting it returns 403 (`forbidden`); send `"scope": "read"` explicitly.
 
 Call the API with `Authorization: Bearer mlk_...`.
 
@@ -24,7 +25,7 @@ Same endpoints as the app, so the API is always at parity:
 | Issues | `GET/POST /issues`, `GET/PATCH/DELETE /issues/<id>`, `POST /issues/<id>/restore` |
 | Comments | `GET/POST /issues/<id>/comments`, `PATCH/DELETE /comments/<id>` |
 | Attachments | `GET/POST /issues/<id>/attachments` (links), `DELETE /issues/<id>/attachments/<aid>`, file uploads below |
-| Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/<id>` |
+| Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/<id>` (field `priority`: 0 none, 1 urgent .. 4 low, default 0) |
 | Teams | `GET/POST /teams`, `GET/PATCH/DELETE /teams/<id>`, `/teams/<id>/members` |
 | Also | `/cycles`, `/labels`, `/members`, `/audit` |
 
@@ -112,6 +113,19 @@ Contract: `docs/contracts/A4-subissues-relations-estimates.md`. All routes under
 - **Relations**: items and the POST 201 body carry `related_issue { id, identifier, title, status, priority, assignee_id, team_id }`. Duplicate pair: 409 `conflict` with `details { relation_id, type }` (type as seen from the requested issue). `POST` accepts `cancel_source` (boolean). **Deviation from the contract text**: default `true`, because main already cancels the source on `duplicate` (test `a1-relations`); `false` skips it.
 - **Bulk** `POST /issues/bulk` (existing, max 250 ids): patch gains `estimate` (validated against the team scale, per issue) and `add_label_ids` / `remove_label_ids` (aliases of `label_ids_add` / `label_ids_remove`); optional `versions: { <issue_id>: <version> }` is a per-issue If-Match (stale: that id fails with `precondition_failed`, `details.current_version`). Failed items may carry `details`. Actions `delete` / `restore` / `archive` / `unarchive` bump versions; team-guests fail per issue with `forbidden`.
 - `GET /teams/:id/estimate-scale` -> `{ scale, allow_zero, values }` (`values` empty for `none`). Admin+ always; other callers must be team members (404 otherwise); guests 403.
+## Search (A7)
+
+`GET /api/v1/w/:slug/search?q&kind&...` full-text search (config `simple`, prefix match on the last token, websearch syntax; `DEM-12` ranks that issue first).
+- `q` trimmed 1..200 chars, no NUL byte: otherwise 422 `validation_failed`. Any text param containing NUL is 422, never 500.
+- `kind` comma list of `issue|comment|project|attachment` (default `issue,comment,project`; unknown: 422). Attachment hits: title match, visibility of the issue, only rows that are not soft-deleted and `upload_status = ready` (links count as ready).
+- Filters: `status`, `team_id`, `assignee_id`, `project_id`, `label_id`, `priority` (0..4), `cycle_id`, `state_id`, `due_before`, `due_after` (YYYY-MM-DD), `has_attachment`, `include_done` (default true). Any issue-only filter drops projects. Bad enum / uuid / date / bool: 422.
+- `sort=rank` (default, `rank desc, id`) or `sort=updated` (`updated_at desc, id`); `limit` 1..100, `cursor` opaque. A cursor from the other sort, or a garbled one: 400 `bad_request`.
+- Item: `{ kind, id, issue_id, identifier, title, snippet, rank, status, team_id, project_id, assignee_id, updated_at, parent_identifier, matched }`. `snippet` is HTML-escaped; only `<mark>`/`</mark>` are live tags (render as text + mark). `parent_identifier` is null unless the caller can see the parent. `matched` is a subset of `title|description|comment|attachment`.
+- Visibility: owner/admin all; member their teams; guest only shared issues (no projects). Rate limit 120 requests/min per user: 429 `rate_limited` with `Retry-After` (seconds; override `SEARCH_RATE_LIMIT`).
+
+`GET /search/recents` -> `{ items: [{ id, kind: query|issue|project, query, entity_id, created_at }] }` newest first, max 20, entities no longer visible dropped.
+`POST /search/recents` strict body `{ kind, query? | entity_id? }` (`query` iff `kind=query`, else visible `entity_id`): 201; 422 bad body, 404 entity not visible, 403 guest + `project`. Re-adding the same query (case-insensitive) or entity moves it to the top; the 50 newest per user are kept.
+`DELETE /search/recents` 204 clears; `DELETE /search/recents/:id` 204 idempotent (unknown/foreign id), 400 `bad_request` if the id is not a uuid. Any role incl. guest may clear or delete their own recents. Recents are per user (RLS `own_rows`).
 ## Project and cycle counters (A1)
 
 One rule for every surface (API, project list, project page, roadmap rings, cycles list): **canceled issues are out of scope, soft-deleted issues do not exist.**

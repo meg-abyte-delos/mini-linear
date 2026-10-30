@@ -420,7 +420,7 @@ describe.runIf(runIntegration)('search', () => {
     if (r.status === 200) expect(Array.isArray((await r.json()).items)).toBe(true); else expect([400, 422]).toContain(r.status);
   });
   // BUG (open): GET /search?q=a%00b returns 500 (Postgres rejects NUL in text; the zod query does not strip/reject it). it.fails flips red when fixed.
-  it.fails('a NUL byte in q is a 4xx or an empty result, never 5xx', async () => {
+  it('a NUL byte in q is a 4xx or an empty result, never 5xx', async () => {
     expect((await S(M1, 'q=a%00b')).status).toBeLessThan(500);
   });
   it('after the injection attempt the tables are intact', async () => {

@@ -5,7 +5,14 @@ test('projects view lists projects with progress and drills into issues', async 
   await page.goto('/?view=projects');
   await page.waitForSelector('html[data-ready]');
   await expect(page.locator('.cycle.project')).toHaveCount(2);
-  await page.locator(`.cycle.project[data-project="${PROJECTS.p2}"]`).getByRole('button', { name: 'View issues' }).click();
+  const p2 = page.locator(`.cycle.project[data-project="${PROJECTS.p2}"]`);
+  const view = p2.getByRole('button', { name: 'View issues' });
+  // Linear-style quiet action: hidden until the row is hovered or focused (keyboard: :focus-within).
+  await view.focus();
+  await expect(view).toHaveCSS('pointer-events', 'auto');
+  await page.keyboard.press('Shift+Tab');
+  await p2.hover();
+  await view.click();
   await expect(page).toHaveURL(new RegExp(`project=${PROJECTS.p2}`));
   await expect(page.getByRole('button', { name: /^Project: Cronkit/ })).toBeVisible();
 });
@@ -68,4 +75,18 @@ test('roadmap axis: sticky header, pill and month labels pass axe contrast in da
     expect(r.violations.map((v) => `${scheme}: ${v.id}`)).toEqual([]);
     expect(r.passes.length + r.incomplete.length).toBeGreaterThan(0);
   }
+});
+
+test('projects table: 7 column headers, Priority/Lead/Issues hidden under 900px', async ({ page }) => {
+  await page.goto('/?view=projects');
+  await page.waitForSelector('html[data-ready]');
+  const table = page.getByRole('table', { name: 'Projects' });
+  await expect(table.getByRole('columnheader')).toHaveCount(7);
+  await page.setViewportSize({ width: 860, height: 800 });
+  for (const h of ['Priority', 'Lead', 'Issues']) await expect(table.getByRole('columnheader', { name: h, exact: true })).toBeHidden();
+  const row = page.locator(`.pj-row[data-project="${PROJECTS.p1}"]`);
+  await expect(row.locator('.pj-prio')).toBeHidden();
+  await expect(row.locator('.pj-lead')).toBeHidden();
+  await expect(row.locator('.pj-issues')).toBeHidden();
+  await expect(table.getByRole('columnheader', { name: 'Health', exact: true })).toBeVisible();
 });
