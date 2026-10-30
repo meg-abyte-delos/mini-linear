@@ -9,7 +9,7 @@ test('issues list and GET always return team_id', async ({ page }) => {
   expect(made.status()).toBe(201);
   const it = (await made.json()) as { id: string; team_id: string };
   expect(it.team_id).toBe(team.id);
-  const list = (await (await page.request.get('/api/v1/w/demo/issues?limit=200')).json()) as { items: { id: string; team_id?: string | null }[] };
+  const list = (await (await page.request.get('/api/v1/w/demo/issues?limit=100')).json()) as { items: { id: string; team_id?: string | null }[] };
   expect(list.items.length).toBeGreaterThan(0);
   for (const i of list.items) expect(i.team_id, `issue ${i.id} has no team_id`).toMatch(/^[0-9a-f-]{36}$/);
   expect(list.items.find((i) => i.id === it.id)?.team_id).toBe(team.id);
