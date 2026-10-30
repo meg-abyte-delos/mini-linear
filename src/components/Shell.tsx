@@ -7,6 +7,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
+import { ProgressRing } from '@/components/ProgressRing';
+import { subIssueStats } from '@/lib/sub-issues';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/sim-store';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
@@ -177,6 +179,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
+  const subStats = useMemo(() => subIssueStats(allIssues), [allIssues]);
+  const subBadge = (i: Issue) => { const st = subStats.get(i.id); return st ? <span className='sub-prog' data-testid={`sub-${i.identifier ?? i.id}`} title={`${st.done} of ${st.total} sub-issues done`}><ProgressRing pct={st.pct} size={14} showPct={false} label={`${st.done} of ${st.total} sub-issues done`} /><span>{st.done}/{st.total}</span></span> : null; };
   // Filters live in the URL: replaceState keeps other params (seed, state) and does not refetch.
   function setFilters(f: Filters) {
     setFiltersState(f);
@@ -647,6 +651,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       {shown('id') && <span className='id'>{i.identifier ?? i.id}</span>}
       {shown('status') && <StatusIcon status={i.status} />}
       <span className='title'>{i.title}</span>
+      {subBadge(i)}
       <span className='labels'>{shown('labels') && i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{shown('project') && (() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
       {shown('created') && <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>}
       {shown('assignee') && assignee(i)}
@@ -656,7 +661,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
-      <div className='card-meta'><span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
+      <div className='card-meta'>{subBadge(i)}<span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
   );
 
