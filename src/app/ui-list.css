@@ -35,6 +35,25 @@
 .tb-menu [role=menuitem]:hover, .tb-menu [role=menuitem]:focus-visible { background:var(--hover); outline:none; }
 .tb-menu.display { right:0; padding:10px; display:grid; gap:8px; }
 .tb-menu.display label { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; color:var(--muted-strong); }
+.fwrap { position:relative; }
+.row .labels .chip.lb1::before { background:var(--lb-red); } .row .labels .chip.lb2::before { background:var(--lb-purple); } .row .labels .chip.lb3::before { background:var(--lb-blue); }
+.row .labels .chip.proj::before { background:var(--lb-project); }
+.row .labels { flex:none; max-width:none; overflow:visible; justify-content:flex-end; }
+.row .title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Wave B list: Linear measurements on tokens (tokens.css, #187). */
+.row { height:var(--row-h); gap:var(--row-gap); transition:background-color var(--dur-instant) var(--ease-out); }
+.row .id { width:var(--id-w); font-size:var(--fs-base); font-weight:var(--fw-regular); letter-spacing:var(--tracking-id); font-variant-numeric:normal; color:var(--muted); }
+.row .title { font-size:var(--fs-base); font-weight:var(--fw-medium); color:var(--fg); }
+.row .labels .chip { height:var(--chip-h); color:var(--muted-strong); border-color:var(--line-soft); }
+.row .rowsel { transition:opacity var(--dur-instant) var(--ease-out); }
+.row[aria-selected=true] { box-shadow:inset 2px 0 0 var(--accent); }
+/* Sticky header needs an opaque fill so rows do not show through while scrolling. */
+.group h2 { height:var(--group-h); position:sticky; top:0; z-index:2; background:color-mix(in srgb, var(--fg) 5%, var(--bg)); }
+.group h2 .chev { transition:transform var(--dur-fast) var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .row, .row .rowsel, .group h2 .chev { transition:none; } }
+
+/* Display popover (Wave B): Menu pickers for Grouping/Ordering. */
 .tb-menu.display .dp-pick { display:inline-flex; align-items:center; justify-content:space-between; gap:6px; min-width:120px; height:26px; padding:0 8px; border:1px solid var(--line); border-radius:6px; background:var(--hover); color:var(--fg); font:inherit; font-size:12px; cursor:pointer; transition:border-color var(--dur-fast) var(--ease-out); }
 .tb-menu.display .dp-pick svg { color:var(--muted); }
 .tb-menu.display .dp-pick:hover, .tb-menu.display .dp-pick[aria-expanded=true] { border-color:var(--muted); }
@@ -55,3 +74,5 @@
 .dp-switch input:disabled + i { opacity:.4; }
 @keyframes dp-in { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:none; } }
 @media (prefers-reduced-motion: reduce) { .tb-menu.display, .dp-chip, .dp-switch i, .dp-switch i::after, .tb-menu.display .dp-pick { animation:none; transition:none; } }
+.tb-menu.display .dp-row { display:flex; align-items:center; justify-content:space-between; gap:var(--row-gap); min-height:var(--chip-h); padding:4px 12px; }
+.tb-menu.display .dp-k { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-base); color:var(--muted-strong); }
