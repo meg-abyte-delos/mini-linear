@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ownerSql, seedTwoWorkspaces, withWorkspace, type Seed } from "../helpers/seed";
 import { setSessionResolver, db } from "../../src/lib/http/ctx";
 import { searchWorkspace } from "../../src/lib/search/handlers";
+import { encodeCursor } from "../../src/lib/http/cursor";
 import * as L from "../../src/lib/resources/labels-cycles";
 
 const haveDb = !!(process.env.DATABASE_URL && process.env.DATABASE_OWNER_URL);
@@ -67,5 +68,24 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
       seen.push(...p.items.map((c) => c.name)); cur = p.next_cursor;
     } while (cur);
     expect(seen).toEqual(names);
+  });
+
+  it("cycles: a validly signed cursor with a non numeric k is a 400 invalid cursor", async () => {
+    setSessionResolver(async () => seed.a.admin);
+    const cur = encodeCursor(seed.a.id, "cycles", { k: "abc", id: randomUUID() });
+    const r = await L.listCycles(new Request(`http://localhost/api/v1/w/${seed.a.slug}/cycles?cursor=${encodeURIComponent(cur)}`), seed.a.slug);
+    expect(r.status).toBe(400);
+    expect(JSON.stringify(await r.json())).toContain("invalid cursor");
+  });
+
+  it("title-only match: found, flagged matched=title, snippet is the plain description head (no mark)", async () => {
+    const id = randomUUID();
+    await withWorkspace(owner, seed.a.id, async (tx) => {
+      await tx`insert into issues (id, workspace_id, team_id, number, title, description, sort_key, created_by) values (${id}, ${seed.a.id}, ${team}, 2, 'Zebrafinch title', 'nothing relevant here', 'a2', ${seed.a.admin})`;
+    });
+    const h = (await search("zebrafinch")).find((x) => x.id === id);
+    expect(h).toBeTruthy();
+    expect((h as Hit & { matched: string[] }).matched).toEqual(["title"]);
+    expect(h!.snippet).toBe("nothing relevant here");
   });
 });
