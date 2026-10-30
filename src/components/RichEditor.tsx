@@ -8,7 +8,7 @@ import { parseMarkdown, safeHref } from '@/lib/detail/markdown';
 import { blocksToMarkdown } from '@/lib/detail/md-serialize';
 import { blockOf, blockNode, readBlocks, renderMarkdown } from '@/lib/detail/md-dom';
 
-interface Props { value: string; onCommit: (md: string) => void; readOnly?: boolean; label?: string; placeholder?: string }
+interface Props { value: string; onCommit: (md: string) => void; readOnly?: boolean; floating?: boolean; label?: string; placeholder?: string }
 
 const ic = (d: string) => <svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true' focusable='false'><path d={d} /></svg>;
 const ICON = {
@@ -40,12 +40,14 @@ function caretIn(node: Node, atEnd = false) {
 }
 function placeholderBr(target: HTMLElement) { if (!target.textContent) target.append(document.createElement('br')); }
 
-export function RichEditor({ value, onCommit, readOnly = false, label = 'Description', placeholder = 'Add description…' }: Props) {
+export function RichEditor({ value, onCommit, readOnly = false, floating = false, label = 'Description', placeholder = 'Add description…' }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const last = useRef(value);
   const saved = useRef<Range | null>(null);
   const dirty = useRef(false); // set by every user edit: focus + blur without an edit must not write back a normalised description
   const [link, setLink] = useState<string | null>(null);
+  const [hasSel, setHasSel] = useState(false); // floating mode: the bar shows on a non-empty selection or after typing a slash
+  const [slash, setSlash] = useState(false);
   const [active, setActive] = useState<{ bold: boolean; italic: boolean }>({ bold: false, italic: false });
 
   const syncEmpty = () => {
@@ -82,7 +84,8 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
   useEffect(() => {
     const onSel = () => {
       const root = ref.current; const s = window.getSelection();
-      if (!root || !s || !s.anchorNode || !root.contains(s.anchorNode)) return;
+      if (!root || !s || !s.anchorNode || !root.contains(s.anchorNode)) { setHasSel(false); return; }
+      setHasSel(!s.isCollapsed);
       saved.current = s.rangeCount ? s.getRangeAt(0).cloneRange() : null;
       try { setActive({ bold: document.queryCommandState('bold'), italic: document.queryCommandState('italic') }); } catch { /* unsupported */ }
     };
@@ -154,6 +157,10 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
         }
       }
     }
+    if (floating && ne.inputType === 'insertText' && ne.data === '/' && sel?.anchorNode) {
+      const b = blockOf(root, sel.anchorNode);
+      if (b && (b.textContent ?? '').trim() === '/') setSlash(true); // the slash stays in the text: it only opens the bar
+    } else if (ne.inputType === 'insertText') setSlash(false);
     syncEmpty();
   };
 
@@ -233,9 +240,9 @@ export function RichEditor({ value, onCommit, readOnly = false, label = 'Descrip
   );
 
   return (
-    <div className='re' data-readonly={readOnly || undefined} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) commit(); }}>
-      {!readOnly && (
-        <div className='re-bar' role='toolbar' aria-label='Description formatting' onKeyDown={onBarKey} onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault(); }}>
+    <div className='re' data-readonly={readOnly || undefined} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { commit(); setSlash(false); } }}>
+      {!readOnly && (!floating || hasSel || slash || link !== null) && (
+        <div className='re-bar' data-floating={floating || undefined} role='toolbar' aria-label='Description formatting' onKeyDown={onBarKey} onMouseDown={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault(); }}>
           {btn('Bold', 'Bold', () => exec('bold'), ICON.bold, { shortcut: ['⌘', 'B'], pressed: active.bold })}
           {btn('Italic', 'Italic', () => exec('italic'), ICON.italic, { shortcut: ['⌘', 'I'], pressed: active.italic })}
           {btn('Strikethrough', 'Strikethrough', () => exec('strikeThrough'), ICON.strike, { shortcut: ['⌘', '⇧', 'S'] })}

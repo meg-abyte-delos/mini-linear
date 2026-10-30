@@ -19,3 +19,7 @@
 .auth-sub { margin:4px 0 0; text-align:center; color:var(--muted-strong); font-size:var(--fs-sm, 12px); }
 .auth-err { display:flex; align-items:center; gap:8px; margin:0; padding:8px 10px; border:1px solid color-mix(in srgb, var(--danger) 40%, transparent); border-radius:8px; background:color-mix(in srgb, var(--danger) 10%, transparent); color:var(--danger); font-size:var(--fs-sm, 12px); }
 .auth-err svg { flex:none; }
+.auth-card .nf-link { display:inline-flex; align-items:center; justify-content:center; height:40px; margin-top:4px; border-radius:8px; background:var(--accent); color:var(--accent-fg); font-size:var(--fs-base, 13px); font-weight:600; text-decoration:none; }
+.auth-card .nf-link:hover { background:var(--accent-hover); }
+.auth-card .nf-link:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.auth-card .auth-sub { text-align:center; }

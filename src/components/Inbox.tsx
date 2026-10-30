@@ -126,9 +126,15 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, refresh
                 <span className={`rowsel${checked.has(n.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }}>{checked.has(n.id) ? '☑' : '☐'}</span>
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
                 <span className='nav-av' aria-hidden='true' data-kind={n.actor ? 'user' : 'system'}>{n.actor ? n.actor.email.charAt(0) : <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.5'><circle cx='8' cy='8' r='5.5' /><path d='M8 5v3l2 1.5' /></svg>}</span>
-                <span className='nid'>{n.issue?.identifier ?? 'Deleted'}</span>
-                <span className='ntitle' title={n.issue?.title ?? ''}>{n.issue?.title ?? ''}</span>
-                <span className='nwho' title={whoLabel(n)}>{whoLabel(n)}</span>
+                <span className='nmain'>
+                  <span className='ntitle' title={n.issue?.title ?? ''}>{n.issue?.title ?? ''}</span>
+                  <span className='nsub'>
+                    {n.issue && <span className='nstatus' data-status={n.issue.status} title={STATUS_LABEL[n.issue.status as Status] ?? n.issue.status}><StatusIcon status={n.issue.status as Status} /></span>}
+                    <span className='nid'>{n.issue?.identifier ?? 'Deleted'}</span>
+                    <span className='nsep' aria-hidden='true'>·</span>
+                    <span className='nwho' title={whoLabel(n)}>{whoLabel(n)}</span>
+                  </span>
+                </span>
                 <span className='ntime'>{relTime(n.created_at)}</span>
               </li>
             ))}

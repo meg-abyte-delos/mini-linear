@@ -33,7 +33,7 @@ import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilters, type FilterKey, type Filters } from '@/lib/filters';
 import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
-import { listTeams } from '@/lib/settings-client';
+import { listTeams, type Team } from '@/lib/settings-client';
 import { DisplayPick } from '@/components/DisplayPick';
 import { NewIssueModal, type NewIssueDraft } from '@/components/NewIssueModal';
 import { FilterMenu } from '@/components/FilterMenu';
@@ -486,8 +486,16 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     let made: Issue | null | undefined;
     let patchFailed = false;
     if (api) {
-      const row = await apiCreate(api.slug, api.teamId, d.title);
+      const row = await apiCreate(api.slug, d.team_id || api.teamId, d.title);
       if (!row) { setToast('Could not create the issue.'); return false; }
+      if (d.team_id && d.team_id !== api.teamId) {
+        // Another team's issue does not belong in this team's store: apply the properties server-side, then just confirm.
+        const other = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
+        let failed = false;
+        if (Object.keys(other).length) { const r = await apiPatch(api.slug, row, row.version, other); failed = r.kind !== 'ok'; }
+        setToast(failed ? `Created ${row.identifier ?? d.title}, but some properties could not be saved.` : `Created ${row.identifier ?? d.title}`);
+        return true;
+      }
       versions.current.set(row.id, row.version);
       store.current.upsert({ ...row, sort_key: String(Date.now()) });
       const patch = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
@@ -610,11 +618,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     setSelId(list[n]!.id);
   }
   // Sidebar team row shows the real team (e.g. "Demo"), not the workspace name again.
-  const [teamName, setTeamName] = useState('Team');
+  const [teamList, setTeamList] = useState<Team[]>([]); const [teamName, setTeamName] = useState('Team');
   useEffect(() => {
     if (!api) return;
     let live = true;
-    void listTeams(api.slug).then((ts) => { const t = ts.find((x) => x.id === api.teamId) ?? ts[0]; if (live && t) setTeamName(t.name); }).catch(() => { /* keep fallback */ });
+    void listTeams(api.slug).then((ts) => { if (live) setTeamList(ts); const t = ts.find((x) => x.id === api.teamId) ?? ts[0]; if (live && t) setTeamName(t.name); }).catch(() => { /* keep fallback */ });
     return () => { live = false; };
   }, [api?.slug, api?.teamId]); // eslint-disable-line react-hooks/exhaustive-deps
   const hint = (id: string) => { const d = SHORTCUTS.find((x) => x.id === id); return d ? formatKeys(d.keys).replace(' then ', ' ') : undefined; };
@@ -969,7 +977,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         </div>
       )}
-      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
+      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} teams={teamList} teamId={api?.teamId ?? ''} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
       {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
       {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}

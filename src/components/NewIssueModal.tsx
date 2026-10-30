@@ -8,16 +8,17 @@ import { RichEditor } from '@/components/RichEditor';
 import { Avatar, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { PropIcon } from '@/components/PropIcons';
 import { PRIORITY_LABEL, STATUSES, STATUS_LABEL, type Issue, type Status } from '@/lib/issues';
+import type { Team } from '@/lib/settings-client';
 import type { Person } from '@/lib/people';
 
-export interface NewIssueDraft { title: string; description: string; status: Status; priority: Issue['priority']; assignee_id: string | null; label_ids: string[]; project_id: string | null }
+export interface NewIssueDraft { title: string; description: string; status: Status; priority: Issue['priority']; assignee_id: string | null; label_ids: string[]; project_id: string | null; team_id: string }
 interface Named { id: string; name: string; hue?: string }
-interface Props { open: boolean; initialStatus?: Status; people: readonly Person[]; labels: readonly Named[]; projects: readonly Named[]; onClose: () => void; onSubmit: (d: NewIssueDraft) => Promise<boolean> }
-type Kind = 'status' | 'priority' | 'assignee' | 'labels' | 'project';
-const TITLES: Record<Kind, string> = { status: 'Set status', priority: 'Set priority', assignee: 'Assign to', labels: 'Add labels', project: 'Add to project' };
+interface Props { open: boolean; initialStatus?: Status; people: readonly Person[]; labels: readonly Named[]; projects: readonly Named[]; teams?: readonly Team[]; teamId?: string; onClose: () => void; onSubmit: (d: NewIssueDraft) => Promise<boolean> }
+type Kind = 'team' | 'status' | 'priority' | 'assignee' | 'labels' | 'project';
+const TITLES: Record<Kind, string> = { team: 'Select team', status: 'Set status', priority: 'Set priority', assignee: 'Assign to', labels: 'Add labels', project: 'Add to project' };
 const FOCUSABLE = 'button:not(:disabled):not([tabindex="-1"]), input:not(:disabled), [contenteditable="true"]';
 
-export function NewIssueModal({ open, initialStatus, people, labels, projects, onClose, onSubmit }: Props) {
+export function NewIssueModal({ open, initialStatus, people, labels, projects, teams = [], teamId = '', onClose, onSubmit }: Props) {
   const { mounted, state } = useExitMount(open);
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState<Status>('todo');
@@ -25,6 +26,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
   const [assignee, setAssignee] = useState<string | null>(null);
   const [labelIds, setLabelIds] = useState<string[]>([]);
   const [project, setProject] = useState<string | null>(null);
+  const [team, setTeam] = useState(teamId);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false); // sync guard: state alone lets a double Cmd+Enter through before re-render
@@ -46,7 +48,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) { setTitle(''); setStatus(initialStatus ?? 'todo'); setPriority(0); setAssignee(null); setLabelIds([]); setProject(null); busyRef.current = false; setBusy(false); setInvalid(false); setPick(null); setEditorKey((k) => k + 1); desc.current = ''; }
+    if (open) { setTitle(''); setStatus(initialStatus ?? 'todo'); setPriority(0); setAssignee(null); setLabelIds([]); setProject(null); setTeam(teamId); busyRef.current = false; setBusy(false); setInvalid(false); setPick(null); setEditorKey((k) => k + 1); desc.current = ''; }
   }
 
   useEffect(() => {
@@ -81,7 +83,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
     busyRef.current = true;
     setBusy(true);
     let ok = false;
-    try { ok = await onSubmit({ title: t.slice(0, 255), description: desc.current, status, priority, assignee_id: assignee, label_ids: labelIds, project_id: project }); }
+    try { ok = await onSubmit({ title: t.slice(0, 255), description: desc.current, status, priority, assignee_id: assignee, label_ids: labelIds, project_id: project, team_id: team }); }
     finally { busyRef.current = false; setBusy(false); }
     if (!ok) return;
     if (!more) { onClose(); return; }
@@ -89,9 +91,11 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
   }
 
   const person = people.find((p) => p.id === assignee);
+  const curTeam = teams.find((t) => t.id === team) ?? teams[0];
   const proj = projects.find((p) => p.id === project);
   const chosen = labels.filter((l) => labelIds.includes(l.id));
   const options = (k: Kind): ComboOption[] => {
+    if (k === 'team') return teams.map((t) => ({ id: t.id, label: t.name, checked: t.id === team }));
     if (k === 'status') return STATUSES.map((s) => ({ id: s, label: STATUS_LABEL[s], checked: s === status, lead: <StatusIcon status={s} /> }));
     if (k === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: n === priority, lead: <PriorityIcon priority={n as Issue['priority']} /> }));
     if (k === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: assignee === null, lead: <UnassignedIcon /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: assignee === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
@@ -100,7 +104,8 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
   };
   const onPick = (id: string) => {
     const k = lastPick.current;
-    if (k === 'status') setStatus(id as Status);
+    if (k === 'team') setTeam(id);
+    else if (k === 'status') setStatus(id as Status);
     else if (k === 'priority') setPriority(Number(id) as Issue['priority']);
     else if (k === 'assignee') setAssignee(id === 'none' ? null : id);
     else if (k === 'labels') setLabelIds((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
@@ -118,14 +123,18 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
             ref={dlg} className='ni' role='dialog' aria-modal='true' aria-labelledby={titleId} data-state={state}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
           >
-            <h2 id={titleId} className='ni-head'>New issue</h2>
+            <div className='ni-top'>
+              {curTeam && <button type='button' className='ni-team' aria-haspopup='dialog' aria-label={curTeam.name + ' team'} onClick={openPick('team')}>{curTeam.key}<span className='ni-caret' aria-hidden='true'>›</span></button>}
+              <h2 id={titleId} className='ni-head'>New issue</h2>
+              <button type='button' className='ni-x' aria-label='Close' onClick={onClose}><svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' aria-hidden='true'><path d='M4 4l8 8M12 4l-8 8' /></svg></button>
+            </div>
             <input
               ref={titleEl} className='ni-title' aria-label='Issue title' placeholder='Issue title' maxLength={255} value={title}
               aria-invalid={invalid || undefined} onChange={(e) => { setTitle(e.target.value); if (invalid) setInvalid(false); }}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) e.preventDefault(); }}
             />
             {invalid && <p className='ni-err' role='alert'>A title is required.</p>}
-            <div className='ni-desc'><RichEditor key={editorKey} value='' onCommit={(md) => { desc.current = md; }} label='Description' placeholder='Add description…' /></div>
+            <div className='ni-desc'><RichEditor key={editorKey} value='' floating onCommit={(md) => { desc.current = md; }} label='Description' placeholder='Add description…' /></div>
             <div className='ni-props' role='group' aria-label='Properties'>
               <button type='button' className='ni-prop' aria-haspopup='dialog' onClick={openPick('status')}><StatusIcon status={status} />{STATUS_LABEL[status]}</button>
               <button type='button' className='ni-prop' aria-haspopup='dialog' onClick={openPick('priority')}><PriorityIcon priority={priority} />{PRIORITY_LABEL[priority]}</button>
@@ -136,7 +145,6 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
             <div className='ni-foot'>
               <label className='ni-more'><input type='checkbox' role='switch' checked={more} onChange={(e) => setMore(e.target.checked)} />Create more</label>
               <span className='ni-hint'><Kbd keys={['⌘', '↵']} /></span>
-              <button type='button' className='dlg-btn' onClick={onClose}>Cancel</button>
               <button type='button' className='dlg-btn dlg-confirm' disabled={busy} onClick={() => void submit()}>Create issue</button>
             </div>
           </div>

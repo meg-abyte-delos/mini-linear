@@ -39,6 +39,19 @@
 .ni-prop .chip.lb1::before, .ni-scrim ~ .pop .chip.lb1::before { background:var(--lb-red); }
 .ni-prop .chip.lb2::before, .ni-scrim ~ .pop .chip.lb2::before { background:var(--lb-purple); }
 .ni-prop .chip.lb3::before, .ni-scrim ~ .pop .chip.lb3::before { background:var(--lb-blue); }
+/* Header: clickable team chip, title, close X. Cancel is gone, Esc also closes. */
+.ni-top { display:flex; align-items:center; gap:var(--sp-2); }
+.ni-top .ni-head { margin-right:auto; }
+.ni-team { display:inline-flex; align-items:center; gap:var(--sp-1); height:var(--side-item-h); padding:0 var(--sp-2); font:inherit; font-size:var(--fs-sm); font-weight:var(--fw-semibold); color:var(--fg); background:transparent; border:1px solid var(--line); border-radius:var(--r-sm); cursor:pointer; }
+.ni-team:hover { background:var(--hover); }
+.ni-team:focus-visible, .ni-x:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.ni-caret { color:var(--muted); }
+.ni-x { display:inline-grid; place-items:center; width:var(--side-item-h); height:var(--side-item-h); padding:0; color:var(--muted-strong); background:transparent; border:0; border-radius:var(--r-sm); cursor:pointer; }
+.ni-x:hover { background:var(--hover); color:var(--fg); }
+/* Formatting bar only on selection or after a slash: floats above the description. */
+.ni .re-bar[data-floating] { position:absolute; bottom:calc(100% + var(--sp-1)); left:0; z-index:5; margin:0; padding:0 var(--sp-1); background:var(--raised); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); animation:prim-fade-in var(--dur-fast) var(--ease-out); }
+.ni-desc { overflow:visible; }
+.ni-desc .re-surface { max-height:var(--ni-desc-max-h); overflow:auto; }
 
 /* Review 20:00: Linear title (borderless, no fill, 18px/500, no ring) and a token switch for Create more. */
 .ni input.ni-title, .ni input.ni-title:focus, .ni input.ni-title:focus-visible { height:auto; padding:var(--sp-1) 0; font-size:var(--fs-xl); font-weight:var(--fw-medium); line-height:1.35; background:transparent; border:0; border-radius:0; box-shadow:none; outline:none; }
