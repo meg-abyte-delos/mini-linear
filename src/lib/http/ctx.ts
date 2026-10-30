@@ -35,7 +35,7 @@ export function requireRole(ctx: Ctx, min: Role) { if (!atLeast(ctx.role, min)) 
  * (non-member -> 404, never 403, so slugs are not enumerable), then run the handler in ONE transaction with
  * app.workspace_id set (RLS). Client-supplied workspace ids are never read. Any throw rolls the tx back.
  */
-export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx) => Promise<Response>, sql: postgres.Sql = db()): Promise<Response> {
+export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx) => Promise<Response>, sql: postgres.Sql = db(), opts: { rawReq?: boolean } = {}): Promise<Response> {
   try {
     const key = await resolveApiKey(req, sql);
     // Bearer keys are not ambient credentials (no cookie), so the CSRF origin check applies to cookie auth only.
@@ -56,6 +56,9 @@ export async function withWorkspaceCtx(req: Request, slug: string, fn: (ctx: Ctx
       await tx`select set_config('app.user_id', ${userId}, true)`;
       return fn({ tx, userId, workspaceId: workspace_id, role, req: r, via: key ? "api_key" : "session", apiKeyId: key?.key_id });
     });
+    // rawReq: the handler streams the request body itself (uploads): no clone (it would buffer the whole body) and no
+    // retry (the body can only be read once), so a deadlock surfaces as 409. Such handlers keep their transactions short.
+    if (opts.rawReq) return (await run(req)) as Response;
     try {
       return (await run(req.clone())) as Response;
     } catch (e) {
