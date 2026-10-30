@@ -54,7 +54,7 @@ function excerpt(text: string, needle: string): string {
 
 /** Client-side highlight of every case-insensitive occurrence of the query's words in a plain text (titles carry no server marks). */
 export function highlightParts(text: string, q: string): { text: string; mark: boolean }[] {
-  const words = [...new Set(q.trim().split(/\s+/).filter((w) => w.length >= 2))].map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const words = [...new Set(q.trim().split(/\s+/).filter((w) => w.length >= 2))].sort((a, b) => b.length - a.length).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   if (!words.length) return [{ text, mark: false }];
   const re = new RegExp(`(${words.join('|')})`, 'gi');
   return text.split(re).map((t, i) => ({ text: t, mark: i % 2 === 1 })).filter((p) => p.text);
