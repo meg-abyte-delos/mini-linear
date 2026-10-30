@@ -36,7 +36,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   try {
     if (!sim) readOnly = (await loadRole(api)) === 'guest';
     if (!sim) ({ issues, meta, truncated } = await loadRemote(api)); else issues = await listIssues(sim);
-    if (seed > 0 && !sim) issues = [...issues, ...seedIssues(seed)]; } catch (e) {
+    // Perf fixture lives in the home team: the team scope is strict (no team_id = hidden).
+    if (seed > 0 && !sim) issues = [...issues, ...seedIssues(seed).map((i) => ({ ...i, team_id: api.teamId }))]; } catch (e) {
     if (e instanceof HttpError && e.status === 401) unauthenticated = true;
     // Log the real cause server-side only; the UI gets a fixed, user-safe message.
     console.error('listIssues failed:', e instanceof Error ? e.message : e);
