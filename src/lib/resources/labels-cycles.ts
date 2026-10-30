@@ -104,6 +104,7 @@ const dayNum = (a: string, b: string) => Math.round((Date.parse(a) - Date.parse(
 export const listCycles = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member"); // guests: no cycles (same as projects)
   const q = parseQuery(req, listQuery.extend({ team_id: uuidSchema.optional() })), cur = q.cursor ? decodeCursor(q.cursor, ctx.workspaceId, "cycles") : null;
+  if (cur && !Number.isFinite(Number(cur.k))) throw new ApiError("bad_request", "invalid cursor");
   const today = (await ctx.tx<{ d: string }[]>`select current_date::text as d`)[0]!.d;
   const rows = await ctx.tx<Row[]>`${CSEL(ctx)} where ${teamVisible(ctx, "team_id")}
     ${cur ? ctx.tx`and ((${CYCLE_SK(ctx.tx)}), cycles.id) > (${Number(cur.k)}::int, ${cur.id}::uuid)` : ctx.tx``} ${q.team_id ? ctx.tx`and cycles.team_id = ${q.team_id}` : ctx.tx``}
