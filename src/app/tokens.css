@@ -15,7 +15,7 @@
   --enter-shift:4px; --enter-scale:.98;
 
   --font-sans:'Inter Variable', Inter, system-ui, -apple-system, sans-serif;
-  --fs-xs:11px; --fs-sm:12px; --fs-base:13px; --fs-lg:15px; --fs-xl:18px;
+  --fs-xs:11px; --fs-sm:12px; --fs-base:13px; --fs-lg:15px; --fs-xl:18px; --fs-2xl:24px;
   --fw-regular:450; --fw-medium:500; --fw-semibold:600;
   --lh-tight:1.25; --lh-base:1.45;
   --tracking-id:-0.26px;

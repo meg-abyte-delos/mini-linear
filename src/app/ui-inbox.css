@@ -86,9 +86,9 @@
 .idp-bar { display:flex; align-items:center; gap:8px; height:44px; flex:none; padding:0 16px 0 24px; border-bottom:1px solid var(--line-soft); }
 .idp-id { color:var(--muted-strong); font-size:var(--fs-sm); font-weight:500; white-space:nowrap; }
 .idp-bar .inbox-detail-actions { display:flex; flex-wrap:nowrap; margin:0 0 0 auto; padding:0; border:0; gap:4px; }
-.idp-bar .inbox-detail-actions button:first-child { margin-left:0; }
 .idp-bar .inbox-detail-actions button:last-child { margin-left:0; border-color:transparent; color:var(--muted-strong); }
 .idp-bar .inbox-detail-actions button.primary { border-color:var(--line); color:var(--fg); background:var(--raised); }
+.idp-bar .inbox-detail-actions button.primary:hover { background:var(--hover); border-color:var(--muted); }
 .idp-body { display:flex; flex:1; min-height:0; }
 .idp-main { flex:1; min-width:0; overflow-y:auto; padding:32px 40px 48px; }
 .idp-main > * { max-width:760px; }
@@ -103,3 +103,12 @@
 @media (max-width:1180px) { .inbox-detail dl.idp-props { flex-basis:200px; } .idp-main { padding:24px 24px 40px; } }
 /* list: the issue ID never wraps ("DEM-" / "36") */
 .nrow .nid { flex:none; width:auto; min-width:56px; white-space:nowrap; }
+/* Review 20:00: Linear inbox list ~360px, two-line rows: ID + title on top, excerpt below at full width. ID never wraps. */
+.inbox-wrap .inbox { flex:0 0 clamp(360px, 32%, 520px); width:clamp(360px, 32%, 520px); min-width:0; max-width:none; }
+.nrow { display:grid; grid-template-columns:14px 6px 18px auto minmax(0,1fr) auto; grid-template-rows:auto auto; grid-template-areas:'sel dot av id title time' 'sel dot av who who time'; align-items:center; column-gap:var(--sp-2); row-gap:2px; height:auto; min-height:52px; padding:var(--sp-2) var(--sp-4); }
+.nrow .rowsel { grid-area:sel; } .nrow .ndot { grid-area:dot; } .nrow .nav-av { grid-area:av; }
+.nrow .nid { grid-area:id; width:auto; white-space:nowrap; }
+.nrow .ntitle { grid-area:title; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nrow .nwho { grid-area:who; max-width:none; min-width:0; white-space:nowrap; }
+.nrow .ntime { grid-area:time; align-self:start; line-height:20px; }
+@media (max-width:900px) { .inbox-wrap .inbox { flex:1 1 100%; width:auto; } }
