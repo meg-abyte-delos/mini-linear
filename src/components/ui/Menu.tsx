@@ -7,10 +7,10 @@ import { firstEnabled, lastEnabled, moveIndex, typeahead } from '@/lib/ui/nav';
 export type MenuItem = { type?: 'item'; id: string; label: string; icon?: ReactNode; shortcut?: string[]; destructive?: boolean; disabled?: boolean; onSelect: () => void };
 export type MenuEntry = { type: 'separator' } | MenuItem;
 
-interface Props { open: boolean; anchorRef: RefObject<HTMLElement | null>; onClose: () => void; label: string; entries: MenuEntry[]; align?: 'start' | 'end' }
+interface Props { open: boolean; anchorRef: RefObject<HTMLElement | null>; onClose: () => void; label: string; entries: MenuEntry[]; align?: 'start' | 'end'; matchWidth?: boolean }
 
 // role=menu with roving focus: Up/Down/Home/End, typeahead, Enter/Space select, Esc closes and returns focus.
-export function Menu({ open, anchorRef, onClose, label, entries, align }: Props) {
+export function Menu({ open, anchorRef, onClose, label, entries, align, matchWidth }: Props) {
   const items = entries.filter((e): e is MenuItem => e.type !== 'separator');
   const [active, setActive] = useState(() => firstEnabled(items));
   const [wasOpen, setWasOpen] = useState(open);
@@ -37,7 +37,7 @@ export function Menu({ open, anchorRef, onClose, label, entries, align }: Props)
 
   let idx = -1;
   return (
-    <Popover open={open} anchorRef={anchorRef} onClose={onClose} label={label} role='menu' align={align} initialFocus='first'>
+    <Popover open={open} anchorRef={anchorRef} onClose={onClose} label={label} role='menu' align={align} matchWidth={matchWidth} initialFocus='first'>
       <div className='menu' onKeyDown={onKeyDown}>
         {entries.map((e, n) => {
           if (e.type === 'separator') return <div key={`sep-${n}`} role='separator' className='menu-sep' />;
