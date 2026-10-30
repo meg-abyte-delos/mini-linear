@@ -646,7 +646,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
-      <div className='card-meta'><span className='card-prio' title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
+      <div className='card-meta'><span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
   );
 
