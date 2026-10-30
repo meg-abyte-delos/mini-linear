@@ -27,8 +27,9 @@
 .re { position:relative; }
 /* Linear: no reserved toolbar row between title and description. The bar floats above the editor's top-right
    corner while the editor has focus, so the description sits right under the title (was a 32px blank strip). */
-.re-bar { position:absolute; z-index:2; right:0; bottom:calc(100% + var(--sp-1)); display:flex; align-items:center; gap:2px; min-height:var(--re-bar-h); padding:0 2px; background:var(--raised); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); opacity:0; visibility:hidden; transition:opacity var(--dur-fast) var(--ease-out), visibility 0s linear var(--dur-fast); }
-.re:focus-within .re-bar { opacity:1; visibility:visible; transition:opacity var(--dur-fast) var(--ease-out), visibility 0s; }
+.re-bar { position:absolute; z-index:2; right:0; bottom:calc(100% + var(--sp-1)); display:flex; align-items:center; gap:2px; min-height:var(--re-bar-h); padding:0 2px; background:var(--raised); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); opacity:0; pointer-events:none; transition:opacity var(--dur-fast) var(--ease-out); }
+/* Stays in the a11y tree and focusable at rest (keyboard reaches it); shown on editor or bar focus. */
+.re:focus-within .re-bar, .re-bar:focus-within { opacity:1; pointer-events:auto; }
 .re[data-readonly] .re-bar { display:none; }
 .idp .re-btn { display:inline-grid; place-items:center; width:var(--re-btn); height:var(--re-btn); padding:0; border:0; border-radius:var(--r-sm); color:var(--muted-strong); transition:background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
 .idp .re-btn:hover { background:var(--hover); color:var(--fg); }
