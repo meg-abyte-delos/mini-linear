@@ -12,7 +12,7 @@ test.describe.configure({ mode: 'serial' });
 test.use({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark', reducedMotion: 'reduce' });
 
 const TODAY = 'today=2026-10-27';
-const SHOT = { maxDiffPixelRatio: 0.015, animations: 'disabled' as const, caret: 'hide' as const };
+const SHOT = { maxDiffPixelRatio: 0.002, animations: 'disabled' as const, caret: 'hide' as const };
 
 async function ready(page: Page, url: string, waitFor: () => Promise<unknown>) {
   await page.goto(url);
