@@ -15,6 +15,7 @@ import './ui-rings.css';
 import './ui-burndown.css';
 import './ui-bulk.css';
 import './ui-sidebar.css';
+import './tokens.css';
 import { cookies } from 'next/headers';
 
 export const metadata = { title: 'Mini-Linear' };
