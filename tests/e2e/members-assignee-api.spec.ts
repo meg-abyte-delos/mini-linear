@@ -54,11 +54,35 @@ test('issue page timeline names the actor (no Someone) once members are loaded',
   // The feed refetches asynchronously after the PATCH (flaked once on main 9d74509: only "created the issue" within 5s).
   // The title change is already persisted, so retry with a reload as fallback instead of trusting a single refetch.
   await expect(async () => {
-    if (!(await feed.innerText().catch(() => '')).match(/changed (the )?title/)) {
+    if (!(await feed.innerText().catch(() => '')).includes('changed title from')) {
       await page.reload();
       await page.waitForSelector('html[data-ready]');
     }
-    await expect(page.getByRole('list', { name: 'Activity' })).toContainText(/changed (the )?title/, { timeout: 2000 });
+    await expect(page.getByRole('list', { name: 'Activity' })).toContainText('changed title from', { timeout: 2000 });
   }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
   await expect(feed).not.toContainText('Someone');
+});
+
+// Strict counterpart of the test above (which tolerates a reload): after a PATCH the open issue page refetches its activity feed by itself.
+// No reload, no retry-with-reload: the entry must show up within the timeout, otherwise the live refetch is broken.
+// FIXME(front): fails on main 3ef3296. After a title edit the open issue page keeps its optimistic entry ("changed the title") for 10 s+ and never shows the
+// server entry ("changed title from X to Y", #192): the activity feed is not refetched/reconciled until a reload. Un-fixme once the page refetches after a PATCH.
+test.fixme('issue page feed refetches after an edit without a reload', async ({ page }) => {
+  const teams = await (await page.request.get('/api/v1/w/demo/teams')).json();
+  const created = await page.request.post('/api/v1/w/demo/issues', { data: { team_id: teams.items[0].id, title: `Feed refetch ${Date.now()}` } });
+  const it = (await created.json()) as { identifier: string };
+  await page.goto(`/w/demo/issue/${it.identifier}`);
+  await page.waitForSelector('html[data-ready]');
+  const feed = page.getByRole('list', { name: 'Activity' });
+  await expect(feed).toContainText('created the issue');
+  let navigations = 0;
+  page.on('framenavigated', (f) => { if (f === page.mainFrame()) navigations++; });
+  const t = page.getByLabel('Title', { exact: true });
+  await t.fill('Feed refetch edited');
+  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'));
+  await t.press('Enter');
+  await saved;
+  // server wording ("changed title from X to Y", #192), not the optimistic client text: proves the feed was refetched
+  await expect(feed).toContainText('changed title from Feed refetch', { timeout: 10_000 });
+  expect(navigations, 'no reload happened').toBe(0);
 });
