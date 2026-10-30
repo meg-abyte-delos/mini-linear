@@ -130,8 +130,8 @@ describe.runIf(runIntegration)('sub-issues (parent_id)', () => {
     const hidden = await ok(A1);
     expect((await api(M2, 'GET', `${P}/issues/${hidden.body.id}/children`)).status).toBe(404);
   });
-  // BUG (open, contract A4: hidden parent => 422 same as unknown): POST /issues with a parent_id the caller cannot see (other team) returns 201, attaching under a hidden issue. it.fails flips red when fixed: then switch to it().
-  it.fails('a member of another team cannot attach a child under a hidden parent', async () => {
+  // Fixed by A4 (#231): hidden parent => 422, same as unknown.
+  it('a member of another team cannot attach a child under a hidden parent', async () => {
     const hidden = await ok(A1);
     const r = await issue(M2, { parent_id: hidden.body.id }, teamB);
     expect(r.status).toBe(422);
@@ -148,7 +148,7 @@ describe.runIf(runIntegration)('sub-issues (parent_id)', () => {
     expect(await children(M1, p.body.id)).not.toContain(c.body.id);
   });
   // BUG (open, contract A4: soft-deleted parent => 422): POST /issues under a soft-deleted parent returns 201.
-  it.fails('a soft-deleted parent is refused as a new parent (422); existing children keep their parent_id', async () => {
+  it('a soft-deleted parent is refused as a new parent (422); existing children keep their parent_id', async () => {
     const p = await ok(M1); const c = await ok(M1, { parent_id: p.body.id });
     expect([200, 204]).toContain((await api(M1, 'DELETE', `${P}/issues/${p.body.id}`, undefined, { 'if-match': ver(p.etag) })).status);
     expect((await (await api(M1, 'GET', `${P}/issues/${c.body.id}`)).json()).parent_id).toBe(p.body.id);
