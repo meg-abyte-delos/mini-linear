@@ -40,6 +40,8 @@ export function detailApi(slug: string, f: Fetch = (...a) => fetch(...a)) {
     react: (cid: string, emoji: string, on: boolean) => call<null>(f, `${b}/comments/${cid}/reactions`, j(on ? 'POST' : 'DELETE', { emoji })),
     archive: (id: string, on: boolean) => call<unknown>(f, `${b}/issues/${id}/${on ? 'archive' : 'unarchive'}`, j('POST')),
     remove: (id: string, version: number) => call<null>(f, `${b}/issues/${id}`, { ...j('DELETE'), headers: { 'if-match': `"${version}"` } }),
+    subscription: (id: string) => call<{ subscribed: boolean }>(f, `${b}/issues/${id}/subscription`),
+    subscribe: (id: string, on: boolean) => call<{ subscribed: boolean } | null>(f, `${b}/issues/${id}/subscription`, j(on ? 'PUT' : 'DELETE')),
     restore: (id: string) => call<unknown>(f, `${b}/issues/${id}/restore`, j('POST')),
   };
 }

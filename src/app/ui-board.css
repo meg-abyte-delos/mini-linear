@@ -39,3 +39,22 @@
 /* Empty column: quiet drop target instead of bare text. */
 .board .col-empty { margin: 6px 4px 0; padding: var(--sp-3) var(--sp-2); text-align: center; border: 1px dashed color-mix(in srgb, var(--fg) 10%, transparent); border-radius: 6px; }
 .board .col.over-zone .col-empty { border-color: var(--accent); }
+
+/* Wave C: card density + drag motion, matched to Linear's board. */
+[data-theme='dark'] .board .card, .board .card { box-shadow: 0 1px 1px color-mix(in srgb, #000 20%, transparent); }
+.board .card-title { color: color-mix(in srgb, var(--fg) 88%, var(--bg)); }
+.board .card-prio[data-none] { border-color: transparent; color: var(--muted); }
+.board .card { position: relative; transition: border-color .12s ease, background-color .12s ease, opacity .12s ease; }
+
+/* Drag source stays in place as a quiet slot (the browser drag image is the moving copy). */
+.board .card.dragging { transform: none; opacity: 1; background: transparent; border: 1px dashed color-mix(in srgb, var(--fg) 16%, transparent); box-shadow: none; }
+.board .card.dragging > * { opacity: .35; }
+
+/* Drop target: a 2px accent line in the gap above the card, not an inset shadow over its content. */
+.board .card.over::before { content: ''; position: absolute; left: 0; right: 0; top: -5px; height: 2px; border-radius: 1px; background: var(--accent); }
+.board .card.over { box-shadow: 0 1px 1px color-mix(in srgb, #000 20%, transparent); }
+
+/* Column hovered while dragging: soft accent tint, no dashed outline. */
+.board .col.over-zone { outline: 0; background: color-mix(in srgb, var(--accent) 6%, transparent); transition: background-color .12s ease; }
+
+@media (prefers-reduced-motion: reduce) { .board .card, .board .col, .board .col-act { transition: none; } }

@@ -67,10 +67,10 @@ test('"..." menu: items, order, danger Delete last behind a separator; ArrowDown
   await btn.focus(); await page.keyboard.press('Enter');
   const menu = page.getByRole('menu', { name: `${A} actions` });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveText([/Copy link/, /Copy branch/, /Archive/, /Delete/]);
-  await expect(menu.getByRole('separator')).toHaveCount(1);
+  await expect(menu.getByRole('menuitem')).toHaveText([/Copy ID/, /Copy title/, /Copy link/, /Copy branch name/, /(Un)?subscribe/i, /Move to project/, /Make a copy/, /Archive/, /Delete/]);
+  await expect(menu.getByRole('separator')).toHaveCount(2);
   await expect(menu.getByRole('menuitem').first()).toBeFocused();
-  await page.keyboard.press('ArrowDown'); await expect(menu.getByRole('menuitem', { name: /Copy branch/ })).toBeFocused();
+  await page.keyboard.press('ArrowDown'); await expect(menu.getByRole('menuitem', { name: /Copy title/ })).toBeFocused();
   await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp');
   await expect(menu.getByRole('menuitem', { name: /Delete/ })).toBeFocused();
   await page.keyboard.press('ArrowDown'); await expect(menu.getByRole('menuitem').first()).toBeFocused();
@@ -118,9 +118,11 @@ test.fixme('archived issue page survives a reload (deep link)', async ({ page })
 test('delete from the menu: confirm dialog, issue lands in trash on the API, Restore visible and works (PR text: "Restore stays visible when in trash")', async ({ page }) => {
   const D = await mk(page, `hdr del ${stamp}`);
   await open(page, D);
-  let msg = ''; page.once('dialog', (d) => { msg = d.message(); void d.accept(); });
   await more(page).click(); await page.getByRole('menuitem', { name: 'Delete' }).click();
-  expect(msg).toContain(D);
+  const dlg = page.getByRole('alertdialog', { name: new RegExp(D) });
+  await expect(dlg).toBeVisible();
+  await dlg.getByRole('button', { name: 'Delete' }).click();
+  await expect(dlg).toBeHidden();
   await expect(page.locator('.idp-banner')).toContainText('trash');
   await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible();
   await page.getByRole('button', { name: 'Restore' }).click();
@@ -129,8 +131,8 @@ test('delete from the menu: confirm dialog, issue lands in trash on the API, Res
 
 test('delete: dismissing the confirm keeps the issue untouched', async ({ page }) => {
   await open(page, A);
-  page.once('dialog', (d) => void d.dismiss());
   await more(page).click(); await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
   await expect(page.locator('.idp-banner')).toHaveCount(0);
   await expect(page.getByLabel('Title', { exact: true })).toBeEditable();
 });
