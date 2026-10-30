@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { initialsOf } from '../../src/lib/member-hue';
-import { RICH_ISSUES, RICH_COMMENTS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, RICH_USERS, issueByKey, mentionsOf, commentAt } from '../../scripts/demo-rich-data';
+import { RICH_ISSUES, RICH_COMMENTS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, RICH_USERS, issueByKey, mentionsOf, commentAt, atDay, lastStateChangeAt } from '../../scripts/demo-rich-data';
 
 const PROJECT_NAMES = ['Mini Linear', 'Cronkit', 'Design System']; // projects created by the demo seeds
 const BASE_RETITLED = 'Port the cron parser from the prototype'; // DEM-7, retitled by the rich seed
@@ -112,5 +112,15 @@ describe('seed-demo-rich guards', () => {
   it('requires the demo password', () => {
     const r = run({ DATABASE_OWNER_URL: 'postgres://o:p@localhost:5432/x' });
     expect(r.status).not.toBe(0); expect(r.stderr).toContain('SEED_DEMO_PASSWORD is required');
+  });
+});
+
+describe('seed v2 activity timeline', () => {
+  it('the last state change of every issue falls after its creation and before its last update, so the spread trail always fits', () => {
+    for (const r of RICH_ISSUES) {
+      const created = atDay(r.day, 0, (r.n * 7) % 50), last = lastStateChangeAt(r), updated = atDay(r.day + r.age, 6);
+      expect(last >= created, `${r.team}-${r.n} last>=created`).toBe(true);
+      expect(last <= updated, `${r.team}-${r.n} last<=updated`).toBe(true);
+    }
   });
 });

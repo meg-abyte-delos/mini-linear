@@ -4,7 +4,7 @@
 import pg from 'pg';
 import { hashPassword } from '../src/lib/auth/password';
 import { id, USERS, PROJECTS, CYCLES, LABELS } from './demo-ids';
-import { RICH_ISSUES, RICH_COMMENTS, RICH_USERS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, STATE_KEYS, atDay, commentAt, issueByKey, mentionsOf, type Who, type TeamKey } from './demo-rich-data';
+import { RICH_ISSUES, RICH_COMMENTS, RICH_USERS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, STATE_KEYS, atDay, commentAt, lastStateChangeAt, issueByKey, mentionsOf, type Who, type TeamKey } from './demo-rich-data';
 
 const url = process.env.DATABASE_OWNER_URL;
 if (!url) throw new Error('DATABASE_OWNER_URL is required');
@@ -79,6 +79,9 @@ try {
   }
   const CY = { c1: CYCLES.c1, c2: CYCLES.c2, c3: CYCLES.c3 } as const;
   let ev = 0;
+  // Reseeds rewrite the trail: audit rows of seeded issues and comments left by older seed versions (other ids or timestamps) would otherwise stay and leave a half history.
+  const seeded = [...RICH_ISSUES.map((r) => (r.team === 'DEM' ? id(100 + r.n) : id(3000 + r.key))), ...RICH_COMMENTS.map((m) => id(2000 + m.k))];
+  await c.query("delete from audit_events where workspace_id = $1 and entity in ('issue','comment') and entity_id = any($2::uuid[]) and id >= $3 and id < $4", [W, seeded, id(50000), id(120000)]);
   const audit = (n: number, actor: string, entity: string, entityId: string, action: string, at: string, diff: object) =>
     c.query('insert into audit_events (id, workspace_id, actor_id, entity, entity_id, action, diff, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict (id) do nothing', [id(50000 + n * 20 + ev++), W, actor, entity, entityId, action, JSON.stringify(diff), at]);
   // Ids: DEM-n keeps id(100+n) (base seed + earlier rich seed); other teams use id(3000 + key). `key` also numbers the audit events.
@@ -92,20 +95,26 @@ try {
       [iid, W, team, r.n, r.title, r.desc, stateId(r.team, r.state), r.prio, `a${String(r.key).padStart(3, '0')}`, creator, assignee, r.pj ? PJ[r.pj] : null, r.cy ? CY[r.cy] : null, r.est ?? null, r.due ?? null, created, atDay(r.day + r.age, 6)]);
     await c.query('delete from issue_labels where issue_id = $1 and label_id <> all($2::uuid[])', [iid, r.labels.map((l) => lab[l])]);
     for (const l of r.labels) await c.query('insert into issue_labels (workspace_id, issue_id, label_id) values ($1,$2,$3) on conflict do nothing', [W, iid, lab[l]]);
-    // Audit trail: created as backlog, then one step per state up to the current one; assignee, cycle, project, labels and an urgent bump where they apply.
+    // Audit trail: created as backlog, then assignee, cycle, project, labels, an urgent bump and one step per state up to the current one.
+    // After the create, every event is spread evenly (minutes to days) between the creation and the last state change, so the feed reads in order.
     ev = 0;
     await audit(r.key, creator, 'issue', iid, 'create', created, { title: { before: null, after: r.title }, status: { before: null, after: 'backlog' }, priority: { before: null, after: r.prio === 1 ? 2 : r.prio } });
-    if (r.who) await audit(r.key, creator, 'issue', iid, 'update', atDay(r.day, 1), { assignee_id: { before: null, after: assignee } });
-    if (r.cy) await audit(r.key, creator, 'issue', iid, 'update', atDay(r.day, 1, 5), { cycle_id: { before: null, after: CY[r.cy] } });
-    if (r.pj) await audit(r.key, creator, 'issue', iid, 'update', atDay(r.day, 1, 10), { project_id: { before: null, after: PJ[r.pj] } });
-    for (const l of r.labels) await audit(r.key, creator, 'issue', iid, 'update', atDay(r.day, 1, 20), { label_ids: { before: [], after: [lab[l]] } });
-    if (r.prio === 1) await audit(r.key, creator, 'issue', iid, 'update', atDay(r.day, 2), { priority: { before: 2, after: 1 } });
+    const steps: [string, object][] = [];
+    if (r.who) steps.push([creator, { assignee_id: { before: null, after: assignee } }]);
+    if (r.cy) steps.push([creator, { cycle_id: { before: null, after: CY[r.cy] } }]);
+    if (r.pj) steps.push([creator, { project_id: { before: null, after: PJ[r.pj] } }]);
+    for (const l of r.labels) steps.push([creator, { label_ids: { before: [], after: [lab[l]] } }]);
+    if (r.prio === 1) steps.push([creator, { priority: { before: 2, after: 1 } }]);
     const path = r.state === 5 ? [1, 5] : Array.from({ length: r.state }, (_, k) => k + 1);
     let prev = 0;
-    for (const [k, s] of path.entries()) {
-      const when = atDay(r.day + Math.ceil(((k + 1) * r.age) / path.length), 3 + k);
-      await audit(r.key, r.who ? uid[r.who] : creator, 'issue', iid, 'update', when, { status: { before: STATE_KEYS[prev], after: STATE_KEYS[s] }, state_id: { before: stateId(r.team, prev), after: stateId(r.team, s) } });
+    for (const s of path) {
+      steps.push([r.who ? uid[r.who] : creator, { status: { before: STATE_KEYS[prev], after: STATE_KEYS[s] }, state_id: { before: stateId(r.team, prev), after: stateId(r.team, s) } }]);
       prev = s;
+    }
+    const t0 = Date.parse(created), t1 = Math.max(Date.parse(lastStateChangeAt(r)), t0 + steps.length * 60000);
+    for (const [j, [actor, diff]] of steps.entries()) {
+      const ms = j === steps.length - 1 ? t1 : t0 + Math.round((((j + 1) / steps.length) * (t1 - t0)) / 60000) * 60000;
+      await audit(r.key, actor, 'issue', iid, 'update', new Date(ms).toISOString(), diff);
     }
   }
   for (const t of Object.values(TEAMS)) await c.query('update teams set issue_seq = greatest(issue_seq, $2) where id = $1', [t.id, RICH_ISSUES.filter((x) => TEAMS[x.team].id === t.id).reduce((a, r) => Math.max(a, r.n), 0)]);
