@@ -132,10 +132,10 @@ export function Members({ slug }: { slug: string }) {
                   <tr key={m.user_id} data-testid='member-row'>
                     <td><span className='set-person'><UserAvatar userId={m.user_id} name={name} size='md' /><span className='set-person-text'>{name}{self && <span className='set-you'>you</span>}</span></span></td>
                     <td className='set-muted'>{m.email}</td>
-                    <td>{admin && !self && m.role !== 'owner'
+                    <td>{admin && !self && S.canManageMember(role, m.role)
                       ? <select className='set-select set-role-select' aria-label={`Role for ${name}`} value={m.role}
                           onChange={(e) => void act(S.setMemberRole(slug, m.user_id, e.target.value as S.WorkspaceRole), `${name} is now ${e.target.value}`)}>
-                          {ROLES.filter((r) => r !== 'admin' || role === 'owner' || m.role === 'admin').map((r) => <option key={r} value={r}>{cap(r)}</option>)}
+                          {S.assignableRoles(role).map((r: S.AssignableRole) => <option key={r} value={r}>{cap(r)}</option>)}
                         </select>
                       : <span className='set-role' data-role={m.role}>{m.role}</span>}</td>
                     <td><span className='set-state'>Active</span></td>
