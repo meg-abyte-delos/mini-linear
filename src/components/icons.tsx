@@ -10,8 +10,8 @@ export function StatusIcon({ status }: { status: Status }) {
       {status === 'todo' && <circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' />}
       {status === 'in_progress' && (<><circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' /><path d={pie(0.5)} className='fill' /></>)}
       {status === 'in_review' && (<><circle cx='7' cy='7' r='6' fill='none' strokeWidth='1.5' /><path d={pie(0.75)} className='fill' /></>)}
-      {status === 'done' && (<><circle cx='7' cy='7' r='6.75' className='fill' stroke='none' /><path d='M4.5 7.1 6.3 8.9 9.6 5.4' fill='none' stroke='var(--bg, #08090a)' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' /></>)}
-      {status === 'canceled' && (<><circle cx='7' cy='7' r='6.75' className='fill' stroke='none' /><path d='M5 5 9 9M9 5 5 9' fill='none' stroke='var(--bg, #08090a)' strokeWidth='1.5' strokeLinecap='round' /></>)}
+      {status === 'done' && (<><circle cx='7' cy='7' r='6.75' className='fill' stroke='none' /><path d='M4.5 7.1 6.3 8.9 9.6 5.4' fill='none' stroke='var(--bg)' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round' /></>)}
+      {status === 'canceled' && (<><circle cx='7' cy='7' r='6.75' className='fill' stroke='none' /><path d='M5 5 9 9M9 5 5 9' fill='none' stroke='var(--bg)' strokeWidth='1.5' strokeLinecap='round' /></>)}
     </svg>
   );
 }
@@ -19,7 +19,7 @@ export function StatusIcon({ status }: { status: Status }) {
 // Priority: Linear bars (3 x 3px, heights 4/7/10, baseline 12), urgent = rounded square with "!".
 export function PriorityIcon({ priority }: { priority: Issue['priority'] }) {
   if (priority === 0) return (<svg className='pi' width='14' height='14' viewBox='0 0 14 14' aria-hidden='true' focusable='false'><g className='dimfill'><rect x='1.5' y='6.25' width='2.5' height='1.5' rx='.5' /><rect x='5.75' y='6.25' width='2.5' height='1.5' rx='.5' /><rect x='10' y='6.25' width='2.5' height='1.5' rx='.5' /></g></svg>);
-  if (priority === 1) return (<svg className='pi pi-urgent' width='14' height='14' viewBox='0 0 14 14' aria-hidden='true' focusable='false'><rect x='1' y='1' width='12' height='12' rx='3' className='fill' /><path d='M7 3.8v3.9' stroke='var(--bg, #08090a)' strokeWidth='1.6' strokeLinecap='round' /><circle cx='7' cy='10.1' r='.95' fill='var(--bg, #08090a)' /></svg>);
+  if (priority === 1) return (<svg className='pi pi-urgent' width='14' height='14' viewBox='0 0 14 14' aria-hidden='true' focusable='false'><rect x='1' y='1' width='12' height='12' rx='3' className='fill' /><path d='M7 3.8v3.9' stroke='var(--bg)' strokeWidth='1.6' strokeLinecap='round' /><circle cx='7' cy='10.1' r='.95' fill='var(--bg)' /></svg>);
   const n = 5 - priority;
   return (
     <svg className='pi' width='14' height='14' viewBox='0 0 14 14' aria-hidden='true' focusable='false'>
@@ -45,7 +45,6 @@ const PATHS = {
   filter: 'M3 6h18M7 12h10M10 18h4',
   display: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4',
   cycle: 'M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8M21 3v5h-5',
-  compose: 'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z',
 } as const;
 
 export type IconName = keyof typeof PATHS;
