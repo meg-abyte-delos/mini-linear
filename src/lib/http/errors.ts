@@ -1,8 +1,8 @@
 import { ZodError } from "zod";
 import { randomUUID } from "node:crypto";
 
-export type ErrorCode = "bad_request" | "unauthenticated" | "forbidden" | "not_found" | "conflict" | "precondition_failed" | "precondition_required" | "validation_failed" | "rate_limited" | "internal" | "INVITE_INVALID";
-const STATUS: Record<ErrorCode, number> = { bad_request: 400, unauthenticated: 401, forbidden: 403, not_found: 404, conflict: 409, precondition_failed: 412, precondition_required: 428, validation_failed: 422, rate_limited: 429, internal: 500, INVITE_INVALID: 404 };
+export type ErrorCode = "bad_request" | "unauthenticated" | "forbidden" | "not_found" | "conflict" | "precondition_failed" | "precondition_required" | "validation_failed" | "rate_limited" | "internal" | "INVITE_INVALID" | "payload_too_large" | "unsupported_media_type";
+const STATUS: Record<ErrorCode, number> = { bad_request: 400, unauthenticated: 401, forbidden: 403, not_found: 404, conflict: 409, precondition_failed: 412, precondition_required: 428, validation_failed: 422, rate_limited: 429, internal: 500, INVITE_INVALID: 404, payload_too_large: 413, unsupported_media_type: 415 };
 
 export class ApiError extends Error {
   constructor(public code: ErrorCode, message: string = code, public details?: unknown) { super(message); }
