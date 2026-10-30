@@ -7,6 +7,7 @@
 \if :{?slug} \else \set slug perf \endif
 \if :{?issues} \else \set issues 5000 \endif
 BEGIN;
+DO $$ BEGIN IF current_database() !~ 'perf|test|dev' THEN RAISE EXCEPTION 'perf-seed refused: database % is not perf/test/dev', current_database(); END IF; END $$;
 SELECT gen_random_uuid() AS ws \gset
 SELECT set_config('app.workspace_id', :'ws', true);
 SELECT setseed(0.42);

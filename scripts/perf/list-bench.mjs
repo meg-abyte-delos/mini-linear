@@ -24,9 +24,23 @@ async function one(url, fn) { const c = new pg.Client({ connectionString: url })
 async function setup() {
   const sup = process.env.PGSUPER_URL; if (!sup) throw new Error("--setup needs PGSUPER_URL (superuser URL on any db)");
   const DB = "ml_perf_bench", OWNER_PW = "ci_only", APP_PW = "ci_only_app";
+  // Safety: --setup drops/creates a database and creates roles with throwaway passwords. Local clusters only.
+  const su = new URL(sup); const host = su.hostname;
+  const local = host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]" || host === "" || host.startsWith("/") || su.searchParams.has("host");
+  if (!local && process.env.PERF_ALLOW_REMOTE !== "1") throw new Error(`--setup refused: PGSUPER_URL host "${host}" is not local (set PERF_ALLOW_REMOTE=1 only for a throwaway cluster)`);
+  // Never alter pre-existing roles: their passwords are not ours to reset.
+  const pre = await one(sup, (c) => c.query("select rolname from pg_roles where rolname in ('owner','app_user')"));
+  if (pre.rows.length) throw new Error(`--setup refused: role(s) already exist on this cluster (${pre.rows.map((r) => r.rolname).join(", ")}); use DATABASE_URL + WS_ID mode instead`);
+  const created = { roles: false };
+  const drop = async () => one(sup, async (c) => {
+    await c.query(`DROP DATABASE IF EXISTS ${DB}`);
+    if (created.roles) for (const r of ["app_user", "owner"]) await c.query(`DROP ROLE IF EXISTS ${r}`).catch(() => {});
+  });
+  try {
   await one(sup, async (c) => {
     await c.query(`DROP DATABASE IF EXISTS ${DB}`);
-    await c.query(`DO $$ BEGIN IF NOT EXISTS (select 1 from pg_roles where rolname='owner') THEN CREATE ROLE owner LOGIN PASSWORD '${OWNER_PW}' NOSUPERUSER NOBYPASSRLS CREATEROLE; END IF; END $$`);
+    await c.query(`CREATE ROLE owner LOGIN PASSWORD '${OWNER_PW}' NOSUPERUSER NOBYPASSRLS CREATEROLE`);
+    created.roles = true;
     await c.query(`CREATE DATABASE ${DB} OWNER owner`);
   });
   const owner = `postgres://owner:${OWNER_PW}@${new URL(sup).host}/${DB}`;
@@ -44,7 +58,8 @@ async function setup() {
     .join("\n").replaceAll(":'ws'", `'${ws}'`).replaceAll(":'slug'", "'perf'").replaceAll(":issues", String(ISSUES));
   const t0 = Date.now(); await one(owner, (c) => c.query(sql));
   console.log(`seeded ${ISSUES} issues in ${((Date.now() - t0) / 1000).toFixed(1)}s, workspace ${ws}`);
-  return { app: `postgres://app_user:${APP_PW}@${new URL(sup).host}/${DB}`, ws, drop: async () => one(sup, (c) => c.query(`DROP DATABASE IF EXISTS ${DB}`)) };
+  return { app: `postgres://app_user:${APP_PW}@${new URL(sup).host}/${DB}`, ws, drop };
+  } catch (e) { await drop().catch(() => {}); throw e; } // no half-built scratch DB or roles left behind
 }
 
 const SEL = `select i.*, t.key as team_key, coalesce((select array_agg(label_id order by label_id) from issue_labels where issue_id = i.id), '{}') as label_ids,
