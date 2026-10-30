@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mockInboxClient, httpInboxClient, snoozePresets, groupByIssue, shortWhen, whoLabel, type Notif } from '../../src/lib/inbox-client';
+import { mockInboxClient, httpInboxClient, snoozePresets, groupByIssue, unreadRows, shortWhen, whoLabel, type Notif } from '../../src/lib/inbox-client';
 
 describe('snoozePresets', () => {
   it('computes later/tomorrow/next Monday relative to now', () => {
@@ -42,7 +42,8 @@ describe('http inbox client', () => {
     const c = httpInboxClient('acme', f);
     await c.list('archived'); await c.list('snoozed'); await c.list('unread'); await c.putPrefs({ mention: { email: true } });
     expect(urls).toEqual([
-      'GET /api/v1/w/acme/notifications?limit=100&archived=true', 'GET /api/v1/w/acme/notifications?limit=100&snoozed=true',
+      'GET /api/v1/w/acme/notifications?limit=100&archived=true', 'GET /api/v1/w/acme/notifications?limit=100',
+      'GET /api/v1/w/acme/notifications?limit=100&snoozed=true', 'GET /api/v1/w/acme/notifications?limit=100',
       'GET /api/v1/w/acme/notifications?limit=100&unread=true', 'PUT /api/v1/w/acme/notification-preferences']);
   });
 });
@@ -75,6 +76,11 @@ describe('shortWhen', () => {
     expect(shortWhen(new Date(2026, 9, 28, 10, 5).toISOString(), now)).toBe('Oct 28, 10:05');
     expect(shortWhen(new Date(2025, 11, 1, 9, 0).toISOString(), now)).toBe('Dec 1, 2025, 09:00');
   });
+  it('never says just now for a future date (Snoozed until)', () => {
+    expect(shortWhen(new Date(now + 30e3).toISOString(), now)).toBe('in 1m');
+    expect(shortWhen(new Date(now + 2 * 3600e3 + 60e3).toISOString(), now)).toBe('in 2h');
+    expect(shortWhen(new Date(2026, 10, 2, 9, 0).toISOString(), now)).toBe('Nov 2, 09:00');
+  });
 });
 
 describe('whoLabel', () => {
@@ -82,5 +88,12 @@ describe('whoLabel', () => {
     expect(whoLabel(notif('a', 'i', '2026-10-30T08:00:00Z', null, { type: 'due_soon', actor: null, actor_id: null, kind: 'system' }))).toBe('Due soon');
     expect(whoLabel(notif('a', 'i', '2026-10-30T08:00:00Z', null))).toBe('sam commented');
     expect(whoLabel(notif('a', 'i', '2026-10-30T08:00:00Z', null, { actor: null, actor_id: null }))).toBe('Someone commented');
+  });
+});
+
+describe('unreadRows', () => {
+  it('counts unread rows after grouping by issue, not events', () => {
+    const items = [notif('a', 'i1', '2026-10-30T08:00:00Z', null), notif('b', 'i1', '2026-10-30T09:00:00Z', null), notif('c', 'i2', '2026-10-30T07:00:00Z', null), notif('d', 'i3', '2026-10-30T06:00:00Z', '2026-10-30T06:30:00Z')];
+    expect(unreadRows(items)).toBe(2);
   });
 });

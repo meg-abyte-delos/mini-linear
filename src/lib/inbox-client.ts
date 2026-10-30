@@ -45,10 +45,14 @@ export function httpInboxClient(slug: string, f: typeof fetch = fetch): InboxCli
       const r = await f(`${b}?limit=100${qs}`);
       if (!r.ok) throw new Error('list failed');
       const j = (await r.json()) as { items: Notif[]; unread_count: number };
-      return { items: j.items, unread_count: j.unread_count };
+      // The badge counts unread rows (one per issue), like the dots; archived/snoozed tabs ask the active list.
+      return { items: j.items, unread_count: tab === 'all' || tab === 'unread' ? unreadRows(j.items) : await this.unreadCount() };
     },
     async unreadCount() {
-      try { const r = await f(`${b}/unread-count`); return r.ok ? ((await r.json()) as { unread_count: number }).unread_count : 0; } catch { return 0; }
+      try {
+        const r = await f(`${b}?limit=100`);
+        return r.ok ? unreadRows(((await r.json()) as { items: Notif[] }).items) : 0;
+      } catch { return 0; }
     },
     async act(id, action, until) {
       try {
@@ -80,7 +84,7 @@ export function mockInboxClient(): InboxClient {
   const isSnoozed = (n: Notif) => !!n.snoozed_until && new Date(n.snoozed_until).getTime() > Date.now();
   const active = () => rows.filter((n) => !n.archived_at && !isSnoozed(n));
   let prefs = Object.fromEntries(NOTIF_TYPES.map((t) => [t, { in_app: true, email: false }])) as PrefMap;
-  const unread = () => active().filter((n) => !n.read_at).length;
+  const unread = () => unreadRows(active());
   return {
     async list(tab = 'all') {
       const items = tab === 'archived' ? rows.filter((n) => n.archived_at) : tab === 'snoozed' ? rows.filter((n) => !n.archived_at && isSnoozed(n)) : tab === 'unread' ? active().filter((n) => !n.read_at) : active();
@@ -118,10 +122,16 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 /** Short Linear-style timestamp: "just now", "5m ago", "3h ago", then "Oct 30, 10:00" (year added when not the current one). */
 export function shortWhen(iso: string, nowMs = Date.now()): string {
   const d = new Date(iso);
-  const s = Math.max(0, Math.round((nowMs - d.getTime()) / 1000));
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  const diff = Math.round((nowMs - d.getTime()) / 1000);
+  if (diff < 0) {
+    const f = -diff; // future (Snoozed until): relative within a day, absolute beyond
+    if (f < 3600) return `in ${Math.max(1, Math.ceil(f / 60))}m`;
+    if (f < 86400) return `in ${Math.floor(f / 3600)}h`;
+  } else {
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  }
   const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   const yr = d.getFullYear() === new Date(nowMs).getFullYear() ? '' : `, ${d.getFullYear()}`;
   return `${MONTHS[d.getMonth()]} ${d.getDate()}${yr}, ${hm}`;
@@ -141,4 +151,9 @@ export function groupByIssue(items: Notif[]): { rows: Notif[]; members: Map<stri
   });
   rows.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return { rows, members };
+}
+
+/** Unread rows once grouped one per issue: what the list shows as dots and the sidebar badge shows. */
+export function unreadRows(items: Notif[]): number {
+  return groupByIssue(items).rows.filter((n) => !n.read_at).length;
 }
