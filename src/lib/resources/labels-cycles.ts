@@ -62,6 +62,7 @@ export const patchLabel = (req: Request, slug: string, rawId: string) => withWor
   await audit(ctx, "label", id, "update", diffOf(before, row, LABEL_F));
   return out(row);
 });
+// Note: one audit row per affected issue (N inserts, not batched). Label deletes are rare and the per-issue rows are what the activity feed reads.
 export const deleteLabel = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const id = parseId(rawId), want = ifMatchVersion(req), before = await getLabel(ctx, id);
   await assertScopeAdmin(ctx, before.team_id as string | null);
@@ -119,6 +120,8 @@ export const patchCycle = (req: Request, slug: string, rawId: string) => withWor
   await audit(ctx, "cycle", id, "update", diffOf(before, row, CYCLE_F));
   return out(row);
 });
+// Note: deleting a cycle does not bump the version of its issues. issues.cycle_id is ON DELETE SET NULL (a DB-side cascade), so the
+// row version only moves on app-level updates; the change is still recorded as an activity event per issue. Same for project delete.
 export const deleteCycle = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "admin");
   const id = parseId(rawId), want = ifMatchVersion(req), before = await getCycle(ctx, id);

@@ -69,7 +69,7 @@ type Item = { action: string; entity: string; summary: string; actor_id: string;
     // a no-op patch must not add an empty "updated the issue" event
     const n = items.length; await patch(i.id, (await (await call(H.getIssue as Fn, seed.a.member, "GET", undefined, null, seed.a.slug, i.id)).json()).version, { priority: 1 });
     expect((await feed(i.id)).filter((x) => x.action === "update" && x.changes.length === 0).length).toBe(0);
-    expect((await feed(i.id)).length).toBeGreaterThanOrEqual(n);
+    expect((await feed(i.id)).length).toBe(n);
   });
 
   it("records comments (create/edit) in the same feed without leaking the body", async () => {
