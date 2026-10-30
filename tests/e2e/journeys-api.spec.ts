@@ -28,8 +28,9 @@ const feedHas = (page: Page, text: string | RegExp) => expect(async () => {
   if (!(typeof text === 'string' ? t.includes(text) : text.test(t))) { await page.reload(); await page.waitForSelector('html[data-ready]'); }
   await expect(feed(page)).toContainText(text, { timeout: 2000 });
 }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
-async function pickFromPanel(page: Page, button: RegExp, dialog: string, option: RegExp) {
-  await page.getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: button }).click();
+// Scoped by the property row (dt label), so text inside another property button cannot match.
+async function pickFromPanel(page: Page, prop: 'Status' | 'Assignee' | 'Cycle', dialog: string, option: RegExp) {
+  await page.getByRole('complementary', { name: 'Properties' }).locator('dt', { hasText: new RegExp('^' + prop + '$') }).locator('xpath=following-sibling::dd[1]').getByRole('button').click();
   const dlg = page.getByRole('dialog', { name: dialog });
   await expect(dlg).toBeVisible();
   const w = patched(page);
@@ -50,13 +51,13 @@ test('journey: create, assign, put in a cycle, complete, and it all survives a r
   expect(it).toMatchObject({ status: 'backlog', assignee_id: null, cycle_id: null });
   await open(page, it.identifier);
 
-  await pickFromPanel(page, /Backlog/, 'Change status', /^In Progress/i);
+  await pickFromPanel(page, 'Status', 'Change status', /^In Progress/i);
   expect((await get(page, it.id)).status).toBe('in_progress');
-  await pickFromPanel(page, /Assignee|Unassigned|No assignee/i, 'Assign to', new RegExp(esc(other.display_name || nameFromEmail(other.email)), 'i'));
+  await pickFromPanel(page, 'Assignee', 'Assign to', new RegExp(esc(other.display_name || nameFromEmail(other.email)), 'i'));
   expect((await get(page, it.id)).assignee_id).toBe(other.user_id);
-  await pickFromPanel(page, /Add to cycle/, 'Move to cycle', new RegExp(esc(cyc.name)));
+  await pickFromPanel(page, 'Cycle', 'Move to cycle', new RegExp(esc(cyc.name)));
   expect((await get(page, it.id)).cycle_id).toBe(cyc.id);
-  await pickFromPanel(page, /In Progress/i, 'Change status', /^Done/i);
+  await pickFromPanel(page, 'Status', 'Change status', /^Done/i);
   expect(await get(page, it.id)).toMatchObject({ status: 'done', assignee_id: other.user_id, cycle_id: cyc.id });
 
   await feedHas(page, /changed status from In Progress to Done/);
@@ -71,9 +72,9 @@ test('journey: a cycle assignment can be cleared with "No cycle"', async ({ page
   const cyc = cycles[0]!;
   const it = await mk(page, `Journey cycle ${stamp}`);
   await open(page, it.identifier);
-  await pickFromPanel(page, /Add to cycle/, 'Move to cycle', new RegExp(esc(cyc.name)));
+  await pickFromPanel(page, 'Cycle', 'Move to cycle', new RegExp(esc(cyc.name)));
   expect((await get(page, it.id)).cycle_id).toBe(cyc.id);
-  await pickFromPanel(page, new RegExp(esc(cyc.name)), 'Move to cycle', /No cycle/);
+  await pickFromPanel(page, 'Cycle', 'Move to cycle', /No cycle/);
   expect((await get(page, it.id)).cycle_id).toBeNull();
 });
 
@@ -93,7 +94,7 @@ test('error path: a bogus status and a stranger assignee are refused', async ({ 
   const h = { 'If-Match': String(it.version) };
   expect((await page.request.patch(`${W}/issues/${it.id}`, { data: { status: 'nope' }, headers: h })).status()).toBe(422);
   const stranger = await page.request.patch(`${W}/issues/${it.id}`, { data: { assignee_id: '00000000-0000-4000-8000-0000000000aa' }, headers: h });
-  expect([404, 422]).toContain(stranger.status());
+  expect(stranger.status()).toBe(422); // validation_failed invalid assignee_id
   expect(await get(page, it.id)).toMatchObject({ status: 'backlog', assignee_id: null });
 });
 
@@ -115,20 +116,21 @@ test.describe('Invite a member', () => {
     expect((await page.request.post(`${W}/invites`, { data: { email: 'not-an-email', role: 'member' } })).status()).toBe(422);
     expect((await page.request.post(`${W}/invites`, { data: { email: email(), role: 'god' } })).status()).toBe(422);
     const inv = (await (await page.request.post(`${W}/invites`, { data: { email: email(), role: 'guest' } })).json()) as Inv;
-    expect([200, 204]).toContain((await page.request.delete(`${W}/invites/${inv.id}`)).status());
+    expect((await page.request.delete(`${W}/invites/${inv.id}`)).status()).toBe(204);
     await expect.poll(async () => (await pending(page)).some((i) => i.id === inv.id)).toBe(false);
   });
+  // mate@example.test: seeded non-admin member (scripts/demo-ids.ts, Ada Kernel), same E2E_PASSWORD as the demo user.
   test('a non-admin member cannot invite', async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const p = await ctx.newPage();
     await login(p, 'mate@example.test');
-    expect([403, 404]).toContain((await p.request.post(`${W}/invites`, { data: { email: email(), role: 'member' } })).status());
+    expect((await p.request.post(`${W}/invites`, { data: { email: email(), role: 'member' } })).status()).toBe(403);
     await ctx.close();
   });
   test('a bogus or malformed invite token is a uniform INVITE_INVALID', async ({ page }) => {
     for (const token of ['nope', 'x'.repeat(40), 12345]) {
       const r = await page.request.post('/api/v1/invites/accept', { data: { token } });
-      expect([404, 422]).toContain(r.status());
+      expect(r.status()).toBe(404); // INVITE_INVALID maps to 404
       expect(((await r.json()) as { error: { code: string } }).error.code).toBe('INVITE_INVALID');
     }
   });

@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Locator } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { settled } from './helpers/settled';
 import { resetInbox } from './reset-inbox';
@@ -30,14 +30,14 @@ async function check(page: Page, name: string, mask: Locator[] = []) {
 
 test('visual: list', async ({ page }) => {
   await ready(page, `/?${TODAY}`, () => expect(page.getByRole('option').first()).toBeVisible());
-  await check(page, 'list');
+  await check(page, 'list', [page.locator('.date')]); // created date = seed day: masked, else the baseline ages daily
 });
 
 test('visual: list with Display popover', async ({ page }) => {
   await ready(page, `/?${TODAY}`, () => expect(page.getByRole('option').first()).toBeVisible());
   await page.getByRole('button', { name: /display/i }).click();
   await settled(page);
-  await check(page, 'list-display');
+  await check(page, 'list-display', [page.locator('.date')]); // created date = seed day: masked, else the baseline ages daily
 });
 
 test('visual: board', async ({ page }) => {
