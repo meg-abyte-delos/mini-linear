@@ -18,7 +18,7 @@ const projectBody = z.object({ name: z.string().trim().min(1).max(255), descript
   status: z.enum(["backlog", "planned", "in_progress", "paused", "completed", "canceled"]),
   start_date: dateStr.nullable(), target_date: dateStr.nullable(), priority: z.number().int().min(0).max(4), member_ids: z.array(uuidSchema).max(200) }).strict();
 /** Admins/owners see every project; members see projects sharing a team with them; guests see none. */
-const pvisible = (ctx: Ctx) => atLeast(ctx.role, "admin") ? ctx.tx`true`
+export const pvisible = (ctx: Ctx) => atLeast(ctx.role, "admin") ? ctx.tx`true`
   : ctx.role === "guest" ? ctx.tx`false`
   : ctx.tx`exists (select 1 from project_teams pt join team_memberships tm on tm.team_id = pt.team_id and tm.workspace_id = pt.workspace_id
       where pt.project_id = p.id and tm.user_id = ${ctx.userId})`;

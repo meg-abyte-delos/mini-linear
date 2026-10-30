@@ -54,7 +54,7 @@ export function CyclesList({ cycles, issues, today, slug, onViewIssues }: Props)
                       {b.id !== 'past' && <span className='cy-started' title='Started'>{s.started} started</span>}
                     </span>
                     <span className='cy-progress'>
-                      <ProgressRing pct={s.pct} size={16} showPct={false} tone={b.id === 'past' ? 'muted' : undefined} label={`${s.pct}% complete, ${s.done} of ${s.total} issues`} />
+                      <ProgressRing pct={s.pct} size={16} showPct={false} tone={b.id === 'past' && s.pct < 100 ? 'muted' : undefined} label={`${s.pct}% complete, ${s.done} of ${s.total} issues`} />
                       <span className='cy-pct'>{s.pct}%</span>
                       <span className='cy-count'>{s.done}/{s.total}</span>
                     </span>
