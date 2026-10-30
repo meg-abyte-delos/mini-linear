@@ -123,3 +123,12 @@
 .board .card:not(#_):focus-visible { box-shadow: none; }
 .board .card:focus { outline: none; }
 .board .card:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: -2px; }
+
+/* Group actions: trailing spacer so the last column clears the right edge when scrolled (flex padding-right is not honoured in overflow containers). */
+.board .board-end { flex: 0 0 var(--sp-3); }
+.board .board-hidden { flex: 0 0 200px; display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-1); align-self: flex-start; }
+.board .board-hidden h3 { margin: 0; height: 36px; display: flex; align-items: center; padding: 0 var(--sp-2); font-size: var(--fs-sm, 12px); font-weight: 500; color: var(--muted); }
+.board .board-hidden-row { display: flex; align-items: center; gap: var(--sp-2); height: 28px; padding: 0 var(--sp-2); border: 0; border-radius: 4px; background: transparent; color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
+.board .board-hidden-row:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.board .board-hidden-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.board .board-hidden-row .count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }

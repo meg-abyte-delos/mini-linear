@@ -6,6 +6,7 @@ describe('computeHealth', () => {
   it('null when finished, no target, or no issues', () => {
     expect(computeHealth({ ...base, status: 'completed' }, '2026-10-20')).toBeNull();
     expect(computeHealth({ ...base, status: 'canceled' }, '2026-10-20')).toBeNull();
+    expect(computeHealth({ ...base, status: 'planned' }, '2026-10-20')).toBeNull();
     expect(computeHealth({ ...base, target_date: null }, '2026-10-20')).toBeNull();
     expect(computeHealth({ ...base, issue_count: 0, progress_pct: 0 }, '2026-10-20')).toBeNull();
   });

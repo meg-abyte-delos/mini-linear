@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
+import { initialsOf } from '../../src/lib/member-hue';
 import { RICH_ISSUES, RICH_COMMENTS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, RICH_USERS, issueByKey, mentionsOf, commentAt } from '../../scripts/demo-rich-data';
 
 const PROJECT_NAMES = ['Mini Linear', 'Cronkit', 'Design System']; // projects created by the demo seeds
@@ -29,6 +30,11 @@ describe('seed v2 data (scripts/demo-rich-data.ts)', () => {
   it('every person has a full name (first + last)', () => {
     for (const n of [...Object.values(PERSONA_NAMES), ...RICH_USERS.map((u) => u.name)]) expect(n.trim().split(/\s+/).length).toBeGreaterThanOrEqual(2);
     for (const n of Object.values(PERSONA_NAMES)) expect(n).not.toMatch(/demo|tester|viewer/i);
+  });
+  it('every person has distinct initials (the members page shows them as avatars)', () => {
+    const names = [...Object.values(PERSONA_NAMES), ...RICH_USERS.map((u) => u.name)];
+    const ini = names.map((n) => initialsOf(n));
+    expect(new Set(ini).size, ini.join(',')).toBe(names.length);
   });
   it('comments: unique keys, replies are one level deep on the same issue, mentions are known personas, threads exist', () => {
     const by = new Map(RICH_COMMENTS.map((c) => [c.k, c]));

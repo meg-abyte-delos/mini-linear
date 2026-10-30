@@ -51,12 +51,25 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
     expect(plain).not.toMatch(/[#*`>\[\]\n]|\(https|```/);
     expect(plain.startsWith("Rate limit quokka")).toBe(false);
     const all = (await search("retry")).find((x) => x.id === issueId)!.snippet;
-    expect(all).toMatch(/^<mark>Retry<\/mark> by email\. Behaviour 5 attempts per minute/);
+    expect(all).toMatch(/^<mark>Retry<\/mark> by email\. Behaviour\. 5 attempts per minute/);
+  });
+
+  it("a stripped heading or bold label keeps a separator (. or :), without doubling existing punctuation", async () => {
+    const id = randomUUID();
+    const desc = "## Behaviour\n- 5 attempts per minute\n**Scale** one to five\n## Done.\n**Note:** marmoset only\n**Solo**\nend";
+    await withWorkspace(owner, seed.a.id, async (tx) => {
+      await tx`insert into issues (id, workspace_id, team_id, number, title, description, sort_key, created_by) values (${id}, ${seed.a.id}, ${team}, 3, 'Separator check', ${desc}, 'a3', ${seed.a.admin})`;
+    });
+    const [row] = await owner<{ p: string }[]>`select search_plain(${desc}) as p`;
+    const p = row!.p;
+    expect(p).toBe("Behaviour. 5 attempts per minute Scale: one to five Done. Note: marmoset only Solo. end");
+    const h = (await search("marmoset")).find((x) => x.id === id)!;
+    expect(h.snippet.replace(/<\/?mark>/g, "")).toContain("Note: ");
   });
 
   it("project snippet is plain description text", async () => {
     const h = (await search("quokka")).find((x) => x.id === projId)!;
-    expect(h.snippet.replace(/<\/?mark>/g, "")).toBe("Heading bold quokka plan");
+    expect(h.snippet.replace(/<\/?mark>/g, "")).toBe("Heading. bold quokka plan");
   });
 
   it("cycles: upcoming soonest first, then past cycles most recent first, cursor pages consistently", async () => {
