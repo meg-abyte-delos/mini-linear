@@ -109,8 +109,12 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .state button { background:transparent; color:inherit; border:1px solid currentColor; border-radius:6px; padding:6px 12px; cursor:pointer; }
 .col-empty { color:var(--muted); font-size:12px; padding:8px; }
 .skeleton { pointer-events:none; }
+.col-list { padding-top:var(--pad-top, 0); padding-bottom:var(--pad-bottom, 0); }
 .sk { display:inline-block; height:10px; border-radius:4px; background:currentColor; opacity:.15; animation:sk 1.2s ease-in-out infinite; }
 .sk-s { width:14px; margin-right:12px; }
+/* Widths per row (was inline style, blocked by CSP style-src): 40 + ((n*17) % 35) */
+.sk-l[data-n='0'] { width:40%; } .sk-l[data-n='1'] { width:57%; } .sk-l[data-n='2'] { width:74%; } .sk-l[data-n='3'] { width:56%; }
+.sk-l[data-n='4'] { width:73%; } .sk-l[data-n='5'] { width:55%; } .sk-l[data-n='6'] { width:72%; } .sk-l[data-n='7'] { width:54%; }
 @keyframes sk { 50% { opacity:.06; } }
 @media (prefers-reduced-motion: reduce) { .sk { animation:none; } }
 

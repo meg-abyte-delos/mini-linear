@@ -7,7 +7,6 @@ import { MOCK_PEOPLE, findPerson, type Person } from '@/lib/people';
 import { fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
 import { barFor, isOverdue, monthTicks, projectProgress, roadmapRange, timelineWidth, sortProjects, statusLabel, todayPct } from '@/lib/roadmap';
 
-type Row = ProjectMeta & { health?: 'on_track' | 'at_risk' | 'off_track' | null; priority?: 0 | 1 | 2 | 3 | 4 };
 const HEALTH: Record<string, string> = { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' };
 const PRIO = ['No priority', 'Urgent', 'High', 'Medium', 'Low'];
 
@@ -49,8 +48,7 @@ export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, ca
             <div className='pj-head' role='row'>
               {['Name', 'Health', 'Priority', 'Lead', 'Target date', 'Issues', 'Status'].map((h) => <span key={h} role='columnheader'>{h}</span>)}
             </div>
-            {sorted.map((p0) => {
-              const p = p0 as Row;
+            {sorted.map((p) => {
               const pr = projectProgress(p, issues.filter((i) => i.project_id === p.id));
               const late = isOverdue(p.target_date, p.status, today);
               const u = findPerson(people, p.lead_id);
