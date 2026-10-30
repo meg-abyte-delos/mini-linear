@@ -1,0 +1,75 @@
+/* ui-light.css: light theme at the same finish level as dark (lane I7).
+   Imported after tokens.css. Defines every token the dark palette defines, so no
+   component falls back to a dark literal in light. Linear light: white canvas,
+   #f9f9fa sidebar, 1px #e6e6e9 hairlines, indigo accent tint for selection. */
+/* Theme-independent defaults for the new tokens (dark values). */
+:root { --shadow-lg:0 24px 64px rgb(0 0 0 / .6); --scrim:rgb(0 0 0 / .55); }
+[data-theme='light'] {
+  --n-bg:#ffffff; --n-panel:#fbfbfc; --n-elev:#ffffff;
+  --bg:var(--n-bg); --side:#f9f9fa; --panel:var(--n-panel); --raised:var(--n-elev);
+  --line:#e6e6e9; --line-soft:#efeff1; --line-input:#8b8f97;
+  --hover:#f3f3f5; --sel:color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --fg:#1b1c1f; --muted-strong:#3c3f45; --muted:#5f636b; --dim:#696d75;
+  --accent-soft:color-mix(in srgb, var(--accent) 10%, transparent);
+  --accent-glow:0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  --accent-halo:inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  --accent-bar-glow:none;
+  --accent-ring:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  --st-ok:#1a7f37; --st-warn:#8a5a00; --st-danger:#c62828; --st-info:#4c56b8;
+  --danger:#c62828; --warn:#8a5a00;
+  --glass:rgb(255 255 255 / .82); --glass-blur:saturate(160%) blur(14px);
+  --shadow-pop:0 4px 16px rgb(0 0 0 / .08), 0 0 0 1px var(--line);
+  --shadow-lg:0 12px 32px rgb(0 0 0 / .10), 0 0 0 1px var(--line);
+  --scrim:rgb(0 0 0 / .18);
+}
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) {
+    --n-bg:#ffffff; --n-panel:#fbfbfc; --n-elev:#ffffff;
+    --bg:var(--n-bg); --side:#f9f9fa; --panel:var(--n-panel); --raised:var(--n-elev);
+    --line:#e6e6e9; --line-soft:#efeff1; --line-input:#8b8f97;
+    --hover:#f3f3f5; --sel:color-mix(in srgb, var(--accent) 9%, var(--bg));
+    --fg:#1b1c1f; --muted-strong:#3c3f45; --muted:#5f636b; --dim:#696d75;
+    --accent-soft:color-mix(in srgb, var(--accent) 10%, transparent);
+    --accent-glow:0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+    --accent-halo:inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+    --accent-bar-glow:none;
+    --accent-ring:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+    --st-ok:#1a7f37; --st-warn:#8a5a00; --st-danger:#c62828; --st-info:#4c56b8;
+    --danger:#c62828; --warn:#8a5a00;
+    --glass:rgb(255 255 255 / .82); --glass-blur:saturate(160%) blur(14px);
+    --shadow-pop:0 4px 16px rgb(0 0 0 / .08), 0 0 0 1px var(--line);
+    --shadow-lg:0 12px 32px rgb(0 0 0 / .10), 0 0 0 1px var(--line);
+    --scrim:rgb(0 0 0 / .18);
+  }
+}
+
+/* Overlay above sticky group headers in every theme (was dark-only: Backlog header showed through the palette scrim in light). */
+.overlay { z-index:50; background:var(--scrim); }
+
+/* Surfaces that hard-coded dark literals now read tokens */
+.palette, .picker { box-shadow:var(--shadow-lg); }
+.tb-menu, .ws-menu, .snooze-menu { box-shadow:var(--shadow-pop); }
+.palette-foot, .palette .hit-id { color:var(--muted); }
+.row[aria-selected=true] .date { color:var(--muted); }
+.card:hover { border-color:color-mix(in srgb, var(--fg) 14%, transparent); }
+.toast, .selbar { background:var(--raised); color:var(--fg); border-color:var(--line); box-shadow:var(--shadow-pop); }
+.pd-health.on_track { color:var(--st-ok, #3fb950); } .pd-health.at_risk { color:var(--st-warn, #d29922); } .pd-health.off_track, .pd-err { color:var(--st-danger, #f85149); }
+.palette li mark, .search-row mark { background:color-mix(in srgb, var(--accent) 22%, transparent); }
+[data-multi] { background:var(--accent-soft); }
+
+/* Light-only finish: selection, group bands and palette surface like Linear light */
+[data-theme='light'] .row[aria-selected=true] { background:var(--sel); }
+[data-theme='light'] .group h2 { background:var(--panel); border-bottom-color:var(--line-soft); }
+[data-theme='light'] .side-link[aria-current=page] { background:color-mix(in srgb, var(--fg) 7%, var(--side)); color:var(--fg); }
+[data-theme='light'] .palette { background:var(--raised); }
+[data-theme='light'] .panel { box-shadow:-12px 0 32px rgb(0 0 0 / .08); }
+[data-theme='light'] .card { box-shadow:0 1px 2px rgb(0 0 0 / .04); }
+[data-theme='light'] .card[aria-selected=true] { border-color:var(--accent); background:var(--sel); }
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) .row[aria-selected=true] { background:var(--sel); }
+  html:not([data-theme]) .group h2 { background:var(--panel); border-bottom-color:var(--line-soft); }
+  html:not([data-theme]) .side-link[aria-current=page] { background:color-mix(in srgb, var(--fg) 7%, var(--side)); color:var(--fg); }
+  html:not([data-theme]) .palette { background:var(--raised); }
+  html:not([data-theme]) .card { box-shadow:0 1px 2px rgb(0 0 0 / .04); }
+  html:not([data-theme]) .card[aria-selected=true] { border-color:var(--accent); background:var(--sel); }
+}

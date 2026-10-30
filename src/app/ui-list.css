@@ -91,3 +91,6 @@
 .group h2 .gh-add { display:inline-flex; align-items:center; justify-content:center; transition:opacity var(--dur-fast) var(--ease-out), background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
 .group h2 .gh-add svg { width:14px; height:14px; }
 @media (prefers-reduced-motion: reduce) { .group h2 .gh-add { transition:none; } }
+
+/* Sub-issue roll-up (list rows and board cards): ProgressRing + done/total. */
+.sub-prog { display:inline-flex; align-items:center; gap:var(--sp-1); flex:none; color:var(--muted); font-size:var(--fs-sm, 12px); font-variant-numeric:tabular-nums; }

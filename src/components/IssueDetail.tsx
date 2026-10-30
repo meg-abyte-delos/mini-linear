@@ -7,6 +7,7 @@ import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
 import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
+import { useIssueRealtime } from '@/lib/detail/use-issue-realtime';
 import { ConfirmDialog, type MenuEntry } from '@/components/ui';
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
@@ -91,6 +92,29 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     void client.subscription(issue.id).then((r) => r.ok && setSubscribed(!!r.data.subscribed));
   }, [client, issue.id]);
 
+  // Realtime: other tabs/users editing this issue, its comments, parent or sub-issues show up without a reload.
+  const issueRef = useRef(issue); issueRef.current = issue;
+  const [gone, setGone] = useState(false);
+  const [rtOffline, setRtOffline] = useState(false);
+  useIssueRealtime(slug, api, initial.id, version, {
+    onSelf: (row) => {
+      const cur = issueRef.current;
+      version.current = row.version;
+      setIssue({ ...cur, ...row });
+      setTitle((t) => (t === cur.title ? row.title : t)); // a title being typed is not overwritten
+    },
+    onSelfGone: () => setGone(true),
+    onOther: (row) => setOthers((o) => (o.some((x) => x.id === row.id) ? o.map((x) => (x.id === row.id && row.version >= x.version ? { ...x, ...row } : x)) : [...o, row])),
+    onOtherGone: (id) => setOthers((o) => o.filter((x) => x.id !== id)),
+    onActivity: () => {
+      if (!client) return;
+      const id = initial.id;
+      void client.comments(id).then((r) => r.ok && setComments(r.data.items));
+      void client.activity(id).then((r) => r.ok && r.data.items.length && setActivity(r.data.items));
+      void client.relations(id).then((r) => r.ok && setRelations(r.data.items));
+    },
+    onState: (s) => setRtOffline(s === 'offline'),
+  });
   useEffect(() => { document.documentElement.dataset.ready = '1'; }, []);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); }, [toast]);
 
@@ -106,6 +130,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     setActivity((a) => [...a, { id: optId, actor_id: ME, action: label, summary: label, created_at: now() }]);
     const r = await patchIssue(slug, prev, version.current, patch as Record<string, unknown>);
     if (r.issue) { version.current = r.issue.version; if (r.kind !== 'ok') setIssue(r.issue); }
+    if (r.kind === 'error' && !r.issue) { setIssue(prev); setTitle(prev.title); } // offline / timeout: roll the optimistic edit back
     if (r.kind === 'conflict') setToast('Issue modified elsewhere. Reloaded the latest version.');
     else if (r.kind === 'error') setToast('Could not save the change.');
     if (r.kind !== 'ok') { setActivity((a) => a.filter((x) => x.id !== optId)); }
@@ -427,7 +452,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
       <ConfirmDialog open={confirmDelete} title={`Delete ${ident}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void lifecycle('delete'); }}>
         <p>{issue.title}</p><p>The issue moves to the trash. You can restore it from there.</p>
       </ConfirmDialog>
-      {toast && <div className='toast' role='status'>{toast}</div>}
+      {gone ? <div className='toast' role='alert'>This issue was deleted elsewhere. <Link href='/'>Back to issues</Link></div> : toast ? <div className='toast' role='status'>{toast}</div> : rtOffline ? <div className='toast' role='status'>Offline. Reconnecting…</div> : null}
     </div>
   );
 }
