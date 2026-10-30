@@ -3,6 +3,18 @@ import { test, expect, type Page } from '@playwright/test';
 const statusOf = (page: Page, id: string) =>
   page.locator(`[data-id="${id}"]`).evaluate((el) => el.closest('section')?.querySelector('h2 span:nth-child(2)')?.textContent);
 
+// The view switch runs in a View Transition: the DOM swaps asynchronously and the
+// ::view-transition overlay swallows pointer events until it ends. Wait for both.
+const openBoard = async (page: Page) => {
+  await page.getByRole('button', { name: /board/i }).click();
+  await page.locator('section.col').first().waitFor();
+  await page.waitForFunction(() =>
+    !document.documentElement
+      .getAnimations({ subtree: true })
+      .some((a) => String((a.effect as KeyframeEffect | null)?.pseudoElement ?? '').startsWith('::view-transition')),
+  );
+};
+
 test('dnd list: dropping a row on another group changes its status', async ({ page }) => {
   await page.goto('/');
   const src = page.getByRole('option').first();
@@ -17,7 +29,7 @@ test('dnd list: dropping a row on another group changes its status', async ({ pa
 
 test('dnd board: dropping a card on another column changes its status', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /board/i }).click();
+  await openBoard(page);
   const src = page.getByRole('option').first();
   const id = (await src.getAttribute('data-id'))!;
   const from = await statusOf(page, id);
@@ -43,7 +55,7 @@ test('palette "Move to" is a keyboard alternative to dragging (WCAG 2.5.7)', asy
 
 test('dnd board: dropping on the last column (scrolled into view)', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /board/i }).click();
+  await openBoard(page);
   const src = page.getByRole('option').first();
   const id = (await src.getAttribute('data-id'))!;
   const h = page.locator('section.col').last().locator('h2');

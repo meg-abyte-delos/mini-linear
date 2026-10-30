@@ -5,6 +5,8 @@ import { listQuery, parseId, parseJson, parseQuery, uuidSchema } from "../http/v
 import { decodeCursor, page } from "../http/cursor";
 import { recordAudit } from "../audit";
 import { uuidv7 } from "../uuid7";
+import { emit } from "../notifications";
+import { emitSync } from "../sync/emit";
 import { SEL, dto, load, visible, norm, meta } from "./handlers";
 
 /** API types. 'blocked_by' is the inverse view of a stored 'blocks'; 'duplicate' means issue_id duplicates related_issue_id. */
@@ -68,6 +70,8 @@ export const createRelation = (req: Request, slug: string, rawId: string) => wit
     await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "update",
       diff: { status: { before: self.status, after: "canceled" } } });
   }
+  await emit(ctx, { kind: "relation_created", issueId: id, relatedIssueId: b.related_issue_id, type: b.type });
+  await emitSync(ctx, { entity: "relation", id: rid, op: "create", issueId: id });
   const res = Response.json(view({ ...ins[0]!, o_id: other.id, o_identifier: other.identifier ?? `${other.team_key}-${other.number}`, o_title: other.title, o_status: other.status, o_priority: other.priority, o_assignee_id: other.assignee_id, o_team_id: other.team_id }, id), { status: 201 });
   res.headers.set("Location", `/api/v1/w/${slug}/issues/${id}/relations/${rid}`);
   return res;
@@ -82,6 +86,7 @@ export const deleteRelation = (req: Request, slug: string, rawId: string, rawRid
   const v = view(rel, id);
   await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "relation_remove",
     diff: { relation: { before: { id: rid, type: v.type, related_issue_id: v.related_issue_id }, after: null } } });
+  await emitSync(ctx, { entity: "relation", id: rid, op: "delete", issueId: id });
   return new Response(null, { status: 204 });
 });
 

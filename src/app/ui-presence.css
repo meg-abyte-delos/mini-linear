@@ -3,7 +3,7 @@
    dim the white initials under 4.5:1; grayscale keeps every hue bg >= 5:1 against #fff.
    The cutout colour is --presence-cut, set per surface below. */
 .presence { --presence-cut:var(--bg); display:inline-flex; align-items:center; padding-left:2px; }
-.presence-av { position:relative; display:inline-flex; margin-left:-4px; border-radius:50%; box-shadow:0 0 0 2px var(--presence-cut); transition:transform .12s ease-out, filter .12s ease-out; }
+.presence-av { position:relative; display:inline-flex; margin-left:-4px; border-radius:50%; box-shadow:0 0 0 2px var(--presence-cut); transition:transform var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out); }
 .presence-av:first-child { margin-left:0; }
 .presence-av[data-active='false'] { filter:grayscale(1); }
 .presence-av .av { width:18px; height:18px; font-size:9px; }
