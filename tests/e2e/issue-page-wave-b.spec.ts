@@ -44,7 +44,7 @@ test('header breadcrumb shows team and ID; status is changed from Properties onl
   await expect(head.getByLabel('Breadcrumb')).toContainText(a.identifier);
   await expect(head.getByRole('button', { name: /^Status: / })).toHaveCount(0);
   const props = page.getByRole('complementary', { name: 'Properties' });
-  await props.getByRole('button', { name: /Backlog|Todo/ }).first().click();
+  await props.getByRole('button', { name: /^(Backlog|Todo)$/ }).click();
   await page.getByRole('dialog', { name: 'Change status' }).getByRole('option', { name: /Done/ }).click();
   await expect(props).toContainText('Done');
 });

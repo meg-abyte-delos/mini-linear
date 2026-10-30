@@ -210,9 +210,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const toggleProp = (k: DisplayProp) => setHidden((h) => { const n = new Set(h); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
-  // Team scope (API mode): the sidebar team picks which team's issues the list/board show. Issues without team_id (mock) are never hidden.
+  // Team scope (API mode): the sidebar team picks which team's issues the list/board show. The API always returns team_id (asserted in review-2200-comp-api.spec); mock mode has no scope.
   const [teamScope, setTeamScope] = useState<string | null>(api?.teamId ?? null);
-  const scopedIssues = useMemo(() => (api && teamScope ? allIssues.filter((i) => !i.team_id || i.team_id === teamScope) : allIssues), [api, teamScope, allIssues]);
+  const scopedIssues = useMemo(() => (api && teamScope ? allIssues.filter((i) => i.team_id === teamScope) : allIssues), [api, teamScope, allIssues]);
   const issues = useMemo(() => applyFilters(scopedIssues, filters), [scopedIssues, filters]);
   const subStats = useMemo(() => subIssueStats(allIssues), [allIssues]);
   const subBadge = (i: Issue) => { const st = subStats.get(i.id); return st ? <span className='sub-prog' data-testid={`sub-${i.identifier ?? i.id}`} title={`${st.done} of ${st.total} sub-issues done`}><ProgressRing pct={st.pct} size={14} showPct={false} label={`${st.done} of ${st.total} sub-issues done`} /><span>{st.done}/{st.total}</span></span> : null; };
@@ -507,7 +507,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (api) {
       const row = await apiCreate(api.slug, d.team_id || api.teamId, d.title);
       if (!row) { setToast('Could not create the issue.'); return false; }
-      if (d.team_id && d.team_id !== api.teamId) {
+      if (d.team_id && d.team_id !== (teamScope ?? api.teamId)) {
         // Another team's issue does not belong in this team's store: apply the properties server-side, then just confirm.
         const other = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
         let failed = false;
@@ -1003,7 +1003,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         </div>
       )}
-      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} teams={teamList} teamId={api?.teamId ?? ''} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
+      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} teams={teamList} teamId={teamScope ?? api?.teamId ?? ''} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
       {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
       {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}
