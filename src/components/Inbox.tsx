@@ -119,6 +119,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
               <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
                 <span className={`rowsel${checked.has(n.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }}>{checked.has(n.id) ? '☑' : '☐'}</span>
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
+                <span className='nav-av' aria-hidden='true'>{(n.actor?.email ?? 's').charAt(0)}</span>
                 <span className='nid'>{n.issue?.identifier ?? 'Deleted'}</span>
                 <span className='ntitle'>{n.issue?.title ?? ''}</span>
                 <span className='nwho'>{n.actor?.email.split('@')[0] ?? 'Someone'} {TYPE_LABEL[n.type]}</span>

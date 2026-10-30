@@ -36,9 +36,9 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect((await put(seed.a.admin, teamA, { cooldown_days: 1 }, 1)).status).toBe(200);
   });
 
-  it("members cannot see settings of a team they are not in; cross-tenant is a 404/422", async () => {
-    expect((await call(S.getCycleSettings as never, seed.a.member, {}, seed.a.slug, teamA2)).status).toBe(422);
-    expect((await call(S.getCycleSettings as never, seed.a.member, {}, seed.a.slug, teamB)).status).toBe(422);
+  it("members cannot see settings of a team they are not in; cross-tenant is a 404 (path id, like every team subroute)", async () => {
+    expect((await call(S.getCycleSettings as never, seed.a.member, {}, seed.a.slug, teamA2)).status).toBe(404);
+    expect((await call(S.getCycleSettings as never, seed.a.member, {}, seed.a.slug, teamB)).status).toBe(404);
   });
 
   it("ensure creates current + upcoming, is idempotent, names Cycle N; window returns current/next", async () => {

@@ -117,6 +117,8 @@ test('toolbar: no always-on pills; one Filter button opens a labelled menu with 
   const menu = page.getByRole('menu', { name: 'Filter by' });
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem')).toHaveText(['Status', 'Priority', 'Assignee', 'Label', 'Project', 'Cycle']);
+  await expect(menu.getByRole('searchbox', { name: 'Filter…' })).toBeFocused(); // the Filter… input takes focus first; ArrowDown reaches the rows
+  await page.keyboard.press('ArrowDown');
   await expect(menu.getByRole('menuitem').first()).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden(); await expect(btn).toBeFocused();
