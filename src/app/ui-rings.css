@@ -7,7 +7,8 @@
 .ring-s0 { stop-color:var(--accent); }
 .ring-s1 { stop-color:color-mix(in srgb, var(--accent) 55%, #ffffff); }
 .ring[data-tone='done'] .ring-s0, .ring[data-tone='done'] .ring-s1 { stop-color:var(--st-ok, #3fb950); }
-.ring[data-tone='muted'] .ring-s0, .ring[data-tone='muted'] .ring-s1 { stop-color:var(--muted); }
+.ring[data-tone='muted'] .ring-s0, .ring[data-tone='muted'] .ring-s1 { stop-color:var(--muted-strong); }
+.ring[data-tone='muted'] .ring-track { stroke:color-mix(in srgb, var(--fg) 10%, transparent); }
 .ring-pct { font-size:12px; line-height:1; color:var(--fg); min-width:3ch; text-align:right; }
 .ring[data-size='lg'] .ring-pct { font-size:13px; font-weight:500; }
 /* Soft glow on the arc, dark only */

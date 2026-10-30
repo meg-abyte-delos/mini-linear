@@ -3,6 +3,7 @@ import { useId } from 'react';
 
 // Progress ring: a 2-circle SVG (track + gradient arc). Geometry is set with SVG attributes only
 // (pathLength=100 + strokeDasharray), never inline styles, so the strict CSP (style-src 'self') keeps it.
+// Butt caps keep the arc length equal to the percentage (round caps overdraw small values).
 // Colors come from ui-rings.css (stop-color / stroke), driven by the Delos Night tokens.
 interface Props { pct: number; size?: number; label: string; showPct?: boolean; tone?: 'accent' | 'muted' | 'done' }
 
@@ -21,7 +22,7 @@ export function ProgressRing({ pct, size = 16, label, showPct = true, tone }: Pr
         </defs>
         <circle className='ring-track' cx='10' cy='10' r='8' fill='none' strokeWidth='2.5' />
         {p > 0 && (
-          <circle className='ring-arc' cx='10' cy='10' r='8' fill='none' strokeWidth='2.5' strokeLinecap='round'
+          <circle className='ring-arc' cx='10' cy='10' r='8' fill='none' strokeWidth='2.5' strokeLinecap='butt'
             pathLength={100} strokeDasharray={`${p} 100`} transform='rotate(-90 10 10)' stroke={`url(#${gid})`} />
         )}
       </svg>
