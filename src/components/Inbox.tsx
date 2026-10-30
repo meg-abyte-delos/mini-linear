@@ -122,7 +122,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
               <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
                 <span className={`rowsel${checked.has(n.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }}>{checked.has(n.id) ? '☑' : '☐'}</span>
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
-                <span className='nav-av' aria-hidden='true'>{(n.actor?.email ?? 's').charAt(0)}</span>
+                <span className='nav-av' aria-hidden='true' data-kind={n.actor ? 'user' : 'system'}>{n.actor ? n.actor.email.charAt(0) : <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.5'><circle cx='8' cy='8' r='5.5' /><path d='M8 5v3l2 1.5' /></svg>}</span>
                 <span className='nid'>{n.issue?.identifier ?? 'Deleted'}</span>
                 <span className='ntitle' title={n.issue?.title ?? ''}>{n.issue?.title ?? ''}</span>
                 <span className='nwho' title={whoLabel(n)}>{whoLabel(n)}</span>
