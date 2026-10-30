@@ -9,6 +9,8 @@ export async function register() {
     const { startPurgeScheduler } = await import('./lib/auth/ratelimit');
     const { db } = await import('./lib/http/ctx');
     startPurgeScheduler(db());
+    const { startAttachmentGc } = await import('./lib/attachments/uploads');
+    startAttachmentGc(db());
     if (process.env.WEBHOOKS_DISABLED !== '1') {
       const { startWebhookDispatcher } = await import('./lib/integrations/webhooks');
       // Own LOGIN role (member of webhook_dispatcher) when configured; otherwise the app pool + SET LOCAL ROLE (dev/CI).
