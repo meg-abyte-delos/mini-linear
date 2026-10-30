@@ -96,6 +96,11 @@ test('group header "+": creates an issue in that status, keyboard reachable, lab
   const created = page.waitForResponse((r) => r.request().method() === 'POST' && /\/issues$/.test(r.url()));
   await add.focus(); await expect(add).toBeVisible();
   await page.keyboard.press('Enter');
+  // The + opens the New issue modal preset to this group's status; the issue exists only once it is submitted.
+  const dlg = page.getByRole('dialog', { name: 'New issue' });
+  await expect(dlg.getByRole('button', { name: 'Todo' })).toBeVisible();
+  await dlg.getByRole('textbox', { name: 'Issue title' }).fill('Group plus issue');
+  await page.keyboard.press('Control+Enter');
   expect((await created).status()).toBe(201);
   await expect.poll(n).toBe(before + 1);
   await page.waitForTimeout(800); // let the status PATCH that follows the create land (API create has no status field)

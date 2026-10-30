@@ -109,6 +109,7 @@ test.describe('guest (read-only)', () => {
     const n = await page.locator('[role=option]').count();
     expect(n).toBe(2);
     await page.keyboard.press('c');
+    await expect(page.getByRole('dialog', { name: 'New issue' })).toHaveCount(0);
     await expect(page.locator('[role=option]')).toHaveCount(n);
     await page.keyboard.press('Control+k');
     await page.getByRole('combobox', { name: 'Search commands' }).fill('create issue');

@@ -13,17 +13,29 @@ test.beforeEach(async ({ page }) => {
 
 const issueCount = async (page: import('@playwright/test').Page) => Number(await page.locator('.crumbs .count').textContent());
 
+// Creating always goes through the New issue modal: type a title, Cmd+Enter / Create issue.
+async function createVia(page: import('@playwright/test').Page, title: string) {
+  const d = page.getByRole('dialog', { name: 'New issue' });
+  await expect(d).toBeVisible();
+  await d.getByRole('textbox', { name: 'Issue title' }).fill(title);
+  await page.keyboard.press('Control+Enter');
+  await expect(d).toBeHidden();
+}
+
 test('golden: create an issue from the sidebar, the C shortcut and the palette', async ({ page }) => {
   const n0 = await issueCount(page);
   await page.getByRole('button', { name: /^New issue/ }).click();
+  await createVia(page, 'Golden sidebar');
   await expect.poll(() => issueCount(page)).toBe(n0 + 1);
-  await expect(page.getByRole('option', { name: /New issue/ }).first()).toBeVisible();
+  await expect(page.getByRole('option', { name: /Golden sidebar/ }).first()).toBeVisible();
   await page.locator('h1.crumb-title').click();
   await page.keyboard.press('c');
+  await createVia(page, 'Golden shortcut');
   await expect.poll(() => issueCount(page)).toBe(n0 + 2);
   await page.keyboard.press('Control+k');
   await page.getByRole('combobox', { name: 'Search commands' }).fill('create issue');
   await page.keyboard.press('Enter');
+  await createVia(page, 'Golden palette');
   await expect.poll(() => issueCount(page)).toBe(n0 + 3);
 });
 
@@ -31,8 +43,9 @@ test('golden: create from the cycles view lands back on the list with the new is
   await page.getByRole('link', { name: 'Cycles' }).click();
   await expect(page.locator('h1.crumb-title')).toHaveText('Cycles');
   await page.getByRole('button', { name: /^New issue/ }).click();
+  await createVia(page, 'Golden from cycles');
   await expect(page.locator('h1.crumb-title')).toHaveText('Issues');
-  await expect(page.getByRole('option', { name: /New issue/ }).first()).toBeVisible();
+  await expect(page.getByRole('option', { name: /Golden from cycles/ }).first()).toBeVisible();
 });
 
 test('golden: board drag and drop moves a card and the column counts follow', async ({ page }) => {
