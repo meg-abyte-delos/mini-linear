@@ -785,7 +785,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
           <div className='crumbs'><span>Delos</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
-          {view !== 'inbox' && (
+          {(view === 'list' || view === 'board') && (
             <div className='switch' role='group' aria-label='View'>
               <button aria-pressed={view === 'list'} onClick={() => setView('list')}><Icon name='list' /><span>List</span></button>
               <button aria-pressed={view === 'board'} onClick={() => setView('board')}><Icon name='board' /><span>Board</span></button>
