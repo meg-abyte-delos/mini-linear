@@ -105,3 +105,20 @@
 .select-btn { display:inline-flex; align-items:center; justify-content:space-between; gap:var(--sp-2); text-align:left; cursor:pointer; }
 .select-btn:disabled { cursor:not-allowed; }
 .select-val[data-empty] { color:var(--dim); }
+
+/* Button primitive (P0 Pierre 19:17). Opt-in: components migrate later (Linus).
+   <button class="btn" data-variant="primary|secondary|ghost|icon" data-size="24|28|32">. One primary per action group. */
+.btn { --btn-h:28px; display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-1, 4px); height:var(--btn-h); padding:0 var(--sp-3); border:1px solid var(--line); border-radius:6px; background:transparent; color:var(--fg); font:inherit; font-size:var(--fs-base); font-weight:var(--fw-medium); line-height:1; white-space:nowrap; cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+.btn[data-size='24'] { --btn-h:24px; padding:0 var(--sp-2); font-size:var(--fs-sm); }
+.btn[data-size='32'] { --btn-h:32px; padding:0 var(--sp-3); }
+.btn, .btn[data-variant='secondary'] { background:color-mix(in srgb, var(--fg) 4%, transparent); }
+.btn:hover:not(:disabled), .btn[data-variant='secondary']:hover:not(:disabled) { background:var(--hover); border-color:color-mix(in srgb, var(--fg) 18%, transparent); }
+.btn[data-variant='primary'] { background:var(--accent); border-color:transparent; color:var(--accent-fg, #fff); }
+.btn[data-variant='primary']:hover:not(:disabled) { background:color-mix(in srgb, var(--accent) 88%, #000); border-color:transparent; }
+.btn[data-variant='ghost'], .btn[data-variant='icon'] { background:transparent; border-color:transparent; color:var(--muted-strong); }
+.btn[data-variant='ghost']:hover:not(:disabled), .btn[data-variant='icon']:hover:not(:disabled) { background:var(--hover); border-color:transparent; color:var(--fg); }
+.btn[data-variant='icon'] { width:var(--btn-h); padding:0; }
+.btn:focus { outline:none; }
+.btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.btn:disabled { color:var(--dim); cursor:default; opacity:.6; }
+@media (prefers-reduced-motion: reduce) { .btn { transition:none; } }

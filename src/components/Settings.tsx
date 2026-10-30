@@ -124,7 +124,7 @@ export function Settings({ slug }: { slug: string }) {
           <label className='set-field'><span className='set-label'>Name</span><input className='set-input' value={form.name} disabled={!admin} maxLength={100} required onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
           <label className='set-field'><span className='set-label'>URL slug</span><input className='set-input' value={form.slug} disabled={!admin} pattern='[a-z0-9][a-z0-9-]{1,38}[a-z0-9]' required onChange={(e) => setForm({ ...form, slug: e.target.value })} /></label>
           <label className='set-field'><span className='set-label'>Logo URL (https)</span><span className='set-logo-row'>
-            <input className='set-input' type='url' value={form.logo_url} disabled={!admin} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} />
+            <input className='set-input' type='url' placeholder='https://example.com/logo.png' value={form.logo_url} disabled={!admin} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {ws.logo_url && <img className='set-logo' src={ws.logo_url} alt={`${ws.name} logo`} width={32} height={32} />}
           </span></label>
@@ -135,8 +135,8 @@ export function Settings({ slug }: { slug: string }) {
         <h2 id='teams-h' className='set-h2'>Teams</h2>
         {admin && (
           <form className='set-card set-form set-form-row' onSubmit={async (e) => { e.preventDefault(); try { await S.createTeam(slug, newTeam.name.trim(), newTeam.key); setNewTeam({ name: '', key: '' }); void reload(); } catch (err) { setMsg((err as Error).message); } }}>
-            <label className='set-field set-grow'><span className='set-label'>Team name</span><input className='set-input' value={newTeam.name} required maxLength={100} onChange={(e) => setNewTeam({ name: e.target.value, key: S.suggestKey(e.target.value) })} /></label>
-            <label className='set-field set-key-field'><span className='set-label'>Key</span><input className='set-input' value={newTeam.key} required pattern='[A-Z]{2,5}' onChange={(e) => setNewTeam({ ...newTeam, key: e.target.value.toUpperCase() })} /></label>
+            <label className='set-field set-grow'><span className='set-label'>Team name</span><input className='set-input' placeholder='e.g. Design' value={newTeam.name} required maxLength={100} onChange={(e) => setNewTeam({ name: e.target.value, key: S.suggestKey(e.target.value) })} /></label>
+            <label className='set-field set-key-field'><span className='set-label'>Key</span><input className='set-input' placeholder='DES' value={newTeam.key} required pattern='[A-Z]{2,5}' onChange={(e) => setNewTeam({ ...newTeam, key: e.target.value.toUpperCase() })} /></label>
             <button type='submit' className='set-btn' data-variant='primary'>Create team</button>
           </form>
         )}

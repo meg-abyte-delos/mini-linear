@@ -17,6 +17,7 @@ import './ui-bulk.css';
 import './ui-sidebar.css';
 import './tokens.css';
 import './ui-light.css';
+import './ui-review-1900.css';
 import { cookies } from 'next/headers';
 
 export const metadata = { title: 'Mini-Linear' };
