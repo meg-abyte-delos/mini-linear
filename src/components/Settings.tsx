@@ -2,10 +2,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as S from '@/lib/settings-client';
 import { httpInboxClient, NOTIF_TYPES, TYPE_LABEL, type PrefMap, type NotifType } from '@/lib/inbox-client';
+import { nameFromEmail } from '@/lib/nl-people';
+import { ConfirmDialog, UserAvatar } from '@/components/ui';
+import { SettingsShell } from '@/components/SettingsShell';
 
 const isAdmin = (r?: string) => r === 'owner' || r === 'admin';
 
-function TeamPanel({ slug, team, members, canAdmin, onChanged }: { slug: string; team: S.Team; members: S.Member[]; canAdmin: boolean; onChanged: (msg: string) => void }) {
+function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slug: string; team: S.Team; members: S.Member[]; canAdmin: boolean; onChanged: (msg: string) => void; onDelete: () => void }) {
   const [rows, setRows] = useState<S.TeamMember[]>([]);
   const [add, setAdd] = useState('');
   const load = useCallback(() => S.listTeamMembers(slug, team.id).then(setRows).catch((e) => onChanged(e.message)), [slug, team.id, onChanged]);
@@ -13,31 +16,34 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged }: { slug: string;
   const run = (p: Promise<unknown>) => p.then(load).catch((e: Error) => onChanged(e.message));
   const outside = members.filter((m) => !rows.some((r) => r.user_id === m.user_id));
   return (
-    <section aria-labelledby={`team-${team.id}`} className='settings-card'>
-      <h3 id={`team-${team.id}`}>{team.name} <span className='count'>{team.key}</span></h3>
-      <table>
+    <section aria-labelledby={`team-${team.id}`} className='set-card set-team'>
+      <div className='set-card-head'>
+        <h3 id={`team-${team.id}`} className='set-card-title'>{team.name} <span className='set-key'>{team.key}</span></h3>
+        {canAdmin && <button type='button' className='set-btn' data-tone='danger' onClick={onDelete}>Delete {team.name}</button>}
+      </div>
+      <table className='set-table'>
         <thead><tr><th scope='col'>Member</th><th scope='col'>Team role</th><th scope='col'><span className='sr-only'>Actions</span></th></tr></thead>
         <tbody>
           {rows.map((r) => (
             <tr key={r.user_id}>
-              <td>{r.email}</td>
+              <td><span className='set-person'><UserAvatar userId={r.user_id} name={nameFromEmail(r.email)} size='md' /><span className='set-person-text'>{r.email}</span></span></td>
               <td>
-                <select aria-label={`Team role for ${r.email}`} value={r.role} disabled={!canAdmin}
+                <select className='set-select' aria-label={`Team role for ${r.email}`} value={r.role} disabled={!canAdmin}
                   onChange={(e) => run(S.setTeamRole(slug, team.id, r.user_id, e.target.value as S.TeamRole))}>
                   <option value='admin'>Admin</option><option value='member'>Member</option><option value='guest'>Guest (read-only)</option>
                 </select>
               </td>
-              <td>{canAdmin && <button type='button' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
+              <td className='set-end'>{canAdmin && <button type='button' className='set-btn' data-variant='ghost' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
             </tr>
           ))}
         </tbody>
       </table>
       {canAdmin && outside.length > 0 && (
-        <form onSubmit={(e) => { e.preventDefault(); if (!add) return; const m = members.find((x) => x.user_id === add); void run(S.addTeamMember(slug, team.id, add, m?.role === 'guest' ? 'guest' : 'member')); setAdd(''); }}>
-          <label>Add member <select value={add} onChange={(e) => setAdd(e.target.value)}>
+        <form className='set-inline' onSubmit={(e) => { e.preventDefault(); if (!add) return; const m = members.find((x) => x.user_id === add); void run(S.addTeamMember(slug, team.id, add, m?.role === 'guest' ? 'guest' : 'member')); setAdd(''); }}>
+          <label className='set-inline-label'>Add member <select className='set-select' value={add} onChange={(e) => setAdd(e.target.value)}>
             <option value=''>Choose…</option>{outside.map((m) => <option key={m.user_id} value={m.user_id}>{m.email}</option>)}
           </select></label>
-          <button type='submit' disabled={!add}>Add</button>
+          <button type='submit' className='set-btn' disabled={!add}>Add</button>
         </form>
       )}
     </section>
@@ -56,20 +62,23 @@ function NotificationPrefs({ slug, onMsg }: { slug: string; onMsg: (m: string) =
     if (r) setPrefs(r); else { setPrefs(prev); onMsg('Could not save notification preferences'); }
   };
   return (
-    <section aria-labelledby='np-h' className='settings-card'>
-      <h2 id='np-h'>Notifications</h2>
-      <table>
-        <thead><tr><th scope='col'>When someone…</th><th scope='col'>In app</th><th scope='col'>Email</th></tr></thead>
-        <tbody>
-          {NOTIF_TYPES.map((t) => (
-            <tr key={t}>
-              <td>{TYPE_LABEL[t]}</td>
-              <td><input type='checkbox' aria-label={`In-app: ${TYPE_LABEL[t]}`} checked={prefs[t].in_app} onChange={(e) => void set(t, 'in_app', e.target.checked)} /></td>
-              <td><input type='checkbox' aria-label={`Email: ${TYPE_LABEL[t]}`} checked={prefs[t].email} onChange={(e) => void set(t, 'email', e.target.checked)} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <section id='notifications' aria-labelledby='np-h' className='set-section'>
+      <h2 id='np-h' className='set-h2'>Notifications</h2>
+      <p className='set-desc'>Choose where you hear about activity that involves you.</p>
+      <div className='set-card'>
+        <table className='set-table'>
+          <thead><tr><th scope='col'>When someone…</th><th scope='col' className='set-center'>In app</th><th scope='col' className='set-center'>Email</th></tr></thead>
+          <tbody>
+            {NOTIF_TYPES.map((t) => (
+              <tr key={t}>
+                <td>{TYPE_LABEL[t]}</td>
+                <td className='set-center'><input type='checkbox' className='set-check' aria-label={`In-app: ${TYPE_LABEL[t]}`} checked={prefs[t].in_app} onChange={(e) => void set(t, 'in_app', e.target.checked)} /></td>
+                <td className='set-center'><input type='checkbox' className='set-check' aria-label={`Email: ${TYPE_LABEL[t]}`} checked={prefs[t].email} onChange={(e) => void set(t, 'email', e.target.checked)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -81,6 +90,8 @@ export function Settings({ slug }: { slug: string }) {
   const [members, setMembers] = useState<S.Member[]>([]);
   const [newTeam, setNewTeam] = useState({ name: '', key: '' });
   const [msg, setMsg] = useState<string | null>(null);
+  const [delTeam, setDelTeam] = useState<S.Team | null>(null);
+  const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
     try {
       const w = await S.getSettings(slug);
@@ -90,7 +101,8 @@ export function Settings({ slug }: { slug: string }) {
     } catch (e) { setMsg((e as Error).message); }
   }, [slug]);
   useEffect(() => { void reload(); }, [reload]);
-  if (!ws) return <main className='settings'><p role='status'>{msg ?? 'Loading settings…'}</p></main>;
+  const h1 = <h1 className='set-h1'>Settings</h1>;
+  if (!ws) return <SettingsShell slug={slug} current='general' header={h1}><p role='status' className='set-muted'>{msg ?? 'Loading settings…'}</p></SettingsShell>;
   const admin = isAdmin(ws.role);
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,38 +111,43 @@ export function Settings({ slug }: { slug: string }) {
     try { const w = await S.patchSettings(slug, p); setMsg('Saved'); if (w.slug !== slug) window.location.assign(`/w/${w.slug}/settings`); else void reload(); }
     catch (err) { setMsg((err as Error).message); }
   };
+  const confirmDelete = async () => {
+    if (!delTeam) return;
+    setBusy(true);
+    try { await S.deleteTeam(slug, delTeam.id); setDelTeam(null); void reload(); } catch (err) { setMsg((err as Error).message); setDelTeam(null); }
+    setBusy(false);
+  };
   return (
-    <main className='settings'>
-      <h1>Settings</h1>
+    <SettingsShell slug={slug} current='general' header={<><h1 className='set-h1'>Settings</h1><p className='set-desc'>Manage your workspace, its teams and your notifications.</p></>}>
       {msg && <p role='status' className='toast'>{msg}</p>}
-      <section aria-labelledby='ws-h' className='settings-card'>
-        <h2 id='ws-h'>Workspace</h2>
-        <form onSubmit={save}>
-          <label>Name <input value={form.name} disabled={!admin} maxLength={100} required onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
-          <label>URL slug <input value={form.slug} disabled={!admin} pattern='[a-z0-9][a-z0-9-]{1,38}[a-z0-9]' required onChange={(e) => setForm({ ...form, slug: e.target.value })} /></label>
-          <label>Logo URL (https) <input type='url' value={form.logo_url} disabled={!admin} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} /></label>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {ws.logo_url && <img src={ws.logo_url} alt={`${ws.name} logo`} width={32} height={32} />}
-          {admin && <button type='submit'>Save</button>}
+      <section aria-labelledby='ws-h' className='set-section'>
+        <h2 id='ws-h' className='set-h2'>Workspace</h2>
+        <form onSubmit={save} className='set-card set-form'>
+          <label className='set-field'><span className='set-label'>Name</span><input className='set-input' value={form.name} disabled={!admin} maxLength={100} required onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          <label className='set-field'><span className='set-label'>URL slug</span><input className='set-input' value={form.slug} disabled={!admin} pattern='[a-z0-9][a-z0-9-]{1,38}[a-z0-9]' required onChange={(e) => setForm({ ...form, slug: e.target.value })} /></label>
+          <label className='set-field'><span className='set-label'>Logo URL (https)</span><span className='set-logo-row'>
+            <input className='set-input' type='url' value={form.logo_url} disabled={!admin} onChange={(e) => setForm({ ...form, logo_url: e.target.value })} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {ws.logo_url && <img className='set-logo' src={ws.logo_url} alt={`${ws.name} logo`} width={32} height={32} />}
+          </span></label>
+          {admin && <div className='set-actions'><button type='submit' className='set-btn' data-variant='primary'>Save changes</button></div>}
         </form>
       </section>
-      <section aria-labelledby='teams-h' className='settings-card'>
-        <h2 id='teams-h'>Teams</h2>
+      <section id='teams' aria-labelledby='teams-h' className='set-section'>
+        <h2 id='teams-h' className='set-h2'>Teams</h2>
         {admin && (
-          <form onSubmit={async (e) => { e.preventDefault(); try { await S.createTeam(slug, newTeam.name.trim(), newTeam.key); setNewTeam({ name: '', key: '' }); void reload(); } catch (err) { setMsg((err as Error).message); } }}>
-            <label>Team name <input value={newTeam.name} required maxLength={100} onChange={(e) => setNewTeam({ name: e.target.value, key: S.suggestKey(e.target.value) })} /></label>
-            <label>Key <input value={newTeam.key} required pattern='[A-Z]{2,5}' onChange={(e) => setNewTeam({ ...newTeam, key: e.target.value.toUpperCase() })} /></label>
-            <button type='submit'>Create team</button>
+          <form className='set-card set-form set-form-row' onSubmit={async (e) => { e.preventDefault(); try { await S.createTeam(slug, newTeam.name.trim(), newTeam.key); setNewTeam({ name: '', key: '' }); void reload(); } catch (err) { setMsg((err as Error).message); } }}>
+            <label className='set-field set-grow'><span className='set-label'>Team name</span><input className='set-input' value={newTeam.name} required maxLength={100} onChange={(e) => setNewTeam({ name: e.target.value, key: S.suggestKey(e.target.value) })} /></label>
+            <label className='set-field set-key-field'><span className='set-label'>Key</span><input className='set-input' value={newTeam.key} required pattern='[A-Z]{2,5}' onChange={(e) => setNewTeam({ ...newTeam, key: e.target.value.toUpperCase() })} /></label>
+            <button type='submit' className='set-btn' data-variant='primary'>Create team</button>
           </form>
         )}
-        {teams.map((t) => (
-          <div key={t.id}>
-            <TeamPanel slug={slug} team={t} members={members} canAdmin={admin} onChanged={setMsg} />
-            {admin && <button type='button' onClick={async () => { if (!window.confirm(`Delete team ${t.name} and all its issues?`)) return; try { await S.deleteTeam(slug, t.id); void reload(); } catch (err) { setMsg((err as Error).message); } }}>Delete {t.name}</button>}
-          </div>
-        ))}
+        {teams.map((t) => <TeamPanel key={t.id} slug={slug} team={t} members={members} canAdmin={admin} onChanged={setMsg} onDelete={() => setDelTeam(t)} />)}
       </section>
       <NotificationPrefs slug={slug} onMsg={setMsg} />
-    </main>
+      <ConfirmDialog open={!!delTeam} destructive busy={busy} title={`Delete ${delTeam?.name ?? 'team'}?`} confirmLabel='Delete team' onConfirm={() => void confirmDelete()} onCancel={() => setDelTeam(null)}>
+        This permanently deletes the team and all of its issues. This cannot be undone.
+      </ConfirmDialog>
+    </SettingsShell>
   );
 }

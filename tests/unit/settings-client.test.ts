@@ -33,3 +33,32 @@ describe('http calls', () => {
     await expect(removeTeamMember('w', 't', 'u', f as unknown as typeof fetch)).resolves.toBeUndefined();
   });
 });
+
+import { createInvite, setMemberRole, listAllMembers, matchesMember, revokeInvite } from '../../src/lib/settings-client';
+describe('members + invites calls', () => {
+  it('createInvite lowercases and trims the email', async () => {
+    const f = vi.fn(async () => res(201, { id: 'i', email: 'a@b.test', role: 'member' }));
+    await createInvite('w', ' A@B.test ', 'member', f as unknown as typeof fetch);
+    expect(f).toHaveBeenCalledWith('/api/v1/w/w/invites', expect.objectContaining({ method: 'POST', body: '{"email":"a@b.test","role":"member"}' }));
+  });
+  it('setMemberRole PATCHes the role; revokeInvite DELETEs', async () => {
+    const f = vi.fn(async () => res(204));
+    await setMemberRole('w', 'u1', 'admin', f as unknown as typeof fetch);
+    expect(f).toHaveBeenCalledWith('/api/v1/w/w/members/u1', expect.objectContaining({ method: 'PATCH', body: '{"role":"admin"}' }));
+    await revokeInvite('w', 'i1', f as unknown as typeof fetch);
+    expect(f).toHaveBeenLastCalledWith('/api/v1/w/w/invites/i1', expect.objectContaining({ method: 'DELETE' }));
+  });
+  it('listAllMembers follows next_cursor', async () => {
+    const f = vi.fn()
+      .mockResolvedValueOnce(res(200, { items: [{ user_id: '1', email: 'a@x.test', role: 'owner' }], next_cursor: 'c 1' }))
+      .mockResolvedValueOnce(res(200, { items: [{ user_id: '2', email: 'b@x.test', role: 'member' }], next_cursor: null }));
+    const rows = await listAllMembers('w', f as unknown as typeof fetch);
+    expect(rows.map((r) => r.user_id)).toEqual(['1', '2']);
+    expect(f.mock.calls[1]![0]).toContain('cursor=c%201');
+  });
+  it('matchesMember filters on name or email, ignoring case', () => {
+    expect(matchesMember({ email: 'Mate@x.test' }, 'Mate', 'MAT')).toBe(true);
+    expect(matchesMember({ email: 'a@x.test' }, 'Ada', 'zz')).toBe(false);
+    expect(matchesMember({ email: 'a@x.test' }, 'Ada', '  ')).toBe(true);
+  });
+});
