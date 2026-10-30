@@ -98,8 +98,11 @@ export const createUpload = (req: Request, slug: string, rawIssue: string) => wi
 const maxPuts = () => num(process.env.ATTACHMENT_MAX_CONCURRENT_PUTS, 8);
 const IDLE_MS = () => num(process.env.ATTACHMENT_IDLE_TIMEOUT_MS, 30_000);
 const TOTAL_MS = () => num(process.env.ATTACHMENT_TOTAL_TIMEOUT_MS, 10 * 60_000);
+const perUserPuts = () => num(process.env.ATTACHMENT_MAX_CONCURRENT_PUTS_PER_USER, 2);
 let inflight = 0;
+const byUser = new Map<string, number>(); // in-flight PUTs per user in this process: one member cannot occupy every slot
 export const inflightPuts = () => inflight;
+export const inflightPutsFor = (userId: string) => byUser.get(userId) ?? 0;
 
 /** Wraps a request body: a read that stalls for `idleMs`, or a transfer longer than `totalMs`, errors the stream (the upload is then aborted and released). */
 export function timedBody(body: ReadableStream<Uint8Array>, idleMs: number, totalMs: number): ReadableStream<Uint8Array> {
@@ -131,10 +134,13 @@ type Claim = { key: string; size: number; mime: string; issueId: string };
 export async function putContent(req: Request, slug: string, rawIssue: string, rawId: string): Promise<Response> {
   if (inflight >= maxPuts()) return errorResponse(new ApiError("rate_limited", "too many uploads in progress, retry shortly"));
   inflight++;
+  let counted: string | undefined;
   try {
     let claim: Claim | undefined;
     const first = await withWorkspaceCtx(req, slug, async (ctx) => {
       requireRole(ctx, "member");
+      if ((byUser.get(ctx.userId) ?? 0) >= perUserPuts()) throw new ApiError("rate_limited", "too many uploads in progress for this user, retry shortly");
+      byUser.set(ctx.userId, (byUser.get(ctx.userId) ?? 0) + 1); counted = ctx.userId; // check and increment are synchronous: no race between PUTs
       const issueId = parseId(rawIssue), id = parseId(rawId);
       await load(ctx, issueId);
       const rows = await ctx.tx<Row[]>`select storage_key, upload_status, mime_type, size_bytes, created_by, extract(epoch from now() - created_at) * 1000 as age_ms
@@ -184,7 +190,10 @@ export async function putContent(req: Request, slug: string, rawIssue: string, r
     }, db(), { rawReq: true });
     if (!done.ok) { await store.delete(key).catch(() => {}); await release(req, slug, id); }
     return done;
-  } finally { inflight--; }
+  } finally {
+    inflight--;
+    if (counted) { const n = (byUser.get(counted) ?? 1) - 1; if (n <= 0) byUser.delete(counted); else byUser.set(counted, n); }
+  }
 }
 
 /** Puts a claimed row back to pending after a failed transfer (best effort: the GC reclaims a stuck 'uploading' row after 10 min). */
@@ -242,13 +251,23 @@ export async function gcAttachments(sql: postgres.Sql = db(), store: AttachmentS
     if (claimed.length < batch) return total;
   }
 }
-/** Deletes stored keys that no row references any more (e.g. after an issue hard delete cascaded its attachments). Returns the number of keys removed. */
+let orphanCursor = ""; // last key examined; the next pass resumes after it, so a store larger than maxKeys is covered over several passes
+/**
+ * Deletes stored keys that no row references any more (e.g. after an issue hard delete cascaded its attachments), plus stale temp files.
+ * Examines at most `maxKeys` keys per pass in sorted key order, resuming after the previous pass's cursor and wrapping to the start
+ * when the end of the store is reached. Returns the number of keys removed.
+ */
 export async function gcOrphanKeys(sql: postgres.Sql = db(), store: AttachmentStore = attachmentStore(), maxKeys = 50_000): Promise<number> {
   const byWs = new Map<string, string[]>();
-  let seen = 0;
+  let seen = 0, last = "", exhausted = true;
   for await (const k of store.list("")) {
-    if (++seen > maxKeys) break; // bound per pass; the sweep is hourly and a bigger store needs the s3 implementation's native listing
-     const [ws, id] = k.split("/") as [string, string]; (byWs.get(ws) ?? byWs.set(ws, []).get(ws)!).push(id); }
+    if (k <= orphanCursor) continue;
+    if (seen >= maxKeys) { exhausted = false; break; }
+    seen++; last = k;
+    const [ws, id] = k.split("/") as [string, string];
+    (byWs.get(ws) ?? byWs.set(ws, []).get(ws)!).push(id);
+  }
+  orphanCursor = exhausted ? "" : last;
   let removed = 0;
   for (const [ws, ids] of byWs) for (let i = 0; i < ids.length; i += 500) {
     const chunk = ids.slice(i, i + 500);

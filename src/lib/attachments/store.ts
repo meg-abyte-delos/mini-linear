@@ -72,10 +72,12 @@ export function fsStore(root: string): AttachmentStore {
     async *list(prefix) {
       let top: string[];
       try { top = await readdir(base); } catch { return; }
+      top.sort(); // deterministic order: the orphan sweep resumes from a cursor
       for (const ws of top) {
         if (!ws.startsWith(prefix.split("/")[0]!) ) continue;
         let files: string[];
         try { files = await readdir(join(base, ws)); } catch { continue; }
+        files.sort();
         for (const f of files) { const k = `${ws}/${f}`; if (KEY.test(k) && k.startsWith(prefix)) yield k; }
       }
     },

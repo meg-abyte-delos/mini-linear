@@ -2,11 +2,15 @@
 -- Uploaded rows are deleted; their bytes stay in the store for the orphan sweep.
 DROP FUNCTION IF EXISTS attachments_gc_claim(integer);
 REVOKE SELECT, UPDATE, DELETE ON issue_attachments FROM definer;
+-- The owner has no workspace context here and the table is FORCE RLS: the DELETE would silently remove 0 rows and the
+-- url SET NOT NULL below would then fail. Lift FORCE for the delete only (same pattern as the 0803 down).
+ALTER TABLE issue_attachments NO FORCE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'issue_attachments' AND column_name = 'storage_key') THEN
     DELETE FROM issue_attachments WHERE storage_key IS NOT NULL;
   END IF;
 END $$;
+ALTER TABLE issue_attachments FORCE ROW LEVEL SECURITY;
 REVOKE UPDATE ON issue_attachments FROM app_user;
 DROP INDEX IF EXISTS issue_attachments_gc_idx;
 DROP INDEX IF EXISTS issue_attachments_storage_uq;

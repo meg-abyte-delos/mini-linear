@@ -378,6 +378,35 @@ const PNG = "\x89PNG\r\n\x1a\nxx";
     expect(ev.at(-1)).toMatchObject({ entity: "issue", op: "update", issue_id: issue });
   });
 
+  it("caps concurrent PUTs per user (another member still uploads), and frees the slot", async () => {
+    process.env.ATTACHMENT_MAX_CONCURRENT_PUTS_PER_USER = "1";
+    try {
+      const mk = async (u: string) => (await (await init(u, { filename: "u.pdf", mime_type: PDF, size_bytes: 10 })).json()).id as string;
+      const a1 = await mk(seed.a.member), a2 = await mk(seed.a.member), o = await mk(seed.a.admin);
+      let end!: () => void;
+      const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(Buffer.from("%PDF-")); end = () => { try { c.close(); } catch { /* done */ } }; } });
+      const first = call(U.putContent, seed.a.member, { method: "PUT", headers: { "content-type": PDF }, body, duplex: "half" } as never, seed.a.slug, issue, a1);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(U.inflightPutsFor(seed.a.member)).toBe(1);
+      expect((await put(seed.a.member, a2, "%PDF-12345")).status).toBe(429);
+      expect((await asOwner(seed.a.id, (tx) => tx`select upload_status from issue_attachments where id = ${a2}`))[0]!.upload_status).toBe("pending");
+      expect((await put(seed.a.admin, o, "%PDF-12345")).status).toBe(200);
+      end(); await first;
+      expect(U.inflightPutsFor(seed.a.member)).toBe(0);
+      expect((await put(seed.a.member, a2, "%PDF-12345")).status).toBe(200);
+    } finally { delete process.env.ATTACHMENT_MAX_CONCURRENT_PUTS_PER_USER; }
+  });
+
+  it("orphan sweep resumes from a cursor: a store larger than maxKeys is fully covered over passes", async () => {
+    const st = fsStore(dir); const { Readable } = await import("node:stream");
+    const ids = Array.from({ length: 6 }, () => randomUUID());
+    for (const id of ids) await st.put(storageKey(seed.a.id, id), Readable.toWeb(Readable.from([Buffer.from("o")])) as never, { size: 1, mime: PDF });
+    let removed = 0;
+    for (let i = 0; i < 400 && ids.some((id) => existsSync(join(dir, storageKey(seed.a.id, id)))); i++) removed += await U.gcOrphanKeys(db(), st, 2);
+    for (const id of ids) expect(existsSync(join(dir, storageKey(seed.a.id, id)))).toBe(false);
+    expect(removed).toBeGreaterThanOrEqual(6);
+  });
+
   it("a ready upload emits an update event on the parent issue", async () => {
     const before = await asOwner(seed.a.id, (tx) => tx`select coalesce(max(id),0)::int as m from sync_events`);
     await upload(seed.a.member, "%PDF-evt");
