@@ -47,4 +47,21 @@ describe.runIf(runIntegration)('A8 attachments over HTTP', () => {
     expect((await req(W.M1, 'DELETE', `${base()}/${a.id}`)).status).toBe(204);
     expect((await req(W.M1, 'GET', a.upload_url)).status).toBe(404);
   }, 60_000);
+
+  it('a client that disconnects mid-upload leaves the row retryable and holds no lock', async () => {
+    const base = `/api/v1/w/w1/issues/${W.i1}/attachments`;
+    const a = (await (await req(W.M1, 'POST', `${base}/uploads`, { headers: J, body: JSON.stringify({ filename: 'cut.pdf', mime_type: 'application/pdf', size_bytes: 10 }) })).json()) as { id: string; upload_url: string };
+    const ac = new AbortController();
+    const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(Buffer.from('%PDF-')); } });
+    const p = req(W.M1, 'PUT', a.upload_url, { headers: { 'content-type': 'application/pdf' }, body: body as never, duplex: 'half', signal: ac.signal } as never).catch(() => null);
+    await new Promise((r) => setTimeout(r, 400));
+    ac.abort(); await p;
+    // the row is reclaimed by the idle timeout (30 s) or immediately when the abort propagates; a retry must eventually succeed
+    let st = 0;
+    for (let i = 0; i < 40 && st !== 200; i++) {
+      st = (await req(W.M1, 'PUT', a.upload_url, { headers: { 'content-type': 'application/pdf' }, body: Buffer.from('%PDF-12345') })).status;
+      if (st !== 200) await new Promise((r) => setTimeout(r, 1000));
+    }
+    expect(st).toBe(200);
+  }, 90_000);
 });

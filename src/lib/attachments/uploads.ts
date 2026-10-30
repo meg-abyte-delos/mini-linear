@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type postgres from "postgres";
 import { withWorkspaceCtx, requireRole, db } from "../http/ctx";
-import { ApiError } from "../http/errors";
+import { ApiError, errorResponse } from "../http/errors";
 import { parseId, parseJson } from "../http/validate";
 import { diffOf } from "../audit";
 import { uuidv7 } from "../uuid7";
@@ -59,7 +59,7 @@ const INLINE_OK = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]
 /** Metadata only: no path separators, no control chars, never "." / "..". */
 export function sanitizeFilename(raw: string): string {
   // eslint-disable-next-line no-control-regex
-  const parts = raw.replace(/[\u0000-\u001f\u007f\u0080-\u009f"]/g, "").split(/[\\/]+/).map((p) => p.trim()).filter(Boolean);
+  const parts = raw.replace(/[\u0000-\u001f\u007f\u0080-\u009f"\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, "").split(/[\\/]+/).map((p) => p.trim()).filter(Boolean);
   const name = (parts[parts.length - 1] ?? "").slice(0, 255);
   if (!name || /^\.+$/.test(name)) throw new ApiError("validation_failed", "filename is not valid");
   return name;
@@ -84,7 +84,7 @@ export const createUpload = (req: Request, slug: string, rawIssue: string) => wi
   await ctx.tx`select pg_advisory_xact_lock(hashtext(${ctx.workspaceId}))`;
   const n = await ctx.tx`select count(*)::int as n from issue_attachments where issue_id = ${issueId} and deleted_at is null`;
   if ((n[0]!.n as number) >= 500) throw new ApiError("validation_failed", "too many attachments on this issue (max 500)");
-  const pend = await ctx.tx`select count(*)::int as n from issue_attachments where created_by = ${ctx.userId} and upload_status = 'pending' and deleted_at is null and created_at > now() - interval '1 hour'`;
+  const pend = await ctx.tx`select count(*)::int as n from issue_attachments where created_by = ${ctx.userId} and upload_status in ('pending','uploading') and deleted_at is null and created_at > now() - interval '1 hour'`;
   if ((pend[0]!.n as number) >= MAX_PENDING) throw new ApiError("validation_failed", `too many pending uploads (max ${MAX_PENDING})`);
   const used = await ctx.tx`select coalesce(sum(size_bytes), 0)::float8 as s from issue_attachments where storage_key is not null and deleted_at is null`;
   if ((used[0]!.s as number) + b.size_bytes > quotaBytes()) throw new ApiError("validation_failed", "workspace attachment quota exceeded");
@@ -95,41 +95,105 @@ export const createUpload = (req: Request, slug: string, rawIssue: string) => wi
   return Response.json({ id, upload_url, expires_at: new Date(Date.now() + PENDING_TTL_MS).toISOString() }, { status: 201, headers: { Location: upload_url } });
 });
 
-/** PUT .../attachments/:aid/content: the creator streams the bytes once; the row becomes ready in the same request. */
-export const putContent = (req: Request, slug: string, rawIssue: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
-  requireRole(ctx, "member");
-  const issueId = parseId(rawIssue), id = parseId(rawId), issue = await load(ctx, issueId);
-  const rows = await ctx.tx<Row[]>`select id, issue_id, storage_key, upload_status, mime_type, size_bytes, filename, title, created_by, created_at,
-      extract(epoch from now() - created_at) * 1000 as age_ms from issue_attachments
-    where id = ${id} and issue_id = ${issueId} and storage_key is not null and deleted_at is null for update`;
-  const row = rows[0];
-  if (!row) throw new ApiError("not_found");
-  if (row.created_by !== ctx.userId) throw new ApiError("forbidden", "only the uploader can send the content");
-  if (row.upload_status !== "pending") throw new ApiError("conflict", "content already uploaded");
-  if ((row.age_ms as number) > PENDING_TTL_MS) throw new ApiError("not_found", "upload expired");
-  const ctype = (req.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
-  if (ctype !== row.mime_type) throw new ApiError("unsupported_media_type", "Content-Type must equal the declared mime_type");
-  const size = Number(row.size_bytes), cl = req.headers.get("content-length");
-  if (cl !== null && Number(cl) > maxBytes()) throw new ApiError("payload_too_large", "body exceeds the maximum file size");
-  if (cl !== null && Number(cl) !== size) throw new ApiError("validation_failed", "Content-Length must equal the declared size_bytes");
-  if (!req.body) { if (size !== 0) throw new ApiError("validation_failed", "empty body"); }
-  const key = row.storage_key as string, store = attachmentStore();
-  let res;
+const maxPuts = () => num(process.env.ATTACHMENT_MAX_CONCURRENT_PUTS, 8);
+const IDLE_MS = () => num(process.env.ATTACHMENT_IDLE_TIMEOUT_MS, 30_000);
+const TOTAL_MS = () => num(process.env.ATTACHMENT_TOTAL_TIMEOUT_MS, 10 * 60_000);
+let inflight = 0;
+export const inflightPuts = () => inflight;
+
+/** Wraps a request body: a read that stalls for `idleMs`, or a transfer longer than `totalMs`, errors the stream (the upload is then aborted and released). */
+export function timedBody(body: ReadableStream<Uint8Array>, idleMs: number, totalMs: number): ReadableStream<Uint8Array> {
+  const reader = body.getReader(), deadline = Date.now() + totalMs;
+  return new ReadableStream<Uint8Array>({
+    async pull(c) {
+      const wait = Math.min(idleMs, deadline - Date.now());
+      let t: ReturnType<typeof setTimeout> | undefined;
+      const stall = new Promise<never>((_, rej) => { t = setTimeout(() => rej(new ApiError("bad_request", wait < idleMs || Date.now() >= deadline ? "upload took too long" : "upload stalled")), Math.max(wait, 1)); });
+      try {
+        const r = await Promise.race([reader.read(), stall]);
+        if (r.done) c.close(); else c.enqueue(r.value);
+      } catch (e) { void reader.cancel().catch(() => {}); c.error(e); } finally { clearTimeout(t); }
+    },
+    cancel(r) { return reader.cancel(r); },
+  });
+}
+
+type Claim = { key: string; size: number; mime: string; issueId: string };
+
+/**
+ * PUT .../attachments/:aid/content: the creator streams the bytes once; the row becomes ready.
+ * Three phases so no database connection or row lock is held while the client is uploading:
+ *  1. short tx: validate, then claim the row (pending -> uploading, conditional UPDATE: a second PUT loses with 409);
+ *  2. no tx: stream to the store (byte cap, magic bytes, idle/total timeout), at most ATTACHMENT_MAX_CONCURRENT_PUTS (8) at once per process;
+ *  3. short tx: finalize (ready, sha256, audit, sync event). On any failure the partial bytes are removed and the row goes back to pending (retryable).
+ * The three transactions use the original request (rawReq): it is only read for its headers, and its body is never cloned/buffered.
+ */
+export async function putContent(req: Request, slug: string, rawIssue: string, rawId: string): Promise<Response> {
+  if (inflight >= maxPuts()) return errorResponse(new ApiError("rate_limited", "too many uploads in progress, retry shortly"));
+  inflight++;
   try {
-    res = await store.put(key, (req.body ?? new Blob([]).stream()).pipeThrough(magicGuard(ctype)), { size: Math.min(size, maxBytes()), mime: ctype });
-  } catch (e) {
-    await store.delete(key).catch(() => {});
-    if (e instanceof SizeMismatch) throw new ApiError("validation_failed", "body length does not match the declared size_bytes");
-    throw e;
-  }
-  try {
-    await ctx.tx`update issue_attachments set upload_status = 'ready', sha256 = ${res.sha256}, size_bytes = ${res.size} where id = ${id}`;
-    const dto = attDto((await ctx.tx<Row[]>`${ATSEL(ctx)} where id = ${id}`)[0]!, slug);
-    await audit(ctx, "attachment", id, "create", { ...diffOf(null, dto, ATT_F), issue_id: { before: null, after: issueId } });
-    await emitAttachmentEvent(ctx, issueId, Number(issue.version));
-    return Response.json(dto);
-  } catch (e) { await store.delete(key).catch(() => {}); throw e; }
-});
+    let claim: Claim | undefined;
+    const first = await withWorkspaceCtx(req, slug, async (ctx) => {
+      requireRole(ctx, "member");
+      const issueId = parseId(rawIssue), id = parseId(rawId);
+      await load(ctx, issueId);
+      const rows = await ctx.tx<Row[]>`select storage_key, upload_status, mime_type, size_bytes, created_by, extract(epoch from now() - created_at) * 1000 as age_ms
+        from issue_attachments where id = ${id} and issue_id = ${issueId} and storage_key is not null and deleted_at is null`;
+      const row = rows[0];
+      if (!row) throw new ApiError("not_found");
+      if (row.created_by !== ctx.userId) throw new ApiError("forbidden", "only the uploader can send the content");
+      if (row.upload_status !== "pending") throw new ApiError("conflict", "content already uploaded");
+      if ((row.age_ms as number) > PENDING_TTL_MS) throw new ApiError("not_found", "upload expired");
+      const ctype = (req.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+      if (ctype !== row.mime_type) throw new ApiError("unsupported_media_type", "Content-Type must equal the declared mime_type");
+      const size = Number(row.size_bytes), cl = req.headers.get("content-length");
+      if (cl !== null && Number(cl) > maxBytes()) throw new ApiError("payload_too_large", "body exceeds the maximum file size");
+      if (cl !== null && Number(cl) !== size) throw new ApiError("validation_failed", "Content-Length must equal the declared size_bytes");
+      if (!req.body && size !== 0) throw new ApiError("validation_failed", "empty body");
+      const got = await ctx.tx`update issue_attachments set upload_status = 'uploading', upload_started_at = now()
+        where id = ${id} and upload_status = 'pending' and deleted_at is null returning id`;
+      if (got.length === 0) throw new ApiError("conflict", "content already uploaded");
+      claim = { key: row.storage_key as string, size, mime: ctype, issueId };
+      return new Response(null, { status: 204 });
+    }, db(), { rawReq: true });
+    if (!claim) return first;
+    const { key, size, mime, issueId } = claim, id = parseId(rawId), store = attachmentStore();
+
+    // Phase 2: stream, no transaction.
+    let res;
+    try {
+      const body = timedBody(req.body ?? new Blob([]).stream(), IDLE_MS(), TOTAL_MS());
+      res = await store.put(key, body.pipeThrough(magicGuard(mime)), { size: Math.min(size, maxBytes()), mime });
+    } catch (e) {
+      await store.delete(key).catch(() => {});
+      await release(req, slug, id);
+      if (e instanceof SizeMismatch) return errorResponse(new ApiError("validation_failed", "body length does not match the declared size_bytes"));
+      return errorResponse(e);
+    }
+
+    // Phase 3: finalize.
+    const done = await withWorkspaceCtx(req, slug, async (ctx) => {
+      const issue = await load(ctx, issueId); // gone or hidden meanwhile: 404 and the bytes are removed below
+      const upd = await ctx.tx`update issue_attachments set upload_status = 'ready', sha256 = ${res.sha256}, size_bytes = ${res.size}
+        where id = ${id} and upload_status = 'uploading' and deleted_at is null returning id`;
+      if (upd.length === 0) throw new ApiError("not_found"); // deleted while uploading
+      const dto = attDto((await ctx.tx<Row[]>`${ATSEL(ctx)} where id = ${id}`)[0]!, slug);
+      await audit(ctx, "attachment", id, "create", { ...diffOf(null, dto, ATT_F), issue_id: { before: null, after: issueId } });
+      await emitAttachmentEvent(ctx, issueId, Number(issue.version));
+      return Response.json(dto);
+    }, db(), { rawReq: true });
+    if (!done.ok) { await store.delete(key).catch(() => {}); await release(req, slug, id); }
+    return done;
+  } finally { inflight--; }
+}
+
+/** Puts a claimed row back to pending after a failed transfer (best effort: the GC reclaims a stuck 'uploading' row after 10 min). */
+async function release(req: Request, slug: string, id: string): Promise<void> {
+  await withWorkspaceCtx(req, slug, async (ctx) => {
+    await ctx.tx`update issue_attachments set upload_status = 'pending', upload_started_at = null where id = ${id} and upload_status = 'uploading'`;
+    return new Response(null, { status: 204 });
+  }, db(), { rawReq: true }).catch(() => {});
+}
 
 const rfc5987 = (s: string) => encodeURIComponent(s).replace(/['()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
 const asciiName = (s: string) => s.replace(/[^\x20-\x7e]|["\\%]/g, "_");
@@ -179,9 +243,12 @@ export async function gcAttachments(sql: postgres.Sql = db(), store: AttachmentS
   }
 }
 /** Deletes stored keys that no row references any more (e.g. after an issue hard delete cascaded its attachments). Returns the number of keys removed. */
-export async function gcOrphanKeys(sql: postgres.Sql = db(), store: AttachmentStore = attachmentStore()): Promise<number> {
+export async function gcOrphanKeys(sql: postgres.Sql = db(), store: AttachmentStore = attachmentStore(), maxKeys = 50_000): Promise<number> {
   const byWs = new Map<string, string[]>();
-  for await (const k of store.list("")) { const [ws, id] = k.split("/") as [string, string]; (byWs.get(ws) ?? byWs.set(ws, []).get(ws)!).push(id); }
+  let seen = 0;
+  for await (const k of store.list("")) {
+    if (++seen > maxKeys) break; // bound per pass; the sweep is hourly and a bigger store needs the s3 implementation's native listing
+     const [ws, id] = k.split("/") as [string, string]; (byWs.get(ws) ?? byWs.set(ws, []).get(ws)!).push(id); }
   let removed = 0;
   for (const [ws, ids] of byWs) for (let i = 0; i < ids.length; i += 500) {
     const chunk = ids.slice(i, i + 500);
@@ -192,12 +259,14 @@ export async function gcOrphanKeys(sql: postgres.Sql = db(), store: AttachmentSt
     const keep = new Set(alive);
     for (const id of chunk) if (!keep.has(id)) { await store.delete(`${ws}/${id}`).catch(() => {}); removed++; }
   }
+  removed += await store.sweepTmp(60 * 60 * 1000);
   return removed;
 }
-const GC_MS = 5 * 60 * 1000;
+const GC_MS = 5 * 60 * 1000, ORPHAN_EVERY = 12; // orphan + temp sweep lists the whole store: hourly, not every 5 min
 /** Runs gcAttachments now and every 5 min. The timer is unref'd and a failed pass only logs. */
 export function startAttachmentGc(sql: postgres.Sql, intervalMs = GC_MS): () => void {
-  const run = () => { void gcAttachments(sql).then(() => gcOrphanKeys(sql)).catch((e: unknown) => console.error(`[mini-linear] attachment gc failed: ${e instanceof Error ? e.message : String(e)}`)); };
+  let n = 0;
+  const run = () => { void gcAttachments(sql).then(() => (n++ % ORPHAN_EVERY === 0 ? gcOrphanKeys(sql) : 0)).catch((e: unknown) => console.error(`[mini-linear] attachment gc failed: ${e instanceof Error ? e.message : String(e)}`)); };
   run();
   const t = setInterval(run, intervalMs); t.unref?.();
   return () => clearInterval(t);

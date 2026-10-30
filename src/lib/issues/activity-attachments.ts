@@ -6,6 +6,7 @@ import { listQuery, parseId, parseJson, parseQuery } from "../http/validate";
 import { recordAudit, diffOf, type Diff } from "../audit";
 import { uuidv7 } from "../uuid7";
 import { load, visible } from "./handlers";
+import { emitAttachmentEvent } from "../attachments/events";
 
 type Row = Record<string, unknown>;
 
@@ -39,9 +40,9 @@ const attBody = z.object({
   mime_type: z.string().max(255).regex(/^[\w.+-]+\/[\w.+-]+$/).optional(), size_bytes: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 }).strict().refine((b) => b.kind === "file" || (b.mime_type === undefined && b.size_bytes === undefined), { message: "mime_type/size_bytes only for kind=file" });
 export const attDto = (r: Row, slug?: string) => {
-  const stored = r.storage_key != null, ready = r.upload_status !== "pending";
+  const stored = r.storage_key != null, ready = r.upload_status === "ready";
   return { id: r.id, issue_id: r.issue_id, kind: r.kind, url: stored ? null : r.url, title: r.title, mime_type: r.mime_type ?? null,
-    size_bytes: r.size_bytes == null ? null : Number(r.size_bytes), filename: r.filename ?? null, upload_status: r.upload_status ?? "ready",
+    size_bytes: r.size_bytes == null ? null : Number(r.size_bytes), filename: r.filename ?? null, upload_status: r.upload_status === "uploading" ? "pending" : (r.upload_status ?? "ready"), // "uploading" is internal: bytes in flight
     sha256: r.sha256 ?? null, download_url: stored && ready && slug ? `/api/v1/w/${slug}/issues/${r.issue_id}/attachments/${r.id}/content` : null,
     created_by: r.created_by, created_at: r.created_at };
 };
@@ -77,12 +78,13 @@ export const createAttachment = (req: Request, slug: string, rawIssue: string) =
 export const deleteAttachment = (req: Request, slug: string, rawIssue: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const issueId = parseId(rawIssue), id = parseId(rawId);
-  await load(ctx, issueId);
+  const issue = await load(ctx, issueId);
   const r = await ctx.tx<Row[]>`${ATSEL(ctx)} where id = ${id} and issue_id = ${issueId} and deleted_at is null and (upload_status = 'ready' or created_by = ${ctx.userId})`;
   if (!r[0]) throw new ApiError("not_found");
   if (r[0].created_by !== ctx.userId && !atLeast(ctx.role, "admin")) throw new ApiError("forbidden"); // creator or admin
   // Soft delete: the row leaves lists at once, the GC removes the bytes (and then the row).
   await ctx.tx`update issue_attachments set deleted_at = now() where id = ${id}`;
+  await emitAttachmentEvent(ctx, issueId, Number(issue.version));
   await audit(ctx, "attachment", id, "delete", { ...diffOf(attDto(r[0], slug), null, ATT_F), issue_id: { before: issueId, after: null } });
   return new Response(null, { status: 204 });
 });

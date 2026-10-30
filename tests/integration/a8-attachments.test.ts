@@ -263,6 +263,121 @@ const PNG = "\x89PNG\r\n\x1a\nxx";
     expect(existsSync(key)).toBe(false);
   });
 
+  it("PUT holds no transaction while streaming: stalled upload is 'uploading', second PUT 409, issue hard delete does not block, idle timeout releases the row", async () => {
+    process.env.ATTACHMENT_IDLE_TIMEOUT_MS = "600";
+    try {
+      const { id } = await (await init(seed.a.member, { filename: "s.pdf", mime_type: PDF, size_bytes: 10 })).json();
+      let push!: (b: Uint8Array) => void, end!: () => void;
+      const body = new ReadableStream<Uint8Array>({ start(c) { push = (b) => c.enqueue(b); end = () => { try { c.close(); } catch { /* already errored by the idle timeout */ } }; } });
+      const slow = call(U.putContent, seed.a.member, { method: "PUT", headers: { "content-type": PDF }, body, duplex: "half" } as never, seed.a.slug, issue, id);
+      push(Buffer.from("%PDF-"));
+      await new Promise((r) => setTimeout(r, 300));
+      const st = await asOwner(seed.a.id, (tx) => tx`select upload_status from issue_attachments where id = ${id}`);
+      expect(st[0]!.upload_status).toBe("uploading");
+      // no backend of ours sits idle in a transaction holding this row
+      const idle = await owner`select count(*)::int as n from pg_stat_activity where datname = current_database() and state = 'idle in transaction' and query ilike '%issue_attachments%'`;
+      expect(idle[0]!.n).toBe(0);
+      expect((await put(seed.a.member, id, "%PDF-12345")).status).toBe(409); // claimed
+      const dto = await (await get(seed.a.member, id)).status;
+      expect(dto).toBe(404); // not ready yet
+      const r = await slow; // never finishes: idle timeout (600 ms)
+      expect(r.status).toBe(400);
+      end();
+      expect(existsSync(join(dir, storageKey(seed.a.id, id)))).toBe(false);
+      expect((await asOwner(seed.a.id, (tx) => tx`select upload_status, upload_started_at from issue_attachments where id = ${id}`))[0]).toMatchObject({ upload_status: "pending", upload_started_at: null });
+      expect((await put(seed.a.member, id, "%PDF-12345")).status).toBe(200); // retry works
+    } finally { delete process.env.ATTACHMENT_IDLE_TIMEOUT_MS; }
+  });
+
+  it("a stalled PUT does not block hard-deleting its issue (no lock held)", async () => {
+    const t = (await asOwner(seed.a.id, (tx) => tx`select team_id from issues where id = ${issue}`))[0]!.team_id as string;
+    const iss = (await (await call(H.createIssue, seed.a.member, { method: "POST", headers: J, body: JSON.stringify({ team_id: t, title: "doomed" }) }, seed.a.slug)).json()).id as string;
+    const { id } = await (await init(seed.a.member, { filename: "d.pdf", mime_type: PDF, size_bytes: 10 }, iss)).json();
+    let push!: (b: Uint8Array) => void, end!: () => void;
+    const body = new ReadableStream<Uint8Array>({ start(c) { push = (b) => c.enqueue(b); end = () => c.close(); } });
+    const slow = call(U.putContent, seed.a.member, { method: "PUT", headers: { "content-type": PDF }, body, duplex: "half" } as never, seed.a.slug, iss, id);
+    push(Buffer.from("%PDF-"));
+    await new Promise((r) => setTimeout(r, 200));
+    const t0 = Date.now();
+    await asOwner(seed.a.id, async (tx) => { await tx`set local lock_timeout = '2s'`; await tx`delete from issues where id = ${iss}`; });
+    expect(Date.now() - t0).toBeLessThan(2000);
+    push(Buffer.from("12345")); end();
+    const r = await slow;
+    expect(r.status).toBe(404); // issue gone: finalize fails, bytes removed
+    expect(existsSync(join(dir, storageKey(seed.a.id, id)))).toBe(false);
+  });
+
+  it("caps concurrent PUTs per process (429) and releases the slot afterwards", async () => {
+    process.env.ATTACHMENT_MAX_CONCURRENT_PUTS = "1";
+    try {
+      const a = (await (await init(seed.a.member, { filename: "a.pdf", mime_type: PDF, size_bytes: 10 })).json()).id as string;
+      const b = (await (await init(seed.a.member, { filename: "b.pdf", mime_type: PDF, size_bytes: 10 })).json()).id as string;
+      let end!: () => void;
+      const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(Buffer.from("%PDF-")); end = () => c.close(); } });
+      const first = call(U.putContent, seed.a.member, { method: "PUT", headers: { "content-type": PDF }, body, duplex: "half" } as never, seed.a.slug, issue, a);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(U.inflightPuts()).toBe(1);
+      const over = await put(seed.a.member, b, "%PDF-12345");
+      expect(over.status).toBe(429);
+      end(); await first; // short body -> 422, slot freed
+      expect(U.inflightPuts()).toBe(0);
+      expect((await put(seed.a.member, b, "%PDF-12345")).status).toBe(200);
+    } finally { delete process.env.ATTACHMENT_MAX_CONCURRENT_PUTS; }
+  });
+
+  it("GC across two workspaces (definer deletes under FORCE RLS): pending, stale uploading and deleted rows of both go, fresh uploading stays", async () => {
+    const mkIssue = async (s: typeof seed.a) => {
+      const team = randomUUID();
+      await asOwner(s.id, async (tx) => {
+        await tx`insert into teams (id, workspace_id, name, key) values (${team}, ${s.id}, 'G', 'GCX')`;
+        await tx`insert into team_memberships (workspace_id, team_id, user_id) values (${s.id}, ${team}, ${s.member})`;
+      });
+      const r = await call(H.createIssue, s.member, { method: "POST", headers: J, body: JSON.stringify({ team_id: team, title: "gc" }) }, s.slug);
+      return { team, iss: (await r.json()).id as string };
+    };
+    const rows: { ws: string; id: string; kind: string }[] = [];
+    for (const s of [seed.a, seed.b]) {
+      const { iss } = await mkIssue(s);
+      for (const kind of ["pending-old", "uploading-stale", "uploading-fresh", "deleted-old"]) {
+        const id = randomUUID(); rows.push({ ws: s.id, id, kind });
+        const status = kind.startsWith("uploading") ? "uploading" : kind === "deleted-old" ? "ready" : "pending";
+        await asOwner(s.id, async (tx) => {
+          await tx`insert into issue_attachments (id, workspace_id, issue_id, kind, url, title, mime_type, size_bytes, filename, storage_key, upload_status, created_by, created_at, upload_started_at, deleted_at)
+            values (${id}, ${s.id}, ${iss}, 'file', null, 't', ${PDF}, 3, 'f.pdf', ${storageKey(s.id, id)}, ${status}, ${s.member},
+              ${kind === "pending-old" ? tx`now() - interval '2 hours'` : tx`now()`}, ${kind === "uploading-stale" ? tx`now() - interval '20 minutes'` : kind === "uploading-fresh" ? tx`now()` : null},
+              ${kind === "deleted-old" ? tx`now() - interval '20 minutes'` : null})`;
+        });
+        const st = fsStore(dir); const { Readable } = await import("node:stream");
+        await st.put(storageKey(s.id, id), Readable.toWeb(Readable.from([Buffer.from("abc")])) as never, { size: 3, mime: PDF });
+      }
+    }
+    expect(await U.gcAttachments(db())).toBeGreaterThanOrEqual(6);
+    for (const r of rows) {
+      const left = await asOwner(r.ws, (tx) => tx`select 1 from issue_attachments where id = ${r.id}`);
+      const bytes = existsSync(join(dir, storageKey(r.ws, r.id)));
+      if (r.kind === "uploading-fresh") { expect(left).toHaveLength(1); expect(bytes).toBe(true); }
+      else { expect(left).toHaveLength(0); expect(bytes).toBe(false); }
+    }
+    await asOwner(seed.a.id, (tx) => tx`delete from issue_attachments where kind = 'file' and upload_status = 'uploading'`);
+    await asOwner(seed.b.id, (tx) => tx`delete from issue_attachments where kind = 'file' and upload_status = 'uploading'`);
+  });
+
+  it("stale .tmp files are swept; bidi overrides are stripped from filenames; delete emits a sync event", async () => {
+    const wsDir = join(dir, seed.a.id); const { writeFileSync, utimesSync, mkdirSync } = await import("node:fs");
+    mkdirSync(wsDir, { recursive: true });
+    const old = join(wsDir, ".dead.tmp"), fresh = join(wsDir, ".live.tmp");
+    writeFileSync(old, "x"); writeFileSync(fresh, "y"); const past = new Date(Date.now() - 2 * 3600_000); utimesSync(old, past, past);
+    expect(await fsStore(dir).sweepTmp(3600_000)).toBe(1);
+    expect(existsSync(old)).toBe(false); expect(existsSync(fresh)).toBe(true);
+    expect(U.sanitizeFilename("invoice\u202Efdp.exe")).toBe("invoicefdp.exe");
+    expect(U.sanitizeFilename("a\u2066b\u200Fc.pdf")).toBe("abc.pdf");
+    const { init: i } = await upload(seed.a.member, "%PDF-del");
+    const before = (await asOwner(seed.a.id, (tx) => tx`select coalesce(max(id),0)::int as m from sync_events`))[0]!.m as number;
+    expect((await call(A.deleteAttachment, seed.a.member, { method: "DELETE" }, seed.a.slug, issue, i.id)).status).toBe(204);
+    const ev = await asOwner(seed.a.id, (tx) => tx`select entity, op, issue_id from sync_events where id > ${before} order by id`);
+    expect(ev.at(-1)).toMatchObject({ entity: "issue", op: "update", issue_id: issue });
+  });
+
   it("a ready upload emits an update event on the parent issue", async () => {
     const before = await asOwner(seed.a.id, (tx) => tx`select coalesce(max(id),0)::int as m from sync_events`);
     await upload(seed.a.member, "%PDF-evt");

@@ -14,6 +14,8 @@ export interface AttachmentStore {
   delete(key: string): Promise<void>;
   /** Every stored key starting with `prefix` ("" = all, `<workspace_id>/` = one workspace). Partial uploads (temp files) are never listed. */
   list(prefix: string): AsyncIterable<string>;
+  /** Removes leftover temp files of crashed uploads older than `maxAgeMs`. Returns how many were removed. */
+  sweepTmp(maxAgeMs: number): Promise<number>;
 }
 export class SizeMismatch extends Error {}
 
@@ -54,6 +56,19 @@ export function fsStore(root: string): AttachmentStore {
       return { stream: Readable.toWeb(rs) as unknown as ReadableStream<Uint8Array>, size };
     },
     async delete(key) { await rm(path(key), { force: true }); },
+    async sweepTmp(maxAgeMs) {
+      let n = 0, top: string[];
+      try { top = await readdir(base); } catch { return 0; }
+      for (const ws of top) {
+        let files: string[];
+        try { files = await readdir(join(base, ws)); } catch { continue; }
+        for (const f of files) {
+          if (!f.startsWith(".") || !f.endsWith(".tmp")) continue;
+          try { if (Date.now() - (await stat(join(base, ws, f))).mtimeMs > maxAgeMs) { await rm(join(base, ws, f), { force: true }); n++; } } catch { /* raced with a finishing upload */ }
+        }
+      }
+      return n;
+    },
     async *list(prefix) {
       let top: string[];
       try { top = await readdir(base); } catch { return; }
