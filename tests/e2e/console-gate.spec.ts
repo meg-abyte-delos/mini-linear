@@ -27,9 +27,7 @@ const SCREENS: Screen[] = [
 ];
 
 
-// No known defects tolerated: the shell CSP style-src defect is fixed (inline styles moved to CSS / CSSOM custom properties).
-const KNOWN: Record<string, string> = {};
-const KNOWN_RE = /Applying inline style violates the following Content Security Policy directive 'style-src/;
+// No known defects tolerated: every console/CSP problem fails the gate.
 
 for (const s of SCREENS) {
   test.describe(`console ${s.name}`, () => {
@@ -50,10 +48,7 @@ for (const s of SCREENS) {
       await page.evaluate(() => document.fonts.ready);
       await settled(page);
       await page.waitForTimeout(500);
-      const tolerated = KNOWN[s.name] ? problems.filter((x) => KNOWN_RE.test(x)) : [];
-      const unexpected = problems.filter((x) => !tolerated.includes(x));
-      expect(unexpected, `console problems on ${s.name}`).toEqual([]);
-      if (KNOWN[s.name]) expect(tolerated.length, `known defect gone on ${s.name} (${KNOWN[s.name]}): remove it from KNOWN`).toBeGreaterThan(0);
+      expect(problems, `console problems on ${s.name}`).toEqual([]);
     });
   });
 }

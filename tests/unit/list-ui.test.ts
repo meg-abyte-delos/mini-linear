@@ -42,3 +42,15 @@ describe('listGroups / visibleOrder (j/k order = render order)', () => {
     expect(visibleOrder(g, new Set(['todo'])).map((x) => x.id)).toEqual(['b']);
   });
 });
+import { fitLabels } from '@/lib/list-ui';
+describe('fitLabels', () => {
+  const L = (...n: string[]) => n.map((name) => ({ name }));
+  it('keeps everything when it fits', () => { expect(fitLabels(L('bug')).hidden).toEqual([]); });
+  it('shows whole pills and folds the rest', () => {
+    const r = fitLabels(L('Needs triage', 'Needs triage again', 'frontend', 'backend'));
+    expect(r.shown.length + r.hidden.length).toBe(4);
+    expect(r.hidden.length).toBeGreaterThan(0);
+    expect(r.shown.length).toBeGreaterThan(0);
+  });
+  it('always shows at least one pill', () => { expect(fitLabels(L('x'.repeat(60), 'y')).shown.length).toBe(1); });
+});

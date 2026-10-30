@@ -55,14 +55,26 @@ test('team role is a ui Select (not a native select) and changes the role', asyn
   const btn = page.getByRole('button', { name: /^Team role for / }).first();
   await expect(btn).toBeVisible();
   expect(await page.locator('select.set-select').count()).toBe(0);
-  const before = await btn.getAttribute('aria-label');
+  const before = (await btn.getAttribute('aria-label')) ?? '';
   await btn.click();
-  await expect(page.getByRole('menu', { name: /Team role for/ })).toBeVisible();
+  const menu = page.getByRole('menu', { name: /Team role for/ });
+  await expect(menu).toBeVisible();
   const items = page.getByRole('menuitem');
   await expect(items).toHaveCount(3);
+  // Escape closes without changing anything.
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toHaveCount(0);
   expect(await btn.getAttribute('aria-label')).toBe(before);
+  // Pick a different role: the button label must change; then restore it.
+  const cur = before.split(': ').pop() ?? '';
+  await btn.click();
+  const other = items.filter({ hasNotText: new RegExp(cur, 'i') }).first();
+  const otherName = (await other.innerText()).replace(/[^A-Za-z ]/g, '').trim();
+  await other.click();
+  await expect(btn).toHaveAttribute('aria-label', new RegExp(`: ${otherName}$`));
+  await btn.click();
+  await page.getByRole('menuitem', { name: new RegExp(cur, 'i') }).first().click();
+  await expect(btn).toHaveAttribute('aria-label', before);
 });
 
 test('invite role is a radiogroup', async ({ page }) => {
@@ -73,4 +85,22 @@ test('invite role is a radiogroup', async ({ page }) => {
   await g.getByRole('radio', { name: 'Guest' }).click();
   await expect(g.getByRole('radio', { name: 'Guest' })).toHaveAttribute('aria-checked', 'true');
   await expect(g.getByRole('radio', { name: 'Member' })).toHaveAttribute('aria-checked', 'false');
+});
+
+test('invite role radiogroup: roving tabindex and arrow keys', async ({ page }) => {
+  await page.goto('/w/demo/members');
+  await page.getByRole('button', { name: /invite/i }).first().click();
+  const g = page.getByRole('radiogroup', { name: 'Role' });
+  const radios = g.getByRole('radio');
+  const n = await radios.count();
+  const checked = g.locator('[aria-checked="true"]');
+  await expect(checked).toHaveAttribute('tabindex', '0');
+  expect(await g.locator('[tabindex="-1"]').count()).toBe(n - 1);
+  const first = (await checked.innerText()).trim();
+  await checked.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(g.locator('[aria-checked="true"]')).not.toHaveText(first);
+  await expect(g.locator('[aria-checked="true"]')).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(g.locator('[aria-checked="true"]')).toHaveText(first);
 });

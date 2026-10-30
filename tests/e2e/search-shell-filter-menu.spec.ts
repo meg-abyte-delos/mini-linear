@@ -84,6 +84,14 @@ test.describe('Filter menu', () => {
     await expect(page.locator('#fb-add')).toBeFocused();
   });
 
+  test('Space on a focused row activates it instead of moving focus to the input', async ({ page }) => {
+    await home(page);
+    await page.locator('#fb-add').click();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+    await expect(page.getByRole('combobox', { name: /Filter by status/ })).toBeVisible();
+  });
+
   test('typing from a row goes back to the input', async ({ page }) => {
     await home(page);
     await page.locator('#fb-add').click();
