@@ -36,6 +36,24 @@ curl -H "Authorization: Bearer $ML_KEY" https://ml.example.com/api/v1/w/acme/iss
 
 A GraphQL endpoint is not provided (out of scope for this iteration).
 
+## Notifications and realtime (A6)
+
+| Endpoint | Notes |
+|---|---|
+| `GET /notifications` | items add `coalesced_count`, `last_event_at`, `meta` (`{from,to}` for `status_change`, `{child_id}` for `sub_issue`, `{reason:"followed_<kind>"}`, `{relation_type,related_issue_id}`, `{due_date}`); reply carries `unread_count` |
+| `POST /notifications/bulk` | `{ids (1..100), action: read\|unread\|archive\|unarchive}` strict. `200 { updated, results:[{id,status:"ok"\|"not_found"}], unread_count }`. Foreign, hidden and unknown ids are `not_found`, never an error |
+| `GET /subscriptions?kind=project\|cycle\|team\|label` | caller's own entity subscriptions `{ items:[{kind,entity_id,created_at}] }`. Guests: 403, bad kind: 422 |
+| `PUT/DELETE /subscriptions/<kind>/<entityId>` | 204, idempotent. Unknown or invisible entity: 404, entityId not a uuid: 422, more than 200: 422 |
+| `/notification-preferences` | now 8 types: assigned, mention, comment, status_change, due_soon, reply, sub_issue, relation |
+
+Types: a reply in a thread you wrote or follow is `reply`; a child added to an issue you follow is `sub_issue`; a relation involving an issue you follow is `relation`. An unread notification of the same `(user, issue, type)` is updated instead of duplicated (`coalesced_count`, `last_event_at`); `mention` and `assigned` never coalesce, a read or archived one is never reused. Issues created in or moved into a followed project/cycle/team, or labelled with a followed label, notify as `sub_issue` with `meta.reason`.
+
+`meta.child_id` and `meta.related_issue_id` are NOT visibility-checked for the recipient: a client must resolve them through the authorised issue GET (404 means hidden) and never render a title from them directly. `POST /notifications/read-all` and `archive-read` touch at most 500 rows per call (`updated` equal to 500 means call again).
+
+`due_soon` is produced by the internal cron route `POST /api/internal/notifications/due-soon` (header `x-cron-secret` = env `CRON_SECRET`, constant-time compare; unset env: 503; wrong or missing header: 401). It is not part of the public API.
+
+**Change feed** (`GET /sync?after=`, SSE `GET /events`, `Last-Event-ID` replay and `resync` unchanged). Events are `{ id (sealed cursor), entity, entity_id, op, version, issue_id|null, scope? , unread_count? }`, SSE event name `<entity>.<op>`. Entities: issue, comment, relation, attachment, label, project, cycle, view, notification, view_state, favorite. Per-user events (`notification`, `view_state`, `favorite`) reach their user only; `notification` events carry the current `unread_count`; events with `issue_id: null` (project, cycle, label, view) are workspace wide and not sent to guests. A child issue created, deleted, restored, re-parented or changing status/estimate also emits an `issue.update` for its parent(s). Lanes emit through `emitSync()` (`src/lib/sync/emit.ts`) or the SQL function `sync_publish()`.
+
 ## Outbound webhooks
 
 Workspace admins, signed-in session only.
