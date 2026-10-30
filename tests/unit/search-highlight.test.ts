@@ -8,6 +8,9 @@ describe('highlightParts', () => {
       { text: 'Cron', mark: true }, { text: 'kit parser for ', mark: false }, { text: 'cron', mark: true }, { text: ' jobs', mark: false },
     ]);
   });
+  it('prefers the longest word when one is a prefix of another', () => {
+    expect(highlightParts('Cronkit parser', 'cron cronkit')).toEqual([{ text: 'Cronkit', mark: true }, { text: ' parser', mark: false }]);
+  });
   it('returns the text untouched without a usable query and escapes regex characters', () => {
     expect(highlightParts('a (b) c', 'a')).toEqual([{ text: 'a (b) c', mark: false }]);
     expect(highlightParts('x (b) y', '(b)')).toEqual([{ text: 'x ', mark: false }, { text: '(b)', mark: true }, { text: ' y', mark: false }]);
