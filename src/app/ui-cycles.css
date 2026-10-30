@@ -1,0 +1,30 @@
+/* Cycles list rows (CyclesList.tsx), modelled on Linear's Cycles page:
+   glyph + name + Current badge | dates + timing | scope | ring + % + done/total | actions (quiet until hover/focus).
+   Scoped to .cycles so the Projects rows (.cycle.project) keep their own grid. */
+.cycles .cycle { grid-template-columns:minmax(180px,1.3fr) minmax(200px,1.2fr) minmax(130px,.8fr) 132px auto; gap:16px; min-height:44px; padding:0 16px 0 20px; cursor:default; transition:background .12s; }
+.cycles .cycle:hover, .cycles .cycle:focus-within { background:var(--hover); }
+.cycles .cy-name { display:flex; align-items:center; gap:8px; min-width:0; font-weight:500; }
+.cycles .cy-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cy-glyph { flex:none; stroke:var(--muted-strong); fill:var(--muted-strong); }
+.cy-glyph[data-bucket='active'] { stroke:var(--accent); fill:var(--accent); }
+.cy-badge { flex:none; height:18px; padding:0 6px; display:inline-flex; align-items:center; border-radius:4px; font-size:11px; font-weight:500; color:var(--fg); background:color-mix(in srgb, var(--accent) 22%, transparent); border:1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.cycles .cy-dates { display:flex; align-items:center; gap:8px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.cy-timing { color:var(--muted-strong); font-size:12px; }
+.cy-timing::before { content:'\00b7'; margin-right:8px; }
+.cy-scope { display:flex; gap:12px; color:var(--muted-strong); font-size:var(--fs-sm); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.cy-progress { display:flex; align-items:center; gap:8px; justify-self:end; font-size:var(--fs-sm); font-variant-numeric:tabular-nums; }
+.cy-pct { color:var(--fg); min-width:36px; text-align:right; }
+.cycles .cy-count { color:var(--muted-strong); min-width:28px; }
+.cycles .cy-actions { display:flex; gap:4px; justify-content:flex-end; }
+/* Actions are ghost buttons: always readable (axe contrast), framed only on row hover / keyboard focus. */
+.cycles .cycle button { height:24px; padding:0 8px; border:1px solid transparent; background:none; color:var(--muted-strong); }
+.cycles .cycle:hover button, .cycles .cycle:focus-within button { border-color:var(--line); background:var(--panel); color:var(--fg); }
+.cycles .cycle button:hover { background:var(--hover); }
+.cycles .cycle button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.cycles .cycle button[aria-expanded='true'] { border-color:var(--accent); color:var(--fg); }
+/* Empty bucket: glyph + title + one-line hint, left-aligned with the row content. */
+.cy-empty { display:grid; grid-template-columns:14px 1fr; column-gap:8px; align-items:center; padding:12px 16px 14px 20px; border-bottom:1px solid var(--line-soft); }
+.cy-empty .col-empty { margin:0; padding:0; color:var(--muted-strong); font-size:var(--fs-sm); }
+.cy-empty-hint { grid-column:2; margin:2px 0 0; color:var(--muted-strong); font-size:12px; }
+@media (max-width:900px) { .cycles .cycle { grid-template-columns:1fr auto auto; } .cycles .cy-scope, .cycles .cy-timing { display:none; } }
+@media (prefers-reduced-motion: reduce) { .cycles .cycle { transition:none; } }
