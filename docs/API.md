@@ -82,3 +82,6 @@ Delivery: 2xx = success (redirects are not followed). Otherwise retried with bac
 `GET /search/recents` -> `{ items: [{ id, kind: query|issue|project, query, entity_id, created_at }] }` newest first, max 20, entities no longer visible dropped.
 `POST /search/recents` strict body `{ kind, query? | entity_id? }` (`query` iff `kind=query`, else visible `entity_id`): 201; 422 bad body, 404 entity not visible, 403 guest + `project`. Re-adding the same query (case-insensitive) or entity moves it to the top; the 50 newest per user are kept.
 `DELETE /search/recents` 204 clears; `DELETE /search/recents/:id` 204 idempotent (unknown/foreign id), 400 `bad_request` if the id is not a uuid. Any role incl. guest may clear or delete their own recents. Recents are per user (RLS `own_rows`).
+
+## Changelog
+- **Behavior change (A4):** `POST /issues/:id/relations` with `type: duplicate` now cancels the source issue by default (`cancel_source` defaults to `true`, was effectively false). Pass `{ "cancel_source": false }` to keep the previous behavior. Moving the source to the team's first `canceled` state happens in the same transaction.
