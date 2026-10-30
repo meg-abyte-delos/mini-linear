@@ -21,22 +21,24 @@ const display = z.object({
   show_empty_groups: z.boolean().optional(), show_sub_issues: z.boolean().optional(),
   properties: z.array(z.string().max(32)).max(20).optional(),
 }).strict().refine((d) => !d.sub_grouping || (!!d.grouping && d.grouping !== 'none' && d.sub_grouping !== d.grouping), 'sub_grouping needs a different grouping');
+export const viewFilters = group;
+export const viewDisplay = display;
 const body = z.object({
   name: z.string().trim().min(1).max(80), shared: z.boolean(), team_id: uuidSchema.nullable(),
   layout: z.enum(['list', 'board']), filters: group, display,
 }).strict();
 const F = ['name', 'shared', 'team_id', 'layout', 'filters', 'display'];
-const SEL = (ctx: Ctx) => ctx.tx`select id, owner_id, team_id, name, shared, layout, filters, display, version, created_at, updated_at from saved_views`;
+export const SEL = (ctx: Ctx) => ctx.tx`select id, owner_id, team_id, name, shared, layout, filters, display, version, created_at, updated_at from saved_views`;
 
 /** Visible = own, or shared; a shared view scoped to a team is hidden from members outside it (404 either way). */
-const visible = (ctx: Ctx) => {
+export const visible = (ctx: Ctx) => {
   const t = ctx.tx;
   if (ctx.role === 'guest') return t`false`;
   const teamOk = ctx.role === 'owner' || ctx.role === 'admin' ? t`true`
     : t`(team_id is null or exists (select 1 from team_memberships tm where tm.team_id = saved_views.team_id and tm.user_id = ${ctx.userId}))`;
   return t`(owner_id = ${ctx.userId} or (shared and ${teamOk}))`;
 };
-const getView = async (ctx: Ctx, id: string) => {
+export const getView = async (ctx: Ctx, id: string) => {
   const r = await ctx.tx<Row[]>`${SEL(ctx)} where id = ${id} and ${visible(ctx)}`;
   if (!r[0]) throw new ApiError('not_found');
   return r[0];
@@ -89,6 +91,7 @@ export const deleteView = (req: Request, slug: string, rawId: string) => withWor
   mustWrite(ctx, before);
   if (Number(before.version) !== want) throw stale(before);
   await ctx.tx`delete from saved_views where id = ${id}`;
+  await ctx.tx`select purge_view_state(${id}::uuid)`; // every user's view:<id> state goes with the view (same tx)
   await audit(ctx, 'saved_view', id, 'delete', diffOf(before, null, F));
   return new Response(null, { status: 204 });
 });
