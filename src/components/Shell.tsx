@@ -24,7 +24,7 @@ import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilters, type FilterKey, type Filters } from '@/lib/filters';
-import { WorkspaceSwitcher, TeamSection } from '@/components/SidebarParts';
+import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'Priority', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
@@ -648,13 +648,15 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   return (
     <div className='shell'>
       <aside className='side' aria-label='Sidebar'>
-        <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
-        {!readOnly && <button className='side-btn new' onClick={() => create()}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
-        <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
+        <div className='side-head'>
+          <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
+          <button className='side-icbtn' onClick={openPalette} aria-label='Search' title='Search (⌘K)' aria-keyshortcuts='Meta+K Control+K'><SideIcon name='search' /></button>
+          {!readOnly && <button className='side-icbtn compose' onClick={() => create()} aria-label='New issue' title='New issue (C)' aria-keyshortcuts='C'><SideIcon name='compose' /></button>}
+        </div>
         <nav aria-label='Primary'>
-          <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><Icon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
-          <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><Icon name='issues' /><span>My issues</span></a>
-          <a className='side-link' href='#views' onClick={(e) => e.preventDefault()}><Icon name='views' /><span>Views</span></a>
+          <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><SideIcon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
+          <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><SideIcon name='mine' /><span>My issues</span></a>
+          <a className='side-link' href='#views' onClick={(e) => e.preventDefault()}><SideIcon name='views' /><span>Views</span></a>
           <div role='group' aria-label='Saved views' data-testid='saved-views'>
             {views.map((v) => (
               <div key={v.id} className='sv-row'>
@@ -668,9 +670,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
           <TeamSection name='Delos'>
-          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><span>Issues</span></a>
-          <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><span>Cycles</span></a>
-          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><span>Projects</span></a>
+          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span></a>
+          <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><SideIcon name='cycles' /><span>Cycles</span></a>
+          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span></a>
           </TeamSection>
         </nav>
       </aside>
