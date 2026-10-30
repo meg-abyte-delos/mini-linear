@@ -68,3 +68,16 @@ Delivery: 2xx = success (redirects are not followed). Otherwise retried with bac
 **Scopes**: `read`, `write`, `admin`; creating a key above your own role is refused. Invalid keys are rate limited per IP (`API_BAD_KEY_LIMIT`, default 30/min); a non-Bearer Authorization header gets 401 (no cookie fallback).
 
 **Payload / retention**: `payload` is the row as JSON (`to_jsonb(row)`) minus the internal `tsv` column. Deliveries older than 30 days are purged by the dispatcher (`purge_webhook_deliveries`).
+
+## Sub-issues, relations, estimates (A4, migration 0801)
+
+Contract: `docs/contracts/A4-subissues-relations-estimates.md`. All routes under `/api/v1/w/<slug>`.
+
+- **Issue DTO** (single and list): `sub_issues: { total, done, in_progress }` (direct, non-deleted children; `in_progress` = state category `started`), `estimate_rollup: { own, children, total }` (`children` = sum of the non-null child estimates, null when none; `total = (own ?? 0) + (children ?? 0)`), `parent: { id, identifier, title } | null`.
+- **Parent rules** (POST and PATCH `parent_id`): the parent must be a live issue the caller sees and must be in the child's team, else 422 `validation_failed` (unknown, foreign, soft-deleted and hidden parents share one message; team mismatch: "sub-issue must be in the parent's team"). Cycles and depth > 5 are 422 (DB trigger). `team_id` is not patchable (strict body, 422), so a parent or child cannot be moved out of its team.
+- `GET /issues?parent_id=<uuid>|none` (`none` = top-level only).
+- `GET /issues/:id/sub-issues?limit&cursor&include=children|descendants`: issue DTOs ordered `(sort_key, id)`; `descendants` flattens the visible subtree with `depth` 1..4. 404 when the parent is not visible. The older `GET /issues/:id/children` (no pagination, max 500) stays.
+- **Reorder**: `PATCH /issues/:id { move: { before_id } | { after_id } }` (If-Match as usual). The target must be another issue with the same parent, else 422. Only `sort_key` and `version` change (not audited).
+- **Relations**: items and the POST 201 body carry `related_issue { id, identifier, title, status, priority, assignee_id, team_id }`. Duplicate pair: 409 `conflict` with `details { relation_id, type }` (type as seen from the requested issue). `POST` accepts `cancel_source` (boolean). **Deviation from the contract text**: default `true`, because main already cancels the source on `duplicate` (test `a1-relations`); `false` skips it.
+- **Bulk** `POST /issues/bulk` (existing, max 250 ids): patch gains `estimate` (validated against the team scale, per issue) and `add_label_ids` / `remove_label_ids` (aliases of `label_ids_add` / `label_ids_remove`); optional `versions: { <issue_id>: <version> }` is a per-issue If-Match (stale: that id fails with `precondition_failed`, `details.current_version`). Failed items may carry `details`. Actions `delete` / `restore` / `archive` / `unarchive` bump versions; team-guests fail per issue with `forbidden`.
+- `GET /teams/:id/estimate-scale` -> `{ scale, allow_zero, values }` (`values` empty for `none`). Admin+ always; other callers must be team members (404 otherwise); guests 403.

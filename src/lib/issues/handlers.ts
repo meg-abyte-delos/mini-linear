@@ -10,6 +10,7 @@ import { assertAssignee, assertTeamVisible, assertTeamWrite, teamVisible } from 
 import { subscribe } from "../resources/subscriptions";
 import { getTemplateRow } from "../resources/templates";
 import { emit } from "../notifications";
+import { between } from "./sortkey";
 import { ESTIMATE_SCALES, estimateValues, type EstimateScale } from "../team-config";
 
 const STATUS = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
@@ -45,10 +46,12 @@ const patchBody = z.object({
   title: z.string().trim().min(1).max(255), description: z.string().max(100000), status: z.enum(STATUS), priority: z.number().int().min(0).max(4),
   assignee_id: uuidSchema.nullable(), project_id: uuidSchema.nullable(), cycle_id: uuidSchema.nullable(), parent_id: uuidSchema.nullable(),
   label_ids: z.array(uuidSchema).max(50), state_id: uuidSchema, estimate: estimate.nullable(), due_date: date.nullable(),
+  // Reorder among siblings (same parent): place right before / after another issue. Changes sort_key only.
+  move: z.union([z.object({ before_id: uuidSchema }).strict(), z.object({ after_id: uuidSchema }).strict()]),
 }).partial().strict();
 const filters = listQuery.extend({
   status: z.enum(STATUS).optional(), team_id: uuidSchema.optional(), assignee_id: uuidSchema.optional(),
-  project_id: uuidSchema.optional(), cycle_id: uuidSchema.optional(), label_id: uuidSchema.optional(), parent_id: uuidSchema.optional(),
+  project_id: uuidSchema.optional(), cycle_id: uuidSchema.optional(), label_id: uuidSchema.optional(), parent_id: z.union([uuidSchema, z.literal("none")]).optional(),
   state_id: uuidSchema.optional(), estimate: z.coerce.number().int().min(0).max(64).optional(),
   due_before: date.optional(), due_after: date.optional(), has_due_date: z.enum(["true", "false"]).optional(),
   include_archived: z.enum(["true", "false"]).optional(),
@@ -73,13 +76,20 @@ export function branchName(handle: string, teamKey: string, n: number, title: st
   return `${slugify(handle, 39) || "user"}/${teamKey.toLowerCase()}-${n}${t ? `-${t}` : ""}`;
 }
 export const handleOf = (email: string) => email.split("@")[0] ?? "";
+/** A4: own estimate + sum of the non-null estimates of the direct children (null when no child has one). */
+export const rollup = (own: number | null | undefined, children: number | string | null | undefined) => {
+  const o = own ?? null, c = children === null || children === undefined ? null : Number(children);
+  return { own: o, children: c, total: (o ?? 0) + (c ?? 0) };
+};
 export const dto = (r: Row, m: Meta) => {
   const identifier = `${r.team_key}-${r.number}`;
   return {
     id: r.id, identifier, team_id: r.team_id, number: r.number, title: r.title, description: r.description,
     status: r.status, priority: r.priority, assignee_id: r.assignee_id, project_id: r.project_id, cycle_id: r.cycle_id, parent_id: r.parent_id,
     state_id: r.state_id, estimate: r.estimate ?? null, due_date: r.due_date ?? null,
-    label_ids: r.label_ids, sub_issues: { total: Number(r.sub_total ?? 0), done: Number(r.sub_done ?? 0) }, version: r.version, created_by: r.created_by, deleted_at: r.deleted_at, archived_at: r.archived_at ?? null,
+    label_ids: r.label_ids, sub_issues: { total: Number(r.sub_total ?? 0), done: Number(r.sub_done ?? 0), in_progress: Number(r.sub_in_progress ?? 0) },
+    estimate_rollup: rollup(r.estimate as number | null | undefined, r.est_children as number | string | null | undefined),
+    parent: r.parent_id ? { id: r.parent_id, identifier: r.parent_identifier ?? null, title: r.parent_title ?? null } : null, version: r.version, created_by: r.created_by, deleted_at: r.deleted_at, archived_at: r.archived_at ?? null,
     branch_name: branchName(m.handle, r.team_key as string, Number(r.number), r.title as string),
     url: `/w/${encodeURIComponent(m.slug)}/issue/${identifier}`,
     created_at: r.created_at, updated_at: r.updated_at,
@@ -99,8 +109,13 @@ export function visible(ctx: Ctx) {
 export const SEL = (ctx: Ctx) => ctx.tx`select i.*, t.key as team_key, coalesce((select array_agg(label_id order by label_id) from issue_labels where issue_id = i.id), '{}') as label_ids,
     i.due_date::text as due_date_text,
     (select count(*) from issues c where c.parent_id = i.id and c.deleted_at is null) as sub_total,
-    (select count(*) from issues c where c.parent_id = i.id and c.deleted_at is null and c.status = 'done') as sub_done
-    from issues i join teams t on t.id = i.team_id and t.workspace_id = i.workspace_id`;
+    (select count(*) from issues c where c.parent_id = i.id and c.deleted_at is null and c.status = 'done') as sub_done,
+    (select count(*) from issues c join workflow_states ws on ws.id = c.state_id where c.parent_id = i.id and c.deleted_at is null and ws.category = 'started') as sub_in_progress,
+    (select sum(c.estimate) from issues c where c.parent_id = i.id and c.deleted_at is null and c.estimate is not null) as est_children,
+    pi.title as parent_title, case when pi.id is null then null else pt.key || '-' || pi.number end as parent_identifier
+    from issues i join teams t on t.id = i.team_id and t.workspace_id = i.workspace_id
+    left join issues pi on pi.id = i.parent_id and pi.workspace_id = i.workspace_id and pi.deleted_at is null
+    left join teams pt on pt.id = pi.team_id`;
 export async function load(ctx: Ctx, id: string, deleted = false) {
   const rows = await ctx.tx<Row[]>`${SEL(ctx)} where i.id = ${id} and ${visible(ctx)} and ${deleted ? ctx.tx`i.deleted_at is not null` : ctx.tx`i.deleted_at is null`}`;
   if (rows.length === 0) throw new ApiError("not_found");
@@ -120,6 +135,29 @@ async function assertCycleTeam(ctx: Ctx, cycleId: string, teamId: string) {
 async function assertStateTeam(ctx: Ctx, stateId: string, teamId: string) {
   const r = await ctx.tx`select 1 from workflow_states where id = ${stateId} and team_id = ${teamId}`;
   if (r.length === 0) throw new ApiError("validation_failed", "state must belong to the issue's team");
+}
+/**
+ * A4: a parent must be a live issue the caller can see, in the child's team. Same 422 for unknown / foreign / soft-deleted /
+ * invisible parents (no existence leak); a visible parent of another team gets its own message.
+ */
+export async function assertParent(ctx: Ctx, parentId: string, teamId: string) {
+  const r = await ctx.tx<{ team_id: string }[]>`select i.team_id from issues i where i.id = ${parentId} and i.deleted_at is null and ${visible(ctx)}`;
+  if (r.length === 0) throw new ApiError("validation_failed", "referenced entity not found");
+  if (r[0]!.team_id !== teamId) throw new ApiError("validation_failed", "sub-issue must be in the parent's team");
+}
+/** New sort_key placing `row` right before / after `anchor`, among issues with the same parent (siblings). */
+async function moveKey(ctx: Ctx, row: Row, mv: { before_id: string } | { after_id: string }) {
+  const anchorId = "before_id" in mv ? mv.before_id : mv.after_id;
+  const a = await load(ctx, anchorId).catch(() => { throw new ApiError("validation_failed", "move target not found"); });
+  if (a.id === row.id || (a.parent_id ?? null) !== (row.parent_id ?? null)) throw new ApiError("validation_failed", "move target must be a different sibling (same parent)");
+  const sib = ctx.tx`i.deleted_at is null and i.id <> ${row.id as string} and i.parent_id is not distinct from ${(row.parent_id ?? null) as string | null} and ${visible(ctx)}`;
+  const k = a.sort_key as string;
+  if ("before_id" in mv) {
+    const p = await ctx.tx<{ sort_key: string }[]>`select i.sort_key from issues i where ${sib} and i.sort_key < ${k} collate "C" order by i.sort_key desc limit 1`;
+    return between(p[0]?.sort_key ?? null, k);
+  }
+  const n = await ctx.tx<{ sort_key: string }[]>`select i.sort_key from issues i where ${sib} and i.sort_key > ${k} collate "C" order by i.sort_key asc limit 1`;
+  return between(k, n[0]?.sort_key ?? null);
 }
 export const stale = (r: Row) => new ApiError("precondition_failed", "stale version", { current_version: r.version });
 /**
@@ -141,7 +179,7 @@ export const listIssues = (req: Request, slug: string) => withWorkspaceCtx(req, 
   const rows = await t<Row[]>`${SEL(ctx)} where i.deleted_at is null and ${visible(ctx)} ${q.include_archived === "true" ? none : t`and i.archived_at is null`}
       ${q.status ? t`and i.status = ${q.status}` : none} ${q.team_id ? t`and i.team_id = ${q.team_id}` : none}
       ${q.assignee_id ? t`and i.assignee_id = ${q.assignee_id}` : none} ${q.project_id ? t`and i.project_id = ${q.project_id}` : none}
-      ${q.cycle_id ? t`and i.cycle_id = ${q.cycle_id}` : none} ${q.parent_id ? t`and i.parent_id = ${q.parent_id}` : none}
+      ${q.cycle_id ? t`and i.cycle_id = ${q.cycle_id}` : none} ${q.parent_id ? (q.parent_id === "none" ? t`and i.parent_id is null` : t`and i.parent_id = ${q.parent_id}`) : none}
       ${q.state_id ? t`and i.state_id = ${q.state_id}` : none} ${q.estimate !== undefined ? t`and i.estimate = ${q.estimate}` : none}
       ${q.due_before ? t`and i.due_date <= ${q.due_before}::date` : none} ${q.due_after ? t`and i.due_date >= ${q.due_after}::date` : none}
       ${q.has_due_date ? (q.has_due_date === "true" ? t`and i.due_date is not null` : t`and i.due_date is null`) : none}
@@ -164,6 +202,7 @@ export const createIssue = (req: Request, slug: string) => withWorkspaceCtx(req,
   const id = uuidv7();
   if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
   if (b.cycle_id) await assertCycleTeam(ctx, b.cycle_id, b.team_id);
+  if (b.parent_id) await assertParent(ctx, b.parent_id, b.team_id);
   await assertEstimate(ctx, b.team_id, b.estimate);
   if (b.state_id) await assertStateTeam(ctx, b.state_id, b.team_id); // state_id wins over status (trigger derives status)
   await ctx.tx`insert into issues (id, workspace_id, team_id, number, title, description, status, priority, assignee_id, project_id, cycle_id, parent_id, sort_key, created_by, state_id, estimate, due_date)
@@ -192,8 +231,10 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
   if (Number(before.version) !== want) throw stale(before);
   if (b.assignee_id) await assertAssignee(ctx, b.assignee_id);
   if (b.cycle_id) await assertCycleTeam(ctx, b.cycle_id, before.team_id as string);
+  if (b.parent_id && b.parent_id !== before.parent_id) await assertParent(ctx, b.parent_id, before.team_id as string);
   if (b.state_id) await assertStateTeam(ctx, b.state_id, before.team_id as string);
   await assertEstimate(ctx, before.team_id as string, b.estimate);
+  const sortKey = b.move ? await moveKey(ctx, before, b.move) : (before.sort_key as string);
   const pick = <K extends keyof typeof b>(k: K, cur: unknown) => (b[k] !== undefined ? b[k] : cur);
   // The version predicate is in the UPDATE too: closes the race between the read above and this write.
   const upd = await ctx.tx`update issues set title = ${pick("title", before.title) as string}, description = ${pick("description", before.description) as string},
@@ -201,7 +242,7 @@ export const patchIssue = (req: Request, slug: string, rawId: string) => withWor
     assignee_id = ${pick("assignee_id", before.assignee_id) as string | null}, project_id = ${pick("project_id", before.project_id) as string | null},
     cycle_id = ${pick("cycle_id", before.cycle_id) as string | null}, parent_id = ${pick("parent_id", before.parent_id) as string | null},
     state_id = ${pick("state_id", before.state_id) as string}, estimate = ${pick("estimate", before.estimate) as number | null},
-    due_date = ${pick("due_date", before.due_date) as string | null},
+    due_date = ${pick("due_date", before.due_date) as string | null}, sort_key = ${sortKey},
     version = version + 1, updated_at = now() where id = ${id} and version = ${want} returning id`;
   if (upd.length === 0) throw stale(before);
   if (b.label_ids) await setLabels(ctx, id, b.label_ids);
@@ -242,6 +283,7 @@ const PURGE_MS = 30 * 86400_000;
 /** Archive / unarchive: idempotent, bump version, audited. Archived issues are hidden from lists unless include_archived=true. */
 async function setArchived(ctx: Ctx, id: string, on: boolean) {
   const row = await load(ctx, id);
+  await assertTeamWrite(ctx, row.team_id as string);
   if (Boolean(row.archived_at) === on) return false;
   await ctx.tx`update issues set archived_at = ${on ? ctx.tx`now()` : null}, version = version + 1, updated_at = now() where id = ${id}`;
   await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: on ? "archive" : "unarchive",
@@ -262,10 +304,14 @@ const bulkPatch = z.object({
   status: z.enum(STATUS), priority: z.number().int().min(0).max(4), assignee_id: uuidSchema.nullable(),
   project_id: uuidSchema.nullable(), cycle_id: uuidSchema.nullable(),
   label_ids_add: z.array(uuidSchema).max(50), label_ids_remove: z.array(uuidSchema).max(50),
+  add_label_ids: z.array(uuidSchema).max(50), remove_label_ids: z.array(uuidSchema).max(50), // aliases of label_ids_add / label_ids_remove
+  estimate: estimate.nullable(),
 }).partial().strict().refine((p) => Object.keys(p).length > 0, "empty patch");
+// versions: optional per-issue If-Match ({ [issue_id]: version }); a stale one fails that issue alone (precondition_failed).
+const versions = z.record(uuidSchema, z.number().int().min(1)).optional();
 const bulkBody = z.union([
-  z.object({ ids: z.array(uuidSchema).min(1).max(BULK_MAX), patch: bulkPatch }).strict(),
-  z.object({ ids: z.array(uuidSchema).min(1).max(BULK_MAX), action: z.enum(["archive", "unarchive", "delete", "restore"]) }).strict(),
+  z.object({ ids: z.array(uuidSchema).min(1).max(BULK_MAX), patch: bulkPatch, versions }).strict(),
+  z.object({ ids: z.array(uuidSchema).min(1).max(BULK_MAX), action: z.enum(["archive", "unarchive", "delete", "restore"]), versions }).strict(),
 ]);
 
 /**
@@ -278,18 +324,24 @@ export const bulkIssues = (req: Request, slug: string) => withWorkspaceCtx(req, 
   const b = await parseJson(req, bulkBody);
   const ids = [...new Set(b.ids)];
   if ("patch" in b && b.patch.assignee_id) await assertAssignee(ctx, b.patch.assignee_id); // request-level: same for every issue
-  const succeeded: string[] = [], failed: { id: string; code: string; message: string }[] = [];
+  const succeeded: string[] = [], failed: { id: string; code: string; message: string; details?: unknown }[] = [];
   for (const id of ids) {
     try {
       await ctx.tx.savepoint(async () => {
+        const want = b.versions?.[id];
+        if (want !== undefined) {
+          const cur = await load(ctx, id, "action" in b && b.action === "restore").catch(() => null);
+          if (cur && Number(cur.version) !== want) throw stale(cur);
+        }
         if ("patch" in b) await bulkPatchOne(ctx, id, b.patch);
         else if (b.action === "archive" || b.action === "unarchive") await setArchived(ctx, id, b.action === "archive");
         else if (b.action === "delete") {
-          await load(ctx, id);
+          await assertTeamWrite(ctx, (await load(ctx, id)).team_id as string);
           await ctx.tx`update issues set deleted_at = now(), version = version + 1, updated_at = now() where id = ${id}`;
           await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "delete", diff: { deleted_at: { before: null, after: "now" } } });
         } else {
           const row = await load(ctx, id, true);
+          await assertTeamWrite(ctx, row.team_id as string);
           if (Date.now() - new Date(row.deleted_at as string).getTime() > PURGE_MS) throw new ApiError("not_found");
           await ctx.tx`update issues set deleted_at = null, version = version + 1, updated_at = now() where id = ${id} and deleted_at is not null`;
           await recordAudit(ctx.tx, { workspaceId: ctx.workspaceId, actorId: ctx.userId, entity: "issue", entityId: id, action: "restore", diff: { deleted_at: { before: "deleted", after: null } } });
@@ -297,7 +349,7 @@ export const bulkIssues = (req: Request, slug: string) => withWorkspaceCtx(req, 
       });
       succeeded.push(id);
     } catch (e) {
-      if (e instanceof ApiError) failed.push({ id, code: e.code, message: e.message });
+      if (e instanceof ApiError) failed.push({ id, code: e.code, message: e.message, ...(e.details ? { details: e.details } : {}) });
       else if (typeof e === "object" && e && "code" in e && String((e as { code: unknown }).code).startsWith("23")) failed.push({ id, code: "validation_failed", message: "constraint violation" });
       else throw e; // unexpected: abort the whole transaction
     }
@@ -307,15 +359,18 @@ export const bulkIssues = (req: Request, slug: string) => withWorkspaceCtx(req, 
 
 async function bulkPatchOne(ctx: Ctx, id: string, p: z.infer<typeof bulkPatch>) {
   const before = await load(ctx, id);
+  await assertTeamWrite(ctx, before.team_id as string);
   if (p.cycle_id) await assertCycleTeam(ctx, p.cycle_id, before.team_id as string);
+  await assertEstimate(ctx, before.team_id as string, p.estimate);
   const v = <K extends keyof typeof p>(k: K, cur: unknown) => (p[k] !== undefined ? p[k] : cur);
   await ctx.tx`update issues set status = ${v("status", before.status) as never}, priority = ${v("priority", before.priority) as number},
     assignee_id = ${v("assignee_id", before.assignee_id) as string | null}, project_id = ${v("project_id", before.project_id) as string | null},
-    cycle_id = ${v("cycle_id", before.cycle_id) as string | null}, version = version + 1, updated_at = now() where id = ${id}`;
-  if (p.label_ids_add || p.label_ids_remove) {
+    cycle_id = ${v("cycle_id", before.cycle_id) as string | null}, estimate = ${v("estimate", before.estimate) as number | null}, version = version + 1, updated_at = now() where id = ${id}`;
+  const add = [...(p.label_ids_add ?? []), ...(p.add_label_ids ?? [])], rem = [...(p.label_ids_remove ?? []), ...(p.remove_label_ids ?? [])];
+  if (add.length || rem.length) {
     const cur = new Set(before.label_ids as string[]);
-    for (const l of p.label_ids_add ?? []) cur.add(l);
-    for (const l of p.label_ids_remove ?? []) cur.delete(l);
+    for (const l of add) cur.add(l);
+    for (const l of rem) cur.delete(l);
     await setLabels(ctx, id, [...cur]);
   }
   const after = await load(ctx, id);
