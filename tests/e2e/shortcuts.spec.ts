@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { GUEST_STATE } from './global-setup';
 
 test.beforeEach(async ({ page }) => {
@@ -95,6 +95,55 @@ test('bulk: priority picker applies to all selected', async ({ page }) => {
   await page.keyboard.press('p');
   await page.getByRole('option', { name: /Urgent/ }).click();
   for (const id of ids) await expect(page.locator(`[data-id="${id}"] .pi-urgent`)).toHaveCount(1);
+});
+
+// These tests create their own issues first so the shared e2e database keeps the same seed for later specs.
+async function newIssue(page: Page) {
+  const n = await page.locator('[role=option]').count();
+  await page.keyboard.press('c');
+  await expect(page.locator('[role=option]')).toHaveCount(n + 1);
+}
+
+test('S opens the status picker for the current issue', async ({ page }) => {
+  await newIssue(page);
+  await page.keyboard.press('s');
+  await expect(page.getByRole('dialog', { name: 'Set status' })).toBeVisible();
+  await page.getByRole('option', { name: /Done/ }).click();
+  await expect(page.getByText('Status: 1 issue updated')).toBeVisible();
+  await page.keyboard.press('Delete');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+});
+
+test('Ctrl+A selects every visible issue, Esc clears', async ({ page }) => {
+  const n = await page.locator('[role=option]').count();
+  await page.keyboard.press('Control+a');
+  await expect(page.locator('[data-multi]')).toHaveCount(n);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-multi]')).toHaveCount(0);
+});
+
+test('hash deletes the selection after a confirm, Cancel keeps it', async ({ page }) => {
+  await newIssue(page); await page.keyboard.press('x');
+  await newIssue(page); await page.keyboard.press('x');
+  await expect(page.locator('[data-multi]')).toHaveCount(2);
+  const before = await page.locator('[role=option]').count();
+  await page.keyboard.press('#');
+  const d = page.getByRole('alertdialog', { name: 'Delete 2 issues?' });
+  await expect(d).toBeVisible();
+  await d.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.locator('[role=option]')).toHaveCount(before);
+  await page.locator('#sb-delete').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(page.locator('[role=option]')).toHaveCount(before - 2);
+  await expect(page.getByText('2 issues deleted')).toBeVisible();
+});
+
+test('Delete key removes the single current issue', async ({ page }) => {
+  await newIssue(page);
+  const before = await page.locator('[role=option]').count();
+  await page.keyboard.press('Delete');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(page.locator('[role=option]')).toHaveCount(before - 1);
 });
 
 // Real guest session (seeded guest@example.test, role guest, 2 shared issues): read-only is derived from the session role, no ?role= hook.

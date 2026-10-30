@@ -1,11 +1,14 @@
 // Shared shortcut registry: single source of truth for keyboard shortcuts, the ? overlay and palette hints.
-export interface Shortcut { id: string; keys: string[]; label: string; group: 'Issues' | 'Navigation' | 'Selection' | 'General' }
+export interface Shortcut { id: string; keys: string[]; label: string; group: 'Issues' | 'Navigation' | 'Selection' | 'General'; hidden?: boolean }
 export const SHORTCUTS: Shortcut[] = [
   { id: 'create', keys: ['c'], label: 'Create issue', group: 'Issues' },
-  { id: 'status', keys: ['s'], label: 'Change status', group: 'Issues' },
+  { id: 'status', keys: ['s'], label: 'Set status', group: 'Issues' },
   { id: 'priority', keys: ['p'], label: 'Set priority', group: 'Issues' },
   { id: 'assignee', keys: ['a'], label: 'Set assignee', group: 'Issues' },
   { id: 'label', keys: ['l'], label: 'Set label', group: 'Issues' },
+  { id: 'delete', keys: ['#'], label: 'Delete issue(s)', group: 'Issues' },
+  { id: 'delete-key', keys: ['Delete'], label: 'Delete issue(s)', group: 'Issues', hidden: true },
+  { id: 'delete-bs', keys: ['Backspace'], label: 'Delete issue(s)', group: 'Issues', hidden: true },
   { id: 'open', keys: ['Enter'], label: 'Open issue', group: 'Issues' },
   { id: 'next', keys: ['j'], label: 'Next issue', group: 'Navigation' },
   { id: 'prev', keys: ['k'], label: 'Previous issue', group: 'Navigation' },
@@ -13,6 +16,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'go-views', keys: ['g', 'v'], label: 'Go to board view', group: 'Navigation' },
   { id: 'go-projects', keys: ['g', 'p'], label: 'Go to projects', group: 'Navigation' },
   { id: 'toggle-select', keys: ['x'], label: 'Select / unselect issue', group: 'Selection' },
+  { id: 'select-all', keys: ['Mod+A'], label: 'Select all issues', group: 'Selection' },
   { id: 'extend-next', keys: ['Shift+J'], label: 'Extend selection down', group: 'Selection' },
   { id: 'extend-prev', keys: ['Shift+K'], label: 'Extend selection up', group: 'Selection' },
   { id: 'palette', keys: ['Mod+K'], label: 'Command palette', group: 'General' },

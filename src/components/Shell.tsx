@@ -20,6 +20,8 @@ import { DISPLAY_PROP_LABEL, GROUPING_LABEL, ORDERING_LABEL, type DisplayProp, l
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
+import { ConfirmDialog } from '@/components/ui';
+import { detailApi } from '@/lib/detail/api';
 import { SelectionBar, type BulkKind } from './SelectionBar';
 import { visibleWindowVar, scrollToIndexVar, cardHeight } from '@/lib/virtual';
 import { Picker, type PickOption } from '@/components/Picker';
@@ -376,7 +378,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (!pick) return;
     const items = pick.ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x); if (!items.length) return;
     const NO = 'none';
-    if (items.length > 1) {
+    if (items.length > 1 || pick.kind === 'status' || pick.kind === 'project' || pick.kind === 'cycle') {
       const k = pick.kind, ids = items.map((x) => x.id);
       if (k === 'label') { void applyBulk(ids, labelTogglePatch(items, optId), 'Labels'); return; }
       const m: Record<string, [string, BulkPatch]> = { priority: ['Priority', { priority: Number(optId) }], assignee: ['Assignee', { assignee_id: optId === NO ? null : optId }], status: ['Status', { status: optId as Status }], project: ['Project', { project_id: optId === NO ? null : optId }], cycle: ['Cycle', { cycle_id: optId === NO ? null : optId }] };
@@ -487,6 +489,37 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (!v) { const el = returnFocus.current; returnFocus.current = null; if (el && document.contains(el)) setTimeout(() => el.focus(), 0); }
   }
   const [multi, setMulti] = useState<string[]>([]);
+  // Delete (# / Delete / Backspace / bar button): confirm, then soft-delete the selection. API mode: DELETE /issues/<id> (If-Match);
+  // rows the server refuses are put back.
+  const [confirmDel, setConfirmDel] = useState<string[] | null>(null);
+  function askDelete() {
+    if (readOnly) { setToast('Guests have read-only access.'); return; }
+    const ids = targetIds().filter((id) => store.current.list().some((x) => x.id === id && !x.deleted_at));
+    if (ids.length) setConfirmDel(ids);
+  }
+  async function deleteIssues(ids: string[]) {
+    const items = ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x);
+    const keep = ordered.filter((i) => !ids.includes(i.id));
+    const at = ordered.findIndex((i) => ids.includes(i.id));
+    for (const it of items) store.current.remove(it.id);
+    setMulti([]); setSelId(keep[Math.min(Math.max(at, 0), keep.length - 1)]?.id ?? '');
+    sync();
+    let failed = 0;
+    if (api) {
+      await Promise.all(ids.map((id) => chains.current.get(id)).filter(Boolean));
+      const client = detailApi(api.slug);
+      await Promise.all(items.map(async (it) => {
+        const r = await client.remove(it.id, versions.current.get(it.id) ?? it.version);
+        if (r.ok) versions.current.delete(it.id);
+        else { failed += 1; store.current.upsert(it); }
+      }));
+      sync();
+    }
+    const done = items.length - failed;
+    setToast(failed ? `Deleted ${done} of ${items.length}, ${failed} could not be deleted` : `${done} issue${done === 1 ? '' : 's'} deleted`);
+  }
+
+  function selectAll() { const list = orderedRef.current; setMulti(list.map((i) => i.id)); if (list.length) setSelId(currentIdRef.current ?? list[0]!.id); }
   function toggleSelect(id: string | undefined) { if (id) setMulti((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id])); }
   // Shift+J/K: move the cursor and add both ends to the selection.
   function extend(dir: 1 | -1) {
@@ -516,7 +549,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'go-project', label: 'Go to project…', run: () => setTimeout(() => setProjPick(null), 0) },
     { id: 'clear-filters', label: 'Clear all filters', run: () => setFilters(emptyFilters()) },
     ...FILTER_KEYS.map((k) => ({ id: `filter-${k}`, label: `Filter by ${FILTER_LABEL[k].toLowerCase()}…`, run: () => { if (view === 'cycles' || view === 'projects') setView('list'); setTimeout(() => setFilterPick({ kind: k, rect: document.getElementById(`fb-${k}`)?.getBoundingClientRect() ?? null }), 0); } })),
-    { id: 'status', label: multi.length > 1 ? `Cycle status of ${multi.length} selected` : 'Change status of selected issue', hint: 'S', run: cycleStatus },
+    { id: 'status', label: multi.length > 1 ? `Cycle status of ${multi.length} selected` : 'Cycle status of selected issue', run: cycleStatus },
+    { id: 'set-status', label: 'Set status…', hint: 'S', run: () => setTimeout(() => openPick('status'), 0) },
+    { id: 'select-all', label: 'Select all issues', hint: '⌘A', run: selectAll },
+    { id: 'delete', label: multi.length > 1 ? `Delete ${multi.length} selected issues…` : 'Delete selected issue…', hint: '#', run: () => setTimeout(askDelete, 0) },
     ...STATUSES.map((st) => ({ id: `move-${st}`, label: multi.length > 1 ? `Move ${multi.length} selected to ${STATUS_LABEL[st]}` : `Move to ${STATUS_LABEL[st]}`, run: () => setStatusBulk(st) })),
     { id: 'set-priority', label: 'Set priority…', hint: 'P', run: () => setTimeout(() => openPick('priority'), 0) },
     { id: 'set-assignee', label: 'Set assignee…', hint: 'A', run: () => setTimeout(() => openPick('assignee'), 0) },
@@ -581,11 +617,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // No hit and no command: one 'No results' line with the single 'Search all' row under it (no separate group).
   const noResults = api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0;
   useEffect(() => { if (palette && activeId) document.getElementById(`pc-${activeId}`)?.scrollIntoView({ block: 'nearest' }); }, [palette, activeId]);
-  const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
+  const actions = useRef({ askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
   const readOnlyRef = useRef(readOnly);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
@@ -606,10 +642,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         return;
       }
       if (e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); actions.current.reorder(e.key === 'ArrowUp' ? -1 : 1); return; }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'a' && !document.querySelector('main[data-view=inbox]')) { e.preventDefault(); actions.current.selectAll(); return; }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (helpOpen.current && e.key !== 'Escape') return;
       // Bare modifier / navigation keydowns (Shift, Control, Tab...) must not reset a pending g sequence.
-      if (e.key.length > 1 && e.key !== 'Enter' && e.key !== 'Escape') return;
+      if (e.key.length > 1 && !['Enter', 'Escape', 'Delete', 'Backspace'].includes(e.key)) return;
       // The inbox owns its list keys while it is the current view.
       if (document.querySelector('main[data-view=inbox]') && ['j', 'k', 'u', 'e', 'h', 's', 'x', '1', '2', '3', 'Enter'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) return;
       const key = keyOf(e); if (!key) return;
@@ -635,7 +672,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         case 'toggle-select': actions.current.toggleSelect(currentIdRef.current); break;
         case 'open': setOpen(true); break;
         case 'create': e.preventDefault(); if (!readOnlyRef.current) actions.current.create(); break;
-        case 'status': actions.current.cycleStatus(); break;
+        case 'status': e.preventDefault(); actions.current.openPick('status'); break;
+        case 'delete': case 'delete-key': case 'delete-bs': e.preventDefault(); actions.current.askDelete(); break;
         case 'priority': e.preventDefault(); actions.current.openPick('priority'); break;
         case 'assignee': e.preventDefault(); actions.current.openPick('assignee'); break;
         case 'label': e.preventDefault(); actions.current.openPick('label'); break;
@@ -815,13 +853,16 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </dl>
         </aside>
       )}
-      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} openKind={pick && pick.ids.length > 1 ? (pick.kind as BulkKind) : null} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} />}
+      {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} openKind={pick && pick.ids.length > 1 ? (pick.kind as BulkKind) : null} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} onDelete={askDelete} />}
+      <ConfirmDialog open={!!confirmDel} title={`Delete ${confirmDel?.length ?? 0} issue${confirmDel?.length === 1 ? '' : 's'}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDel(null)} onConfirm={() => { const ids = confirmDel ?? []; setConfirmDel(null); void deleteIssues(ids); }}>
+        They move to the trash and can be restored from there.
+      </ConfirmDialog>
       {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
       {help && (
         <div className='overlay' onClick={() => setHelp(false)}>
           <div className='palette' role='dialog' aria-modal='true' aria-label='Keyboard shortcuts' onClick={(e) => e.stopPropagation()} ref={(el) => el?.focus()} tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setHelp(false); } else if (e.key === 'Tab') e.preventDefault(); /* focus trap: the dialog is the only focusable element */ }}>
             {(['Issues', 'Navigation', 'Selection', 'General'] as const).map((g) => (
-              <section key={g}><h3>{g}</h3><ul>{SHORTCUTS.filter((d) => d.group === g).map((d) => <li key={d.id}><span>{d.label}</span><kbd>{formatKeys(d.keys)}</kbd></li>)}</ul></section>
+              <section key={g}><h3>{g}</h3><ul>{SHORTCUTS.filter((d) => d.group === g && !d.hidden).map((d) => <li key={d.id}><span>{d.label}</span><kbd>{formatKeys(d.keys)}</kbd></li>)}</ul></section>
             ))}
           </div>
         </div>
