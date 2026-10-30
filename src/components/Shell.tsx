@@ -3,7 +3,7 @@ import { EmptyState } from '@/components/ui';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
 import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
@@ -143,6 +143,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     void fetchNlPeople(api.slug).then((p) => { if (live) setNlPeople(p); }).finally(() => { if (live) setNlPeopleLoaded(true); });
     return () => { live = false; };
   }, [api?.slug]);
+  const issueById = useMemo(() => new Map(allIssues.map((x) => [x.id, x] as const)), [allIssues]);
+  const getIssue = useCallback((id: string) => issueById.get(id), [issueById]);
   const people = useMemo<readonly Person[]>(() => (api ? peopleFromNl(nlPeople) : MOCK_PEOPLE), [api, nlPeople]);
   // Push a change to the API (no-op in mock mode). Local state is already updated (optimistic); the server row then wins.
   // 412 -> refetch the issue, toast "modified elsewhere", no automatic retry.
@@ -754,7 +756,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <EmptyState icon='issues' title='No issues yet' hint='Issues track the work your team is doing. Create one to get started.'
             action={!readOnly && <button className='primary' onClick={() => create()}>Create issue <kbd>C</kbd></button>} />
         ) : view === 'inbox' ? (
-          <Inbox client={inboxClient} refreshKey={rtTick} getIssue={(id) => allIssues.find((x) => x.id === id)} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
+          <Inbox client={inboxClient} refreshKey={rtTick} getIssue={getIssue} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
           <ProjectDetail slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
             issues={allIssues.filter((i) => i.project_id === detailId).map((i) => ({ id: i.id, identifier: i.identifier ?? i.id, title: i.title, done: i.status === 'done' || i.status === 'canceled' }))}
