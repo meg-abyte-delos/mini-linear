@@ -6,7 +6,9 @@ export function between(lo: string | null, hi: string | null): string {
   const l0 = lo ?? "";
   if (hi !== null && l0 >= hi) throw new Error("between: lo must be < hi");
   let out = "", tight = hi !== null;
+  const cap = l0.length + (hi ?? "").length + 2; // no key exists in some gaps (e.g. "a" and "a0"): fail instead of looping
   for (let i = 0; ; i++) {
+    if (i > cap) throw new Error("between: no key between lo and hi");
     const l = i < l0.length ? at(l0, i) : 0;
     const h = tight ? (i < (hi as string).length ? at(hi as string, i) : 0) : 36;
     if (l === h) { out += A[l]; continue; }

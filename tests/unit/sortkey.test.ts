@@ -14,5 +14,6 @@ describe("between", () => {
     const lo = "m"; let hi = "n";
     for (let i = 0; i < 40; i++) { const k = between(lo, hi); expect(k > lo && k < hi).toBe(true); hi = k; }
   });
+  it("throws instead of looping when no key fits (a, a0)", () => { expect(() => between("a", "a0")).toThrow(/no key/); expect(() => between("a", "a00")).toThrow(); });
   it("rejects an empty range", () => { expect(() => between("b", "a")).toThrow(); expect(() => between("a", "a")).toThrow(); });
 });
