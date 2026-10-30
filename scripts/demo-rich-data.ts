@@ -26,6 +26,16 @@ export type RichIssue = { team: TeamKey; key: number; n: number; title: string; 
 // n, title, state (0 backlog .. 4 done, 5 canceled), priority (0 none, 1 urgent .. 4 low), assignee, project, cycle, labels, created day, days to reach current state, estimate, due date, description
 type T = [number, string, number, number, Who | null, 'p1' | 'p2' | 'p3' | null, 'c1' | 'c2' | 'c3' | null, L[], number, number, number | undefined, string | undefined, string];
 const ROWS: T[] = [
+  [1, 'Set up CI pipeline', 4, 2, 'admin', 'p1', 'c1', ['infra'], 1, 9, 3, undefined, 'Lint, typecheck, unit and e2e on every pull request, with the Postgres service container.'],
+  [2, 'Design the issue list', 3, 3, 'mate', 'p1', 'c2', ['feature', 'design'], 3, 12, 5, undefined, 'Rows with status, priority, assignee and labels. Grouping by status, assignee or project.'],
+  [3, 'Board drag and drop', 2, 2, 'mate', 'p1', 'c2', ['feature'], 5, 10, 5, undefined, 'Drag a card between columns to change its status, and within a column to reorder it.'],
+  [4, 'Keyboard shortcuts', 1, 1, 'admin', 'p1', 'c2', ['feature', 'improvement'], 8, 7, 3, '2026-11-03', 'Create, assign, change status and priority without leaving the keyboard.'],
+  [5, 'Saved views', 0, 3, 'leo', 'p1', null, ['feature'], 11, 0, undefined, undefined, 'Save the current filters, grouping and ordering under a name, and reopen them from the sidebar.'],
+  [6, 'Cycle burndown', 1, 2, 'admin', 'p1', 'c3', ['feature'], 13, 6, 3, undefined, 'Remaining scope per day against the ideal line, for the active cycle.'],
+  [7, 'Port the cron parser from the prototype', 2, 1, 'mate', 'p2', 'c2', ['feature'], 6, 14, 5, undefined, 'Move the prototype parser into the package, with its tests.'],
+  [8, 'Fix flaky nightly build', 1, 1, 'admin', 'p2', 'c2', ['bug', 'infra'], 9, 8, 3, undefined, 'The nightly job fails about one run in five on the date fixtures. Find the shared state.'],
+  [9, 'Write the onboarding doc', 0, 4, 'leo', null, null, ['docs'], 12, 0, undefined, undefined, 'From clone to a running local app and the first pull request.'],
+  [10, 'Roadmap polish', 1, 3, 'maya', 'p1', 'c3', ['design', 'improvement'], 14, 6, 2, undefined, 'Month labels, today marker and bar alignment on the roadmap view.'],
   [11, 'Add keyboard navigation to the issue list', 4, 3, 'maya', 'p1', 'c1', ['feature'], 16, 4, 3, undefined, 'Move the selection with j and k, open with Enter, and keep the focus ring visible.'],
   [12, 'Persist list grouping and ordering per view', 4, 3, 'jonas', 'p1', 'c1', ['improvement'], 17, 5, 3, undefined, 'Grouping and ordering reset on every reload. Store them with the saved view.'],
   [13, 'Fix board card flicker while dragging between columns', 4, 2, 'mate', 'p1', 'c1', ['bug'], 18, 3, 2, undefined, 'The card disappears for one frame when it crosses a column boundary.'],
