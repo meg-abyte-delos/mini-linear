@@ -179,3 +179,20 @@ test.fixme('timeline: assignee change interleaves with comments', async ({ page 
   await page.getByRole('option').first().click();
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set assignee');
 });
+
+test('D9: composer stays in view at 1280x720, activity rows carry avatars, Sub-issues/Relations/Attachments share one "+" affordance', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await ready(page);
+  for (const n of ['one', 'two', 'three', 'four']) {
+    const box = page.getByRole('combobox', { name: 'Leave a comment' });
+    await box.fill(`Comment ${n}, long enough to look like a real remark`);
+    await page.getByRole('button', { name: 'Comment', exact: true }).click();
+    await expect(page.getByRole('article', { name: /Comment by/ })).toHaveCount(['one', 'two', 'three', 'four'].indexOf(n) + 1);
+  }
+  const btn = page.getByRole('button', { name: 'Comment', exact: true });
+  await expect(btn).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('.feed .ev .av').first()).toBeVisible();
+  await expect(page.locator('.cmt header .av').first()).toBeVisible();
+  for (const name of ['Add sub-issue', 'Add relation', 'Add link']) await expect(page.getByRole('button', { name, exact: true }).first()).toHaveClass(/sec-add/);
+  await page.screenshot({ path: 'test-results/d9r-1280.png' });
+});

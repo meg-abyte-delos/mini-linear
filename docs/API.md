@@ -112,6 +112,30 @@ Contract: `docs/contracts/A4-subissues-relations-estimates.md`. All routes under
 - **Relations**: items and the POST 201 body carry `related_issue { id, identifier, title, status, priority, assignee_id, team_id }`. Duplicate pair: 409 `conflict` with `details { relation_id, type }` (type as seen from the requested issue). `POST` accepts `cancel_source` (boolean). **Deviation from the contract text**: default `true`, because main already cancels the source on `duplicate` (test `a1-relations`); `false` skips it.
 - **Bulk** `POST /issues/bulk` (existing, max 250 ids): patch gains `estimate` (validated against the team scale, per issue) and `add_label_ids` / `remove_label_ids` (aliases of `label_ids_add` / `label_ids_remove`); optional `versions: { <issue_id>: <version> }` is a per-issue If-Match (stale: that id fails with `precondition_failed`, `details.current_version`). Failed items may carry `details`. Actions `delete` / `restore` / `archive` / `unarchive` bump versions; team-guests fail per issue with `forbidden`.
 - `GET /teams/:id/estimate-scale` -> `{ scale, allow_zero, values }` (`values` empty for `none`). Admin+ always; other callers must be team members (404 otherwise); guests 403.
+## Project and cycle counters (A1)
+
+One rule for every surface (API, project list, project page, roadmap rings, cycles list): **canceled issues are out of scope, soft-deleted issues do not exist.**
+
+**Visibility**: counts only include issues the caller can see (team visibility). A member of team A looking at a project that spans A and B gets counts for A only; admins and owners get everything. The same member gets 404 on a cycle of a team they are not in, counts included. No count leaks the size of a hidden team.
+
+`GET /projects` and `GET /projects/<id>` return (old names kept):
+
+| Field | Meaning |
+|---|---|
+| `issues_total` (= `issue_count`) | visible, non-deleted, non-canceled issues |
+| `issues_done` (= `done_count`) | status `done` |
+| `issues_in_progress` | status `in_progress` or `in_review` |
+| `issues_canceled` | status `canceled` (informational, not in the total) |
+| `progress_pct` | `round(100 * done / total)`, 0 when empty |
+| `progress_by_estimate` | `round(100 * done estimate / total estimate)` over non-canceled issues; `null` when no issue has an estimate |
+| `health` | health of the latest posted project update, or `null` |
+| `health_computed` | derived, see below |
+
+`health_computed` is `on_track`, `at_risk`, `off_track` or `null`. `null` if the project is `completed` or `canceled`, has no `target_date`, or has no issue. Else `on_track` at 100%; `off_track` when today is past `target_date`; otherwise `gap = elapsed% - progress_pct`, where `elapsed%` is the share of the window `start_date` (or creation day) to `target_date` already elapsed: gap up to 10 is on_track, up to 25 at_risk, else off_track. Pure function in `src/lib/project-health.ts`.
+
+`GET /cycles` and `GET /cycles/<id>` also return `scope` (non-canceled), `started` (`in_progress` or `in_review`), `completed` (`done`), `canceled`, `percent_complete` (`round(100 * completed / scope)`, 0 when empty). Identical to `GET /cycles/<id>/stats`.
+
+UI fix in the same change: the Cycles list ring counted canceled issues in the total and as done (4 issues with 1 canceled showed 50%); it now matches the API (33%).
 
 ## Changelog
 - **Behavior change (A4):** `POST /issues/:id/relations` with `type: duplicate` now cancels the source issue by default (`cancel_source` defaults to `true`, was effectively false). Pass `{ "cancel_source": false }` to keep the previous behavior. Moving the source to the team's first `canceled` state happens in the same transaction.

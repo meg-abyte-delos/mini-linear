@@ -22,9 +22,12 @@ export function scrollToIndex(index: number, scrollTop: number, viewportH: numbe
 }
 
 /** Estimated slot height of a card: grows by one chip row per 3 labels, since .card height is auto. */
-export function cardHeight(labelCount: number): number {
+export const TITLE_LINE_H = 18; // .card-title wraps to 2 lines (line-clamp) past ~TITLE_CHARS_PER_LINE
+export const TITLE_CHARS_PER_LINE = 38;
+export function cardHeight(labelCount: number, titleLength = 0): number {
   const rows = Math.max(1, Math.ceil((labelCount + 1) / 3));
-  return CARD_H + (rows - 1) * CHIP_ROW_H;
+  const extra = titleLength > TITLE_CHARS_PER_LINE ? TITLE_LINE_H : 0;
+  return CARD_H + (rows - 1) * CHIP_ROW_H + extra;
 }
 
 /** Window over items of varying height (prefix sums). */
