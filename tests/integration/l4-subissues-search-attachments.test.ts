@@ -1,5 +1,7 @@
 // Lane 4 (Tess): sub-issues, search, attachments over real HTTP. Written from the contract (Ada's mini-linear-contract.md and the
 // migrations: 0001 parent trigger, 0007 search, 0104 attachments), not from the handlers. Own workspace slugs per run: no clash with world().
+// No teardown: each run leaves its workspaces and the 500-row attachment seed behind. Intended for a throwaway CI database only.
+// Open bugs are pinned with it.fails; each BUG comment needs its ticket id once filed (hidden-parent 201 is an authz gap: cross-team existence leak, High).
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { api, inWs, loginAs, PW, type U } from './helpers/world';
@@ -110,7 +112,7 @@ describe.runIf(runIntegration)('sub-issues (parent_id)', () => {
     const sub = await ok(M1); await ok(M1, { parent_id: sub.body.id });
     expect((await patch(M1, sub.body.id, { parent_id: deep })).status).toBe(422);
   });
-  it('a nonexistent parent_id is a clean 4xx (404/422), not 500', async () => {
+  it('a nonexistent parent_id is 422 (contract A4), not 500', async () => {
     expect((await issue(M1, { parent_id: randomUUID() })).status).toBe(422);
   });
   it('a malformed parent_id is 422', async () => {
@@ -312,11 +314,12 @@ describe.runIf(runIntegration)('attachments', () => {
   it('creation and deletion show up in the issue activity feed', async () => {
     const iss = (await ok(M1)).body.id;
     const a = await (await add(M1, { url: 'https://example.com/act', title: 'activity-attach' }, iss)).json();
-    const feed = async () => JSON.stringify(await (await api(M1, 'GET', `${P}/issues/${iss}/activity`)).json());
-    const before = (await feed()).match(/attach/gi)?.length ?? 0;
+    const entries = async () => { const j = await (await api(M1, 'GET', `${P}/issues/${iss}/activity`)).json(); return (j.items ?? j) as unknown[]; };
+    const mine = async () => (await entries()).filter((e) => JSON.stringify(e).includes('activity-attach'));
+    const before = (await mine()).length;
     expect(before).toBeGreaterThanOrEqual(1);
     await del(M1, a.id, iss);
-    expect((await feed()).match(/attach/gi)!.length).toBeGreaterThan(before);
+    expect((await mine()).length).toBeGreaterThan(before);
   });
   it('DB CHECKs back the API: javascript: url and negative size are refused at the table', async () => {
     await expect(inWs(ws, (c) => c.query("insert into issue_attachments (id, workspace_id, issue_id, kind, url, title, created_by) values ($1,$2,$3,'link','javascript:x','t',$4)", [randomUUID(), ws, I, M1.id]))).rejects.toThrow();
@@ -456,6 +459,9 @@ describe.runIf(runIntegration)('search', () => {
   });
   it('team_id filter narrows to that team', async () => {
     expect(await hits(await S(A1, `q=${tag}&kind=issue&team_id=${teamB}`))).toEqual([]);
+    const inB = await ok(M2, { title: `${tag} teamb-hit` }, teamB);
+    expect(await hid(await S(A1, `q=${tag}&kind=issue&team_id=${teamB}`))).toContain(inB.body.id);
+    expect(await hid(await S(A1, `q=${tag}&kind=issue&team_id=${teamA}`))).not.toContain(inB.body.id);
   });
   it('the index is live: a renamed issue stops matching its old title', async () => {
     const x = await ok(M1, { title: `${tag}before` });
