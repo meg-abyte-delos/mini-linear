@@ -33,6 +33,9 @@ export type Ordering = 'manual' | 'priority' | 'created';
 export const GROUPING_LABEL: Record<Grouping, string> = { status: 'Status', none: 'No grouping' };
 export const ORDERING_LABEL: Record<Ordering, string> = { manual: 'Manual', priority: 'Priority', created: 'Created' };
 
+export type DisplayProp = 'priority' | 'id' | 'status' | 'labels' | 'project' | 'created' | 'assignee';
+export const DISPLAY_PROP_LABEL: Record<DisplayProp, string> = { priority: 'Priority', id: 'ID', status: 'Status', labels: 'Labels', project: 'Project', created: 'Created', assignee: 'Assignee' };
+
 /** Priority 1 (urgent) first, 0 (none) last; created newest first; manual keeps the input order. Stable. */
 export function orderIssues<T extends { priority: number; created_at: string }>(items: readonly T[], o: Ordering): T[] {
   if (o === 'manual') return [...items];
@@ -45,12 +48,12 @@ export function orderIssues<T extends { priority: number; created_at: string }>(
 
 /** List groups exactly as rendered: one group per non-empty status (or a single 'all' group), each ordered. */
 export function listGroups<T extends { status: string; priority: number; created_at: string }>(
-  items: readonly T[], statuses: readonly string[], g: Grouping, o: Ordering,
+  items: readonly T[], statuses: readonly string[], g: Grouping, o: Ordering, showEmpty = false,
 ): { key: string; status: string | null; items: T[] }[] {
   const groups = g === 'none'
     ? [{ key: 'all', status: null as string | null, items: orderIssues(statuses.flatMap((s) => items.filter((i) => i.status === s)), o) }]
     : statuses.map((s) => ({ key: s, status: s as string | null, items: orderIssues(items.filter((i) => i.status === s), o) }));
-  return groups.filter((x) => x.items.length > 0);
+  return showEmpty && g !== 'none' ? groups : groups.filter((x) => x.items.length > 0);
 }
 
 /** Keyboard order (j/k): visible rows only, skipping collapsed groups. */
