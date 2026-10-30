@@ -26,10 +26,13 @@ test('issue page: edits, comments and deletion from another tab arrive live; fai
   // 3. a failed save rolls back to the confirmed title
   const url = `**/api/v1/w/demo/issues/${it.id}`;
   await a.route(url, (r) => (r.request().method() === 'PATCH' ? r.abort() : r.continue()));
-  const at = a.getByLabel('Title', { exact: true });
-  await at.fill('will not stick'); await at.press('Enter');
-  await expect(at).toHaveValue(`${it.title}-b`, { timeout: 10_000 });
-  await a.unroute(url);
+  try {
+    const at = a.getByLabel('Title', { exact: true });
+    await at.fill('will not stick'); await at.press('Enter');
+    await expect(at).toHaveValue(`${it.title}-b`, { timeout: 10_000 });
+  } finally {
+    await a.unroute(url);
+  }
 
   // 4. deleted elsewhere: notice in A
   const cur = (await (await b.request.get(`/api/v1/w/demo/issues/${it.id}`)).json()) as { version: number };
