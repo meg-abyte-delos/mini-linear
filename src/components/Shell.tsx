@@ -4,6 +4,7 @@ import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
+import { useCssVars } from '@/lib/ui/use-css-vars';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
 import { PropIcon } from '@/components/PropIcons';
@@ -67,6 +68,8 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }
     ...(onAdd ? [{ id: 'add', label: 'Add issue', onSelect: () => onAdd(status) }] : []),
     { id: 'fold', label: folded ? 'Expand column' : 'Collapse column', onSelect: () => setFolded((f) => !f) },
   ];
+  const listRef = useRef<HTMLDivElement>(null);
+  useCssVars(listRef, { '--pad-top': `${w.padTop}px`, '--pad-bottom': `${w.padBottom}px` });
   return (
     <section className={`col${overZone ? ' over-zone' : ''}${folded ? ' folded' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
       <div className='col-head'>
@@ -76,7 +79,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd }
         <Menu open={menu} anchorRef={moreRef} onClose={() => setMenu(false)} label={`${STATUS_LABEL[status]} column`} entries={entries} align='end' />
       </div>
       <div className='col-scroll' ref={ref} onScroll={(e) => setTop(e.currentTarget.scrollTop)} data-testid={`col-${status}`}>
-        <div role='listbox' aria-labelledby={`c-${status}`} style={{ paddingTop: w.padTop, paddingBottom: w.padBottom }}>
+        <div ref={listRef} className='col-list' role='listbox' aria-labelledby={`c-${status}`}>
           {items.slice(w.start, w.end).map((i, k) => renderCard(i, w.start + k + 1, items.length))}
         </div>
         {!items.length && <p className='col-empty'>No issues</p>}
