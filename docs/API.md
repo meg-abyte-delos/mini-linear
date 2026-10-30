@@ -113,5 +113,30 @@ Delivery: 2xx = success (redirects are not followed). Otherwise retried with bac
 
 **Payload / retention**: `payload` is the row as JSON (`to_jsonb(row)`) minus the internal `tsv` column. Deliveries older than 30 days are purged by the dispatcher (`purge_webhook_deliveries`).
 
+## Project and cycle counters (A1)
+
+One rule for every surface (API, project list, project page, roadmap rings, cycles list): **canceled issues are out of scope, soft-deleted issues do not exist.**
+
+**Visibility**: counts only include issues the caller can see (team visibility). A member of team A looking at a project that spans A and B gets counts for A only; admins and owners get everything. The same member gets 404 on a cycle of a team they are not in, counts included. No count leaks the size of a hidden team.
+
+`GET /projects` and `GET /projects/<id>` return (old names kept):
+
+| Field | Meaning |
+|---|---|
+| `issues_total` (= `issue_count`) | visible, non-deleted, non-canceled issues |
+| `issues_done` (= `done_count`) | status `done` |
+| `issues_in_progress` | status `in_progress` or `in_review` |
+| `issues_canceled` | status `canceled` (informational, not in the total) |
+| `progress_pct` | `round(100 * done / total)`, 0 when empty |
+| `progress_by_estimate` | `round(100 * done estimate / total estimate)` over non-canceled issues; `null` when no issue has an estimate |
+| `health` | health of the latest posted project update, or `null` |
+| `health_computed` | derived, see below |
+
+`health_computed` is `on_track`, `at_risk`, `off_track` or `null`. `null` if the project is `completed` or `canceled`, has no `target_date`, or has no issue. Else `on_track` at 100%; `off_track` when today is past `target_date`; otherwise `gap = elapsed% - progress_pct`, where `elapsed%` is the share of the window `start_date` (or creation day) to `target_date` already elapsed: gap up to 10 is on_track, up to 25 at_risk, else off_track. Pure function in `src/lib/project-health.ts`.
+
+`GET /cycles` and `GET /cycles/<id>` also return `scope` (non-canceled), `started` (`in_progress` or `in_review`), `completed` (`done`), `canceled`, `percent_complete` (`round(100 * completed / scope)`, 0 when empty). Identical to `GET /cycles/<id>/stats`.
+
+UI fix in the same change: the Cycles list ring counted canceled issues in the total and as done (4 issues with 1 canceled showed 50%); it now matches the API (33%).
+
 ## Changelog
 - **Behavior change (A4):** `POST /issues/:id/relations` with `type: duplicate` now cancels the source issue by default (`cancel_source` defaults to `true`, was effectively false). Pass `{ "cancel_source": false }` to keep the previous behavior. Moving the source to the team's first `canceled` state happens in the same transaction.
