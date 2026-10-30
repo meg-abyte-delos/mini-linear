@@ -15,3 +15,13 @@ Runtime rule (S12, Rex review #7): the owner role is a member of `definer` (BYPA
 
 `workspaces` is INSERT-only for app_user and FORCE RLS applies to inserts: when creating a workspace, `set_config('app.workspace_id', <new id>, true)` FIRST, then `insert into workspaces ...` WITHOUT `RETURNING` (RETURNING needs SELECT, which app_user lacks). Read workspaces only via `resolve_workspace` / `list_my_workspaces(user)` (both SECURITY DEFINER, trusting the session-derived user id). See `createWorkspace` in `src/lib/resources/tenancy.ts`.
 TRUSTED_PROXIES: comma-separated proxy IPs in front of the app (rate-limit client IP = rightmost X-Forwarded-For hop not listed).
+
+## Isolated e2e database (local)
+
+E2E specs write data (issues, comments, presence rows). Never point them at the demo DB.
+`pnpm test:e2e:isolated` drops and recreates `mini_linear_e2e` (`E2E_DB_NAME` to rename; the name must contain `e2e` or `test`),
+applies roles, migrations, grants and the demo seed twice, then runs Playwright with `DATABASE_URL`, `DATABASE_OWNER_URL` and `PGSUPER_URL`
+rewritten to that DB. `pnpm db:e2e-reset` only resets it. CI is unchanged: its Postgres service is already throwaway.
+Isolated runs never reuse a server already listening on :3000.
+Needs `PGSUPER_URL`, `DATABASE_OWNER_URL`, `DATABASE_URL`, `SEED_DEMO_PASSWORD`, `E2E_PASSWORD`.
+Playwright server and e2e DB are in API mode, so mock-data specs (e.g. `dnd.spec.ts` list, `search.spec.ts`, `palette-nl.spec.ts` 'me') still belong to the mock-mode `pnpm test:e2e` job.
