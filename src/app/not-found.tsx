@@ -8,7 +8,7 @@ export default function NotFound() {
     <main className='auth'>
       <div className='auth-card' role='status'>
         <h1>Page not found</h1>
-        <p className='auth-sub'>This page does not exist, or you do not have access to it.</p>
+        <p className='auth-sub'>404: this page could not be found, or you do not have access to it.</p>
         <Link href='/' className='nf-link'>Back to issues</Link>
       </div>
     </main>
