@@ -27,7 +27,20 @@ Same endpoints as the app, so the API is always at parity:
 | Attachments | `GET/POST /issues/<id>/attachments` (links), `DELETE /issues/<id>/attachments/<aid>`, file uploads below |
 | Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/<id>` (field `priority`: 0 none, 1 urgent .. 4 low, default 0) |
 | Teams | `GET/POST /teams`, `GET/PATCH/DELETE /teams/<id>`, `/teams/<id>/members` |
+| Saved views | `GET/POST /views`, `GET/PATCH/DELETE /views/<id>` (PATCH/DELETE need `If-Match`) |
+| View state | `GET/PUT/DELETE /view-state` per user and scope |
+| Favourite views | `GET /views/favorites`, `PUT/DELETE /views/<id>/favorite` |
 | Also | `/cycles`, `/labels`, `/members`, `/audit` |
+
+### View state and favourite views (A5, member+; guests get 403)
+
+- `scope`: `all`, `my-issues`, `team:<uuid>`, `project:<uuid>`, `cycle:<uuid>`, `view:<uuid>`; anything else is 422. A team/project/cycle/view scope the caller cannot see is 404.
+- `GET /view-state?scope=S` returns `{ scope, layout, filters, display, version, updated_at }`; with nothing stored it is 200 with defaults (`layout: "list"`, `filters: {op:"and",rules:[]}`, `display: {}`, `version: 0`). Without `scope`: `{ items: [...] }` (yours only, max 100).
+- `PUT /view-state` body `{ scope, layout, filters, display }` (strict; same `filters`/`display` schemas as `/views`; filters max 32 KB, display max 8 KB, else 422), header `If-Match: <version>` (`0` to create). 200 with the new row; 412 stale, 428 missing header. Ids inside filters are not validated.
+- `DELETE /view-state?scope=S` resets to defaults: 204, idempotent. `scope` is required (422).
+- `GET /views/favorites` returns `{ items: [{ view_id, position, view }] }` ordered by position; views no longer visible to the caller are omitted.
+- `PUT /views/<id>/favorite` body `{ position?: int >= 0 }` (default: end) returns 200 `{ view_id, position }`, idempotent; 404 if the view is not visible; the 51st favourite is 422. `DELETE /views/<id>/favorite`: 204, idempotent.
+- State and favourites are personal (RLS `own_rows`: even admins cannot read another user's rows) and not audited.
 
 **Pagination**: `?limit=1..100` (default 50) and `?cursor=<next_cursor>`; responses are `{ "items": [...], "next_cursor": string | null }`. Cursors are signed and bound to the workspace and list.
 **Concurrency**: PATCH needs `If-Match: <version>` (the `ETag` of the GET); missing: 428, stale: 412.
