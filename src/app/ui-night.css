@@ -15,7 +15,7 @@
   --line:rgba(255,255,255,.06); --line-soft:rgba(255,255,255,.04); --line-input:#686b73;
   --hover:rgba(255,255,255,.04); --sel:color-mix(in srgb, var(--accent) 12%, transparent);
   /* accent + glow tokens */
-  --accent:var(--accent); --accent-soft:color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-soft:color-mix(in srgb, var(--accent) 16%, transparent);
   --accent-glow:0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 16px color-mix(in srgb, var(--accent) 28%, transparent);
   --accent-halo:inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 14px color-mix(in srgb, var(--accent) 12%, transparent);
   --accent-bar-glow:0 0 8px color-mix(in srgb, var(--accent) 80%, transparent);
