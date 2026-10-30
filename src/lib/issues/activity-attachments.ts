@@ -87,36 +87,57 @@ const LABEL: Record<string, string> = {
   project_id: "project", cycle_id: "cycle", parent_id: "parent", label_ids: "labels", estimate: "estimate", due_date: "due date",
   archived_at: "archived", deleted_at: "deleted", body: "comment",
 };
-const PRIORITY = ["No priority", "Urgent", "High", "Medium", "Low"];
-const fmt = (field: string, v: unknown): string => {
-  if (v === null || v === undefined || v === "") return "none";
-  if (field === "priority" && typeof v === "number") return PRIORITY[v] ?? String(v);
-  if (field === "status" && typeof v === "string") return v.replace(/_/g, " ");
-  if (Array.isArray(v)) return v.length ? `${v.length}` : "none";
-  const s = typeof v === "string" ? v : JSON.stringify(v);
-  return s.length > 80 ? s.slice(0, 77) + "..." : s;
+/** Same fallback as the client (nl-people.nameFromEmail): no display name => the email local part, title-cased. Copied: nl-people pulls in client code. */
+const nameFromEmail = (email: string): string => (email.split('@')[0] ?? '').split(/[._+-]+/).filter(Boolean).map((w) => w[0]!.toUpperCase() + w.slice(1)).join(' ') || email;
+const PRIORITY = ['No priority', 'Urgent', 'High', 'Medium', 'Low'];
+/** Display names for the ids an activity diff mentions, per field. A missing id means the entity no longer exists (or is not visible). */
+export type Names = Partial<Record<'assignee_id' | 'project_id' | 'cycle_id' | 'label_ids' | 'state_id' | 'parent_id', Map<string, string>>>;
+const GONE: Record<string, string> = { assignee_id: 'a former member', project_id: 'a deleted project', cycle_id: 'a deleted cycle',
+  label_ids: 'a deleted label', state_id: 'a deleted state', parent_id: 'another issue' };
+const isRef = (f: string): f is keyof Names => f in GONE;
+/** 'in_progress' => 'In Progress' (the UI's wording). */
+export const statusName = (v: string) => v.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+const fmt = (field: string, v: unknown, names: Names = {}): string => {
+  if (v === null || v === undefined || v === '') return 'none';
+  if (field === 'priority' && typeof v === 'number') return PRIORITY[v] ?? String(v);
+  if (field === 'status' && typeof v === 'string') return statusName(v);
+  if (isRef(field) && field !== 'label_ids' && typeof v === 'string') return names[field]?.get(v) ?? GONE[field]!;
+  if (Array.isArray(v)) return v.length ? `${v.length}` : 'none';
+  const s = typeof v === 'string' ? v : JSON.stringify(v);
+  return s.length > 80 ? s.slice(0, 77) + '...' : s;
 };
+const list = (xs: string[]) => (xs.length < 3 ? xs.join(' and ') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+/** The ids of every referenced entity in a set of diffs, grouped by field (one name query per field). */
+export function referencedIds(diffs: Diff[]): Record<keyof Names, string[]> {
+  const out: Record<keyof Names, Set<string>> = { assignee_id: new Set(), project_id: new Set(), cycle_id: new Set(), label_ids: new Set(), state_id: new Set(), parent_id: new Set() };
+  for (const d of diffs) for (const [f, c] of Object.entries(d ?? {})) {
+    if (!isRef(f)) continue;
+    for (const v of [c.before, c.after]) for (const x of Array.isArray(v) ? v : [v]) if (typeof x === 'string' && /^[0-9a-f-]{36}$/i.test(x)) out[f].add(x);
+  }
+  return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, [...v]])) as Record<keyof Names, string[]>;
+}
 export type Change = { field: string; label: string; before: unknown; after: unknown; text: string };
-/** One readable line per changed field. Long text fields (description, comment body) are reported as "updated", not quoted. */
-export function describeChanges(diff: Diff): Change[] {
-  return Object.entries(diff ?? {}).filter(([f]) => f !== "issue_id" && !(f === "state_id" && diff && "status" in diff)).map(([f, { before, after }]) => {
-    const label = LABEL[f] ?? f.replace(/_id$/, "").replace(/_/g, " ");
+/** One readable line per changed field, ids resolved to names through `names`. Long text fields (description, comment body) are reported as 'updated', not quoted. */
+export function describeChanges(diff: Diff, names: Names = {}): Change[] {
+  return Object.entries(diff ?? {}).filter(([f]) => f !== 'issue_id' && !(f === 'state_id' && diff && 'status' in diff)).map(([f, { before, after }]) => {
+    const label = LABEL[f] ?? f.replace(/_id$/, '').replace(/_/g, ' ');
     let text: string;
-    if (f === "description" || f === "body") text = `updated the ${label}`;
-    else if (f === "label_ids") {
+    if (f === 'description' || f === 'body') text = `updated the ${label}`;
+    else if (f === 'label_ids') {
       const b = new Set((before as string[] | null) ?? []), a = new Set((after as string[] | null) ?? []);
-      const add = [...a].filter((x) => !b.has(x)).length, rem = [...b].filter((x) => !a.has(x)).length;
-      text = [add ? `added ${add} label${add > 1 ? "s" : ""}` : "", rem ? `removed ${rem} label${rem > 1 ? "s" : ""}` : ""].filter(Boolean).join(" and ") || "changed labels";
-    } else if (before == null) text = `set ${label} to ${fmt(f, after)}`;
-    else if (after == null) text = `cleared ${label} (was ${fmt(f, before)})`;
-    else text = `changed ${label} from ${fmt(f, before)} to ${fmt(f, after)}`;
+      const nm = (x: string) => names.label_ids?.get(x) ?? GONE.label_ids!;
+      const add = [...a].filter((x) => !b.has(x)).map(nm), rem = [...b].filter((x) => !a.has(x)).map(nm);
+      text = [add.length ? `added ${list(add)}` : '', rem.length ? `removed ${list(rem)}` : ''].filter(Boolean).join(' and ') || 'changed labels';
+    } else if (before == null) text = `set ${label} to ${fmt(f, after, names)}`;
+    else if (after == null) text = `cleared ${label} (was ${fmt(f, before, names)})`;
+    else text = `changed ${label} from ${fmt(f, before, names)} to ${fmt(f, after, names)}`;
     // Rex #68: never expose raw description/comment bodies in the activity feed (guests, deleted comments).
-    if (f === "description" || f === "body") return { field: f, label, before: null, after: null, text };
+    if (f === 'description' || f === 'body') return { field: f, label, before: null, after: null, text };
     return { field: f, label, before, after, text };
   });
 }
-export function summarize(entity: string, action: string, diff: Diff): string {
-  const ch = describeChanges(diff);
+export function summarize(entity: string, action: string, diff: Diff, names: Names = {}): string {
+  const ch = describeChanges(diff, names);
   switch (`${entity}:${action}`) {
     case "issue:create": return "created the issue";
     case "issue:delete": return "deleted the issue";
@@ -134,6 +155,23 @@ export function summarize(entity: string, action: string, diff: Diff): string {
   const verb = action === "create" ? "added" : action === "delete" ? "removed" : action === "update" ? "updated" : action;
   const kind = typeof diff.type?.after === "string" ? `${(diff.type.after as string).replace(/_/g, " ")} ` : typeof diff.type?.before === "string" ? `${(diff.type.before as string).replace(/_/g, " ")} ` : "";
   return `${verb} a ${kind}${noun}`;
+}
+/** Names for every id the page's diffs mention, workspace-scoped so a foreign or deleted id simply stays unresolved. */
+async function resolveNames(ctx: Ctx, diffs: Diff[]): Promise<Names> {
+  const ids = referencedIds(diffs), t = ctx.tx, ws = ctx.workspaceId;
+  const map = (rows: Row[]) => new Map(rows.map((r) => [r.id as string, r.name as string]));
+  const [users, projects, cycles, labels, states, parents] = await Promise.all([
+    ids.assignee_id.length ? t<Row[]>`select u.id, u.display_name, u.email from memberships m join users u on u.id = m.user_id
+      where m.workspace_id = ${ws} and u.id = any(${ids.assignee_id}::uuid[])` : [],
+    ids.project_id.length ? t<Row[]>`select id, name from projects where workspace_id = ${ws} and id = any(${ids.project_id}::uuid[])` : [],
+    ids.cycle_id.length ? t<Row[]>`select id, name from cycles where workspace_id = ${ws} and id = any(${ids.cycle_id}::uuid[])` : [],
+    ids.label_ids.length ? t<Row[]>`select id, name from labels where workspace_id = ${ws} and id = any(${ids.label_ids}::uuid[])` : [],
+    ids.state_id.length ? t<Row[]>`select id, name from workflow_states where workspace_id = ${ws} and id = any(${ids.state_id}::uuid[])` : [],
+    ids.parent_id.length ? t<Row[]>`select i.id, tm.key || '-' || i.number as name from issues i join teams tm on tm.id = i.team_id
+      where i.id = any(${ids.parent_id}::uuid[]) and i.deleted_at is null and ${visible(ctx)}` : [],
+  ]);
+  const people = new Map(users.map((u) => [u.id as string, (u.display_name as string | null) ?? nameFromEmail(u.email as string)]));
+  return { assignee_id: people, project_id: map(projects), cycle_id: map(cycles), label_ids: map(labels), state_id: map(states), parent_id: map(parents) };
 }
 const actQuery = listQuery.extend({ entity: z.enum(["issue", "comment", "attachment", "relation"]).optional() });
 
@@ -168,10 +206,11 @@ export const listActivity = (req: Request, slug: string, rawIssue: string) => wi
   const wanted = [...new Set(p.items.flatMap((r) => otherEnds((r.diff ?? {}) as Diff)))];
   const seen = new Set(wanted.length ? (await t<Row[]>`select i.id from issues i where i.id = any(${wanted}::uuid[]) and i.deleted_at is null and ${visible(ctx)}`).map((r) => r.id as string) : []);
   const shown = p.items.filter((r) => otherEnds((r.diff ?? {}) as Diff).every((id) => seen.has(id)));
+  const names = await resolveNames(ctx, shown.map((r) => (r.diff ?? {}) as Diff));
   const items = shown.map((r) => {
     const diff = (r.diff ?? {}) as Diff;
     return { id: r.id, issue_id: issue.id, actor_id: r.actor_id, entity: r.entity, entity_id: r.entity_id, action: r.action,
-      summary: summarize(r.entity as string, r.action as string, diff), changes: describeChanges(diff), created_at: r.created_at };
+      summary: summarize(r.entity as string, r.action as string, diff, names), changes: describeChanges(diff, names), created_at: r.created_at };
   });
   return Response.json({ items, next_cursor: p.next_cursor });
 });

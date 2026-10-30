@@ -59,7 +59,7 @@ type Item = { action: string; entity: string; summary: string; actor_id: string;
     expect(items.every((x) => x.actor_id === seed.a.member)).toBe(true);
     expect(sole(items, "status")!.changes.find((c) => c.field === "status")).toMatchObject({ after: "in_progress" });
     expect(sole(items, "priority")!.summary).toContain("priority");
-    expect(sole(items, "label_ids")!.summary).toContain("added 1 label");
+    expect(sole(items, "label_ids")!.summary).toContain("added feed-bug");
     expect(sole(items, "project_id")!.changes.find((c) => c.field === "project_id")).toMatchObject({ before: null, after: project.id });
     expect(sole(items, "cycle_id")!.changes.find((c) => c.field === "cycle_id")).toMatchObject({ after: cycle.id });
     const asg = items.filter((x) => x.changes.some((c) => c.field === "assignee_id"));
@@ -69,7 +69,7 @@ type Item = { action: string; entity: string; summary: string; actor_id: string;
     // a no-op patch must not add an empty "updated the issue" event
     const n = items.length; await patch(i.id, (await (await call(H.getIssue as Fn, seed.a.member, "GET", undefined, null, seed.a.slug, i.id)).json()).version, { priority: 1 });
     expect((await feed(i.id)).filter((x) => x.action === "update" && x.changes.length === 0).length).toBe(0);
-    expect((await feed(i.id)).length).toBeGreaterThanOrEqual(n);
+    expect((await feed(i.id)).length).toBe(n);
   });
 
   it("records comments (create/edit) in the same feed without leaking the body", async () => {

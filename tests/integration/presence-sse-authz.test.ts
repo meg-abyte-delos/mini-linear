@@ -72,9 +72,9 @@ describe.runIf(runIntegration)('presence body route: authn / authz / validation'
     expect((await inWs(W.w1, (c) => c.query('select count(*)::int n from issue_presence'))).rows[0].n).toBe(n0);
   });
 
-  it('well-formed but unknown or foreign issue ids are 404 (no existence oracle between 400 and 404 for uuids)', async () => {
+  it('well-formed but unknown or foreign issue ids are 404 (a malformed id is 400 or 404, never 5xx)', async () => {
     expect((await beat(W.M1, randomUUID())).status).toBe(404);
-    expect((await beat(W.M1, 'not-a-uuid')).status).toBeLessThan(500);
+    expect([400, 404]).toContain((await beat(W.M1, 'not-a-uuid')).status);
     expect((await beat(W.M1, W.i2)).status).toBe(404); // w2 issue addressed under w1
   });
 
@@ -227,13 +227,19 @@ describe.runIf(runIntegration)('SSE presence event: snapshot, change, leave, no 
     expect(r.text).not.toContain(W.A1.id);
   }, 30_000);
 
-  it('revoked guest share: the issue disappears from the guest\'s next snapshot', async () => {
+  it('revoked guest share: the revoked issue leaves the guest\'s next snapshot while a control issue stays (stream is live)', async () => {
     const id = await mkIssue(W.M1, W.t1, 'revoked sse');
-    await inWs(W.w1, (c) => c.query('insert into issue_shares (workspace_id, issue_id, guest_user_id, shared_by) values ($1,$2,$3,$4)', [W.w1, id, W.G1.id, W.M1.id]));
-    await beat(W.M1, id);
-    expect(lastFor((await feed(W.G1, 'w1', (p) => !!lastFor(p, id))).events, id)).toBeTruthy();
+    const ctrl = await mkIssue(W.M1, W.t1, 'control sse');
+    for (const i of [id, ctrl]) {
+      await inWs(W.w1, (c) => c.query('insert into issue_shares (workspace_id, issue_id, guest_user_id, shared_by) values ($1,$2,$3,$4)', [W.w1, i, W.G1.id, W.M1.id]));
+      await beat(W.M1, i);
+    }
+    const before = await feed(W.G1, 'w1', (p) => !!lastFor(p, id) && !!lastFor(p, ctrl));
+    expect(lastFor(before.events, id)).toBeTruthy();
+    expect(lastFor(before.events, ctrl)).toBeTruthy();
     await inWs(W.w1, (c) => c.query('update issue_shares set revoked_at = now() where issue_id = $1', [id]));
-    const r = await feed(W.G1, 'w1', (p) => !!lastFor(p, id), 4000);
+    const r = await feed(W.G1, 'w1', (p) => !!lastFor(p, ctrl), 4000);
+    expect(lastFor(r.events, ctrl)).toBeTruthy(); // the stream delivered its snapshot: absence of the revoked issue is meaningful
     expect(r.text).not.toContain(id);
   }, 30_000);
 });

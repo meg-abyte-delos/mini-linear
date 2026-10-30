@@ -21,3 +21,11 @@
 .snooze-menu button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .inbox-detail { width:360px; background:var(--panel); }
 .inbox-detail h2 { font-size:var(--fs-lg); font-weight:600; }
+
+/* Inbox action buttons on tokens (no native UA #efefef): bar, bulk toolbar, detail actions. */
+.inbox-bar button, .inbox-detail-actions button { height:24px; padding:0 var(--sp-2); border:1px solid var(--line); border-radius:6px; background:var(--raised); color:var(--fg); font:inherit; font-size:var(--fs-sm); cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.inbox-bar button:hover:not(:disabled), .inbox-detail-actions button:hover { background:var(--hover); border-color:var(--muted); }
+.inbox-bar button:focus-visible, .inbox-detail-actions button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.inbox-bar button:disabled { color:var(--muted); cursor:default; } /* no opacity: --muted on --raised stays 6:1 (with .7 it fell to 3.6:1) */
+.inbox-bar .bulk { display:inline-flex; align-items:center; gap:6px; }
+@media (prefers-reduced-motion: reduce) { .inbox-bar button, .inbox-detail-actions button { transition:none; } }

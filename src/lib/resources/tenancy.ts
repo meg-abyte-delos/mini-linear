@@ -46,7 +46,7 @@ export const getWorkspaceSettings = (req: Request, slug: string) => withWorkspac
 const logoS = z.union([z.literal(""), z.string().trim().max(2048).url().refine((u) => u.startsWith("https://"), "logo_url must be https")]);
 export const patchWorkspaceSettings = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "admin");
-  const b = await parseJson(req, z.object({ name: nameS.optional(), slug: slugS.optional(), logo_url: logoS.optional() }).strict());
+  const b = await parseJson(req, z.object({ name: nameS.optional(), slug: slugS.optional(), logo_url: logoS.optional() }).strict().refine((v) => Object.keys(v).length > 0, "at least one field is required"));
   const before = (await ctx.tx<Row[]>`select id, slug, name, logo_url from get_workspace_settings()`)[0];
   if (!before) throw new ApiError("not_found");
   const r = await ctx.tx<Row[]>`select * from update_workspace_settings(${b.name ?? null}, ${b.slug ?? null}, ${b.logo_url ?? null})`;

@@ -35,7 +35,6 @@
 .tb-menu [role=menuitem]:hover, .tb-menu [role=menuitem]:focus-visible { background:var(--hover); outline:none; }
 .tb-menu.display { right:0; padding:10px; display:grid; gap:8px; }
 .tb-menu.display label { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:12px; color:var(--muted-strong); }
-.tb-menu.display select { height:26px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); font:inherit; font-size:12px; padding:0 6px; }
 .fwrap { position:relative; }
 .row .labels .chip.lb1::before { background:var(--lb-red); } .row .labels .chip.lb2::before { background:var(--lb-purple); } .row .labels .chip.lb3::before { background:var(--lb-blue); }
 .row .labels .chip.proj::before { background:var(--lb-project); }
@@ -53,3 +52,42 @@
 .group h2 { height:var(--group-h); position:sticky; top:0; z-index:2; background:color-mix(in srgb, var(--fg) 5%, var(--bg)); }
 .group h2 .chev { transition:transform var(--dur-fast) var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { .row, .row .rowsel, .group h2 .chev { transition:none; } }
+
+/* Display popover (Wave B): Menu pickers for Grouping/Ordering. */
+.tb-menu.display .dp-pick { display:inline-flex; align-items:center; justify-content:space-between; gap:var(--sp-2); min-width:var(--dp-pick-min-w); height:var(--dp-pick-h); padding:0 var(--sp-2); border:1px solid var(--line); border-radius:var(--r-sm); background:var(--hover); color:var(--fg); font:inherit; font-size:var(--fs-sm); cursor:pointer; transition:border-color var(--dur-fast) var(--ease-out); }
+.tb-menu.display .dp-pick svg { color:var(--muted); }
+.tb-menu.display .dp-pick:hover, .tb-menu.display .dp-pick[aria-expanded=true] { border-color:var(--muted); }
+.tb-menu.display .dp-pick:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.tb-menu.display .dp-sep { height:1px; margin:6px 0; background:var(--line); }
+.tb-menu.display .dp-h { padding:var(--sp-1) var(--sp-3) var(--sp-2); font-size:var(--fs-sm); font-weight:var(--fw-medium); color:var(--muted); }
+.tb-menu.display .dp-props { display:flex; flex-wrap:wrap; gap:6px; padding:0 var(--sp-3) 6px; }
+.dp-chip { height:var(--chip-h); padding:0 var(--sp-2); border:1px solid var(--line); border-radius:var(--r-sm); background:none; color:var(--muted); font:inherit; font-size:var(--fs-sm); cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.dp-chip:hover { background:var(--hover); }
+.dp-chip.on { background:var(--sel); border-color:var(--muted); color:var(--fg); }
+.dp-chip:focus-visible, .dp-switch input:focus-visible + i { outline:2px solid var(--accent); outline-offset:1px; }
+.dp-switch { cursor:pointer; position:relative; }
+.dp-switch input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:inherit; }
+.dp-switch i { width:var(--dp-switch-w); height:var(--dp-switch-h); border-radius:calc(var(--dp-switch-h) / 2); background:var(--line); position:relative; transition:background-color var(--dur-fast) var(--ease-out); }
+.dp-switch i::after { content:''; position:absolute; top:var(--dp-knob-gap); left:var(--dp-knob-gap); width:var(--dp-knob); height:var(--dp-knob); border-radius:50%; background:var(--fg); transition:transform var(--dur-fast) var(--ease-out); }
+.dp-switch input:checked + i { background:var(--accent); }
+.dp-switch input:checked + i::after { transform:translateX(calc(var(--dp-switch-w) - var(--dp-knob) - 2 * var(--dp-knob-gap))); }
+.dp-switch input:disabled + i { opacity:var(--op-disabled-deco); }
+.dp-switch:has(input:disabled) { cursor:default; }
+@media (prefers-reduced-motion: reduce) { .tb-menu.display, .dp-chip, .dp-switch i, .dp-switch i::after, .tb-menu.display .dp-pick { animation:none; transition:none; } }
+.tb-menu.display .dp-row { display:flex; align-items:center; justify-content:space-between; gap:var(--row-gap); min-height:var(--chip-h); padding:var(--sp-1) var(--sp-3); }
+.tb-menu.display .dp-k { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-base); color:var(--muted-strong); }
+/* List polish (Meg review of main 5301df1): lighter pills, softer titles, legible priority, CSS checkbox, icon add button. */
+.row { --title-fg:color-mix(in srgb, var(--fg) 88%, var(--bg)); --pill-line:color-mix(in srgb, var(--fg) 10%, transparent); }
+.row .title { font-weight:var(--fw-medium); color:var(--title-fg); }
+.row .labels { gap:4px; margin-right:var(--sp-2, 8px); }
+.row .labels .chip { height:20px; padding:0 7px; gap:5px; border:1px solid var(--pill-line); border-radius:999px; background:none; font-size:var(--fs-sm); font-weight:var(--fw-regular); color:var(--muted); }
+.row .labels .chip::before { width:6px; height:6px; }
+.row .pi { display:block; flex:none; align-self:center; }
+.row .pi .on { fill:var(--muted-strong); }
+.row .pi .dim { fill:color-mix(in srgb, var(--fg) 24%, transparent); }
+.row .pi .dimfill { fill:var(--muted); }
+.row .rowsel { display:block; flex:none; width:14px; height:14px; box-sizing:border-box; border:1px solid var(--muted); border-radius:3px; background:none; cursor:pointer; }
+.row .rowsel.on { background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 2px var(--bg); }
+.group h2 .gh-add { display:inline-flex; align-items:center; justify-content:center; transition:opacity var(--dur-fast) var(--ease-out), background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
+.group h2 .gh-add svg { width:14px; height:14px; }
+@media (prefers-reduced-motion: reduce) { .group h2 .gh-add { transition:none; } }

@@ -5,7 +5,7 @@ export type Inline =
   | { t: 'code'; v: string }
   | { t: 'strong' | 'em' | 'del'; c: Inline[] }
   | { t: 'link'; href: string; c: Inline[] }
-  | { t: 'mention'; user: string };
+  | { t: 'mention'; user: string; raw?: string };
 export type Block =
   | { t: 'p'; c: Inline[] }
   | { t: 'h'; level: 1 | 2 | 3; c: Inline[] }
@@ -40,7 +40,7 @@ export function parseInline(src: string): Inline[] {
     let m: RegExpMatchArray | null;
     if (rest[0] === '\\' && rest.length > 1) { buf += rest[1]; i += 2; continue; }
     if ((m = rest.match(/^`([^`]+)`/))) { flush(); out.push({ t: 'code', v: m[1] ?? '' }); i += m[0].length; continue; }
-    if ((m = rest.match(/^@\[([^\]]{1,64})\]\(([0-9a-f-]{36})\)/i))) { flush(); out.push({ t: 'mention', user: m[1] ?? '' }); i += m[0].length; continue; }
+    if ((m = rest.match(/^@\[([^\]]{1,64})\]\(([0-9a-f-]{36})\)/i))) { flush(); out.push({ t: 'mention', user: m[1] ?? '', raw: m[0] }); i += m[0].length; continue; }
     if ((m = rest.match(/^\[([^\]]+)\]\(((?:[^()\s]|\([^()\s]*\))+)\)/))) {
       flush();
       const href = safeHref(m[2] ?? '');
@@ -67,11 +67,13 @@ export function parseMarkdown(src: string): Block[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? '';
     let m: RegExpMatchArray | null;
-    if (/^```/.test(line)) {
+    const fenceOpen = line.match(/^(`{3,})/);
+    if (fenceOpen) {
+      const flen = fenceOpen[1]?.length ?? 3;
       endPara();
       const body: string[] = [];
       i++;
-      while (i < lines.length && !/^```/.test(lines[i] ?? '')) body.push(lines[i++] ?? '');
+      while (i < lines.length && !(((lines[i] ?? '').match(/^(`+)\s*$/)?.[1] ?? '').length >= flen)) body.push(lines[i++] ?? '');
       out.push({ t: 'pre', v: body.join('\n') });
       continue;
     }

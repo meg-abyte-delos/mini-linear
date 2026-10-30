@@ -4,16 +4,16 @@ import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter } from 'next/navigation';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
-import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
+import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { SHORTCUTS, createMatcher, formatKeys, isTypingTarget, keyOf } from '@/lib/shortcuts';
 import { createStore } from '@/lib/sim-store';
 import { fetchAllIssues, startIssueRealtime } from '@/lib/realtime-bridge';
-import { MIN_QUERY, looksLikeIdentifier, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
+import { MIN_QUERY, searchApi, searchLocal, snippetParts, type SearchHit } from '@/lib/search-client';
 import { CyclesList } from '@/components/CyclesList';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
-import { GROUPING_LABEL, ORDERING_LABEL, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
+import { DISPLAY_PROP_LABEL, GROUPING_LABEL, ORDERING_LABEL, type DisplayProp, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
@@ -24,7 +24,8 @@ import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilters, type FilterKey, type Filters } from '@/lib/filters';
-import { WorkspaceSwitcher, TeamSection } from '@/components/SidebarParts';
+import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
+import { DisplayPick } from '@/components/DisplayPick';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'Priority', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
@@ -80,12 +81,19 @@ function paletteGroup(id: string): string {
 function paletteIcon(id: string) {
   if (id === 'list' || id === 'go-project') return <Icon name='list' />;
   if (id === 'board') return <Icon name='board' />;
-  if (id === 'cycles') return <Icon name='views' />;
+  if (id === 'cycles') return <Icon name='cycle' />;
   if (id === 'projects') return <Icon name='team' />;
   if (id === 'create') return <Icon name='plus' />;
   if (id === 'search-all' || id.startsWith('filter-')) return <Icon name='search' />;
   if (id.startsWith('hit-')) return <Icon name='issues' />;
   return <Icon name='inbox' />;
+}
+
+// Cmd+K: highlight the typed term inside an issue title (case-insensitive, first match), like Linear.
+function markTerm(text: string, term: string) {
+  const t = term.trim(); const i = t.length >= MIN_QUERY ? text.toLowerCase().indexOf(t.toLowerCase()) : -1;
+  if (i < 0) return text;
+  return <>{text.slice(0, i)}<mark>{text.slice(i, i + t.length)}</mark>{text.slice(i + t.length)}</>;
 }
 
 export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
@@ -161,6 +169,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [tbMenu, setTbMenu] = useState<'filter' | 'display' | null>(null);
   const [grouping, setGrouping] = useState<Grouping>('status');
   const [ordering, setOrdering] = useState<Ordering>('manual');
+  const [showEmpty, setShowEmpty] = useState(false);
+  const [hidden, setHidden] = useState<ReadonlySet<DisplayProp>>(new Set());
+  const shown = (k: DisplayProp) => !hidden.has(k);
+  const toggleProp = (k: DisplayProp) => setHidden((h) => { const n = new Set(h); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const issues = useMemo(() => applyFilters(allIssues, filters), [allIssues, filters]);
@@ -230,7 +242,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const on = (id: string) => filters[kind].includes(id);
     if (kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: on(st), lead: <StatusIcon status={st} /> }));
     if (kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: on(String(n)), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (kind === 'assignee') return [{ id: NONE, label: 'Unassigned', checked: on(NONE), lead: <span className='av av-none' aria-hidden='true' /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: on(u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (kind === 'assignee') return [{ id: NONE, label: 'Unassigned', checked: on(NONE), lead: <UnassignedIcon /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: on(u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     if (kind === 'label') return LABELS.map((l) => ({ id: l.id, label: l.name, badge: scopeBadge(l.scope), checked: on(l.id), lead: <span className={`chip ${l.hue}`} aria-hidden='true'>&nbsp;</span> }));
     if (kind === 'project') return [{ id: NONE, label: 'No project', checked: on(NONE) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: on(p.id) }))];
     return [{ id: NONE, label: 'No cycle', checked: on(NONE) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: on(c.id) }))];
@@ -284,7 +296,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   useEffect(() => { document.documentElement.dataset.ready = '1'; return () => { delete document.documentElement.dataset.ready; }; }, []);
 
   // Same grouping, ordering and collapsed state as the list render, so j/k never lands on a hidden row.
-  const groups = useMemo(() => listGroups(issues, STATUSES, grouping, ordering), [issues, grouping, ordering]);
+  const groups = useMemo(() => listGroups(issues, STATUSES, grouping, ordering, showEmpty), [issues, grouping, ordering, showEmpty]);
   const ordered = useMemo(
     () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.flatMap((s) => issues.filter((i) => i.status === s))),
     [view, groups, collapsed, issues],
@@ -414,7 +426,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const cur = sel[0];
     if (!pick || !cur) return [];
     if (pick.kind === 'priority') return PRIORITY_LABEL.map((l, n) => ({ id: String(n), label: l, checked: sel.every((x) => x.priority === n), lead: <PriorityIcon priority={n as Issue['priority']} /> }));
-    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <span className='av av-none' aria-hidden='true' /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
+    if (pick.kind === 'assignee') return [{ id: 'none', label: 'Unassigned', checked: sel.every((x) => x.assignee_id === null), lead: <UnassignedIcon /> }, ...people.map((u) => ({ id: u.id, label: u.name, checked: sel.every((x) => x.assignee_id === u.id), lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
     if (pick.kind === 'status') return STATUSES.map((st) => ({ id: st, label: STATUS_LABEL[st], checked: sel.every((x) => x.status === st), lead: <StatusIcon status={st} /> }));
     if (pick.kind === 'project') return [{ id: 'none', label: 'No project', checked: sel.every((x) => x.project_id === null) }, ...PROJECTS.map((p) => ({ id: p.id, label: p.name, checked: sel.every((x) => x.project_id === p.id) }))];
     if (pick.kind === 'cycle') return [{ id: 'none', label: 'No cycle', checked: sel.every((x) => x.cycle_id === null) }, ...CYCLES.map((c) => ({ id: c.id, label: c.name, checked: sel.every((x) => x.cycle_id === c.id) }))];
@@ -526,8 +538,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const matched = fuzzyFilter(commands, q, (c) => c.label);
   const hitCmds: Cmd[] = hits.map((h) => ({ id: `hit-${h.kind}-${h.id}`, label: `${h.identifier ? `${h.identifier} ` : ''}${h.title}`, hint: h.kind === 'issue' ? undefined : h.kind, run: () => openHit(h), hit: h }));
   const allCmd: Cmd[] = q.trim().length >= MIN_QUERY ? [{ id: 'search-all', label: `Search all for “${q.trim()}”`, run: () => router.push(`/search?q=${encodeURIComponent(q.trim())}`) }] : [];
-  // An identifier-looking query (DEL-12) puts the hits first; otherwise commands keep priority.
-  const baseResults: Cmd[] = looksLikeIdentifier(q) ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...hitCmds, ...allCmd];
+  // Like Linear: once the query matches issues, hits come first; an empty query keeps actions on top.
+  const baseResults: Cmd[] = hitCmds.length ? [...hitCmds, ...matched, ...allCmd] : [...matched, ...allCmd];
   // Natural-language action: an extra row next to the search results, never a replacement.
   const nl = q.trim().length >= 4 && !readOnly ? (api ? parseNlCommand(q, nlPeople.users, LABELS, nlPeople.me, { peopleLoading: !nlPeopleLoaded }) : parseNlCommand(q, USERS, LABELS, USERS[0]!.id)) : null;
   // A status-only phrase is already covered by the built-in 'Move to …' commands: no duplicate NL row.
@@ -552,6 +564,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const results: Cmd[] = nlFirst && !nl?.blocked ? [...nlCmd, ...baseResults] : [...baseResults, ...nlCmd];
   // Keep the active row visible while arrowing through a long, sectioned list.
   const activeId = results[pi]?.id;
+  // No hit and no command: one 'No results' line with the single 'Search all' row under it (no separate group).
+  const noResults = api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0;
   useEffect(() => { if (palette && activeId) document.getElementById(`pc-${activeId}`)?.scrollIntoView({ block: 'nearest' }); }, [palette, activeId]);
   const actions = useRef({ reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
@@ -622,39 +636,41 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }, []);
 
   const who = (id: string | null) => findPerson(people, id);
-  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av av-none' aria-hidden='true' title='Unassigned' />; };
+  const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av-wrap' title='Unassigned'><UnassignedIcon /></span>; };
   const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
 
   const row = (i: Issue) => (
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
-      {!readOnly && <span className={`rowsel${multi.includes(i.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${i.identifier ?? i.id}`} onClick={(e) => { e.stopPropagation(); toggleSelect(i.id); }}>{multi.includes(i.id) ? '☑' : '☐'}</span>}
-      <PriorityIcon priority={i.priority} />
-      <span className='id'>{i.identifier ?? i.id}</span>
-      <StatusIcon status={i.status} />
+      {!readOnly && <span className={`rowsel${multi.includes(i.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${i.identifier ?? i.id}`} onClick={(e) => { e.stopPropagation(); toggleSelect(i.id); }} />}
+      {shown('priority') && <PriorityIcon priority={i.priority} />}
+      {shown('id') && <span className='id'>{i.identifier ?? i.id}</span>}
+      {shown('status') && <StatusIcon status={i.status} />}
       <span className='title'>{i.title}</span>
-      <span className='labels'>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{(() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
-      <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>
-      {assignee(i)}
+      <span className='labels'>{shown('labels') && i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}{shown('project') && (() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj'>{pj.name}</span> : null; })()}</span>
+      {shown('created') && <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>}
+      {shown('assignee') && assignee(i)}
     </div>
   );
   const card = (i: Issue, pos?: number, size?: number) => (
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
       <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
-      <div className='card-meta'><span className='card-prio' title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
+      <div className='card-meta'><span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
   );
 
   return (
     <div className='shell'>
       <aside className='side' aria-label='Sidebar'>
-        <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
-        {!readOnly && <button className='side-btn new' onClick={() => create()}><Icon name='plus' /><span>New issue</span><kbd>C</kbd></button>}
-        <button className='side-btn' onClick={openPalette} aria-keyshortcuts='Meta+K Control+K'><Icon name='search' /><span>Search</span><kbd>⌘K</kbd></button>
+        <div className='side-head'>
+          <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
+          <button className='side-icbtn' onClick={openPalette} aria-label='Search' title='Search (⌘K)' aria-keyshortcuts='Meta+K Control+K'><SideIcon name='search' /></button>
+          {!readOnly && <button className='side-icbtn compose' onClick={() => create()} aria-label='New issue' title='New issue (C)' aria-keyshortcuts='C'><SideIcon name='compose' /></button>}
+        </div>
         <nav aria-label='Primary'>
-          <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><Icon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
-          <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><Icon name='issues' /><span>My issues</span></a>
-          <a className='side-link' href='#views' onClick={(e) => e.preventDefault()}><Icon name='views' /><span>Views</span></a>
+          <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><SideIcon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
+          <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><SideIcon name='mine' /><span>My issues</span></a>
+          <a className='side-link' href='#views' onClick={(e) => e.preventDefault()}><SideIcon name='views' /><span>Views</span></a>
           <div role='group' aria-label='Saved views' data-testid='saved-views'>
             {views.map((v) => (
               <div key={v.id} className='sv-row'>
@@ -668,9 +684,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         <div className='side-label'>Your teams</div>
         <nav aria-label='Teams'>
           <TeamSection name='Delos'>
-          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><span>Issues</span></a>
-          <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><span>Cycles</span></a>
-          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><span>Projects</span></a>
+          <a className={`side-link sub${view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? ' active' : ''}`} aria-current={view !== 'cycles' && view !== 'projects' && view !== 'inbox' ? 'page' : undefined} href='#issues' onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span></a>
+          <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setView('cycles'); }}><SideIcon name='cycles' /><span>Cycles</span></a>
+          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span></a>
           </TeamSection>
         </nav>
       </aside>
@@ -690,7 +706,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               </button>
             ))}
             <div className='fwrap'>
-              <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='views' /><span>Filter</span></button>
+              <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></button>
               {tbMenu === 'filter' && (
                 <div className='tb-menu' role='menu' aria-label='Filter by' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-add')?.focus(); } }}>
                   {FILTER_KEYS.map((k, n) => <button key={k} id={`fb-${filters[k].length ? 'm-' : ''}${k}`} role='menuitem' autoFocus={n === 0} onClick={() => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }}>{FILTER_LABEL[k]}</button>)}
@@ -710,11 +726,16 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             )}
             {view === 'list' && (
               <div className='tb-right'>
-                <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='list' /><span>Display</span></button>
+                <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></button>
                 {tbMenu === 'display' && (
                   <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
-                    <label>Grouping<select autoFocus value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>{(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => <option key={g} value={g}>{GROUPING_LABEL[g]}</option>)}</select></label>
-                    <label>Ordering<select value={ordering} onChange={(e) => setOrdering(e.target.value as Ordering)}>{(Object.keys(ORDERING_LABEL) as Ordering[]).map((o) => <option key={o} value={o}>{ORDERING_LABEL[o]}</option>)}</select></label>
+                    <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><DisplayPick label='Grouping' autoFocus value={grouping} labels={GROUPING_LABEL} onChange={setGrouping} /></div>
+                    <div className='dp-row'><span className='dp-k'><Icon name='views' />Ordering</span><DisplayPick label='Ordering' value={ordering} labels={ORDERING_LABEL} onChange={setOrdering} /></div>
+                    <div className='dp-sep' role='separator' />
+                    <label className='dp-row dp-switch'><span className='dp-k'>Show empty groups</span><input type='checkbox' role='switch' checked={showEmpty} disabled={grouping === 'none'} onChange={(e) => setShowEmpty(e.target.checked)} /><i aria-hidden='true' /></label>
+                    <div className='dp-sep' role='separator' />
+                    <div className='dp-h' id='dp-props'>Display properties</div>
+                    <div className='dp-props' role='group' aria-labelledby='dp-props'>{(Object.keys(DISPLAY_PROP_LABEL) as DisplayProp[]).map((k) => <button key={k} type='button' className={`dp-chip${shown(k) ? ' on' : ''}`} aria-pressed={shown(k)} onClick={() => toggleProp(k)}>{DISPLAY_PROP_LABEL[k]}</button>)}</div>
                   </div>
                 )}
               </div>
@@ -756,7 +777,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                 <section key={key} className={`group${s && overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${key}`} {...(s ? zoneProps(s) : {})}>
                   <h2 id={`g-${key}`}>
                     <button className='gh-toggle' aria-expanded={!shut} aria-controls={`gl-${key}`} onClick={() => toggleGroup(key)}>{s && <StatusIcon status={s} />}<span>{s ? STATUS_LABEL[s] : 'All issues'}</span><span className='count'>{items.length}</span><i className='chev' aria-hidden='true'>▾</i></button>
-                    {s && !readOnly && <button className='gh-add' aria-label={`Add issue to ${STATUS_LABEL[s]}`} onClick={() => create(s)}>+</button>}
+                    {s && !readOnly && <button className='gh-add' aria-label={`Add issue to ${STATUS_LABEL[s]}`} onClick={() => create(s)}><Icon name='plus' /></button>}
                   </h2>
                   {!shut && <div id={`gl-${key}`} role='listbox' aria-labelledby={`g-${key}`}>{items.map(row)}</div>}
                 </section>
@@ -820,13 +841,13 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               }}
             />
             <ul id='palette-list' role='listbox' aria-label='Commands'>
+              {noResults && <li role='presentation' data-testid='palette-no-results' className='pal-empty pal-noresults'>No results for “{q.trim()}”</li>}
               {results.map((c, idx) => (
-                <Fragment key={c.id}>{(idx === 0 || paletteGroup(results[idx - 1]!.id) !== paletteGroup(c.id)) && <li role='presentation' className='pal-group'>{paletteGroup(c.id)}</li>}
-                <li id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span className='pal-ic' aria-hidden='true'>{paletteIcon(c.id)}</span><span className='pal-label'>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : c.hit.title}</> : c.label}</span>{c.hint && <span className='pal-keys'>{c.hint.split(' ').map((k, j) => <kbd key={j}>{k}</kbd>)}</span>}</li></Fragment>
+                <Fragment key={c.id}>{!(noResults && c.id === 'search-all') && (idx === 0 || paletteGroup(results[idx - 1]!.id) !== paletteGroup(c.id)) && <li role='presentation' className='pal-group'>{paletteGroup(c.id)}</li>}
+                <li id={`pc-${c.id}`} className={c.id === 'nl' ? (c.disabled ? 'nl-action is-disabled' : 'nl-action') : undefined} role='option' aria-selected={idx === pi} aria-disabled={c.disabled || undefined} onClick={() => { if (c.disabled) return; closePalette(); c.run(); }}><span className='pal-ic' aria-hidden='true'>{c.hit?.kind === 'issue' && c.hit.status && (STATUSES as readonly string[]).includes(c.hit.status) ? <StatusIcon status={c.hit.status as Status} /> : paletteIcon(c.id)}</span><span className='pal-label'>{c.hit ? <>{c.hit.identifier && <b className='hit-id'>{c.hit.identifier} </b>}{c.hit.kind === 'comment' ? snippetParts(c.hit.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>)) : markTerm(c.hit.title, q)}</> : c.label}</span>{c.hint && <span className='pal-keys'>{c.hint.split(' ').map((k, j) => <kbd key={j}>{k}</kbd>)}</span>}</li></Fragment>
               ))}
               {api && q.trim().length >= MIN_QUERY && searchState === 'loading' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-searching'>Searching…</li>}
               {api && q.trim().length >= MIN_QUERY && searchState === 'error' && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-search-error'>Search failed. Try again.</li>}
-              {api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' data-testid='palette-no-results' className='pal-empty'>No results for “{q.trim()}”</li>}
               {results.length === 0 && !(api && q.trim().length >= MIN_QUERY) && <li role='option' aria-selected='false' aria-disabled='true' className='pal-empty'>No matching command</li>}
             </ul>
             <div className='palette-foot'><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>

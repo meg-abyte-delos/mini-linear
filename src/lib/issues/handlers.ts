@@ -19,7 +19,7 @@ const SCOPE = "issues:sort_key:asc";
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v) => !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().startsWith(v), "invalid date");
 const estimate = z.number().int().min(0).max(64);
 const createBody = z.object({
-  team_id: uuidSchema, title: z.string().min(1).max(255), description: z.string().max(100000).default(""),
+  team_id: uuidSchema, title: z.string().trim().min(1).max(255), description: z.string().max(100000).default(""),
   status: z.enum(STATUS).default("backlog"), priority: z.number().int().min(0).max(4).default(0),
   assignee_id: uuidSchema.nullable().default(null), project_id: uuidSchema.nullable().default(null),
   cycle_id: uuidSchema.nullable().default(null), parent_id: uuidSchema.nullable().default(null),
@@ -27,7 +27,7 @@ const createBody = z.object({
   state_id: uuidSchema.optional(), estimate: estimate.nullable().default(null), due_date: date.nullable().default(null),
 }).strict();
 // Optional issue template (area 9): its fields fill whatever the request left at its default; the request always wins.
-const createBodyT = createBody.extend({ title: z.string().min(1).max(255).optional(), template_id: uuidSchema.optional() });
+const createBodyT = createBody.extend({ title: z.string().trim().min(1).max(255).optional(), template_id: uuidSchema.optional() });
 async function applyTemplate(ctx: Parameters<typeof assertTeamVisible>[0], raw: z.infer<typeof createBodyT>) {
   const { template_id, ...b } = raw;
   let title = b.title;
@@ -42,7 +42,7 @@ async function applyTemplate(ctx: Parameters<typeof assertTeamVisible>[0], raw: 
   return { ...b, title };
 }
 const patchBody = z.object({
-  title: z.string().min(1).max(255), description: z.string().max(100000), status: z.enum(STATUS), priority: z.number().int().min(0).max(4),
+  title: z.string().trim().min(1).max(255), description: z.string().max(100000), status: z.enum(STATUS), priority: z.number().int().min(0).max(4),
   assignee_id: uuidSchema.nullable(), project_id: uuidSchema.nullable(), cycle_id: uuidSchema.nullable(), parent_id: uuidSchema.nullable(),
   label_ids: z.array(uuidSchema).max(50), state_id: uuidSchema, estimate: estimate.nullable(), due_date: date.nullable(),
 }).partial().strict();

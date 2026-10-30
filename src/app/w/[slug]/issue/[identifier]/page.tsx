@@ -5,6 +5,7 @@ import { getWorkspaceContext } from '@/lib/auth/workspace-context';
 import { findByIdentifier } from '@/lib/detail/issue-meta';
 import '../../../../issue-detail.css';
 import '../../../../ui-issue-detail.css';
+import '../../../../ui-issue-page.css';
 
 const IDENT_RE = /^[A-Za-z][A-Za-z0-9]{0,9}-\d{1,9}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;

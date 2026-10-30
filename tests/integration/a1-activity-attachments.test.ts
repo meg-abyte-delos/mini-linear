@@ -64,7 +64,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     const body = await (await activity(seed.a.member)).json();
     const sums = body.items.map((x: { summary: string }) => x.summary);
     expect(sums[0]).toBe("deleted a comment"); expect(sums[1]).toBe("commented");
-    expect(sums).toContain("changed status from backlog to in progress, changed priority from No priority to High");
+    expect(sums).toContain("changed status from Backlog to In Progress, changed priority from No priority to High");
     expect(sums).toContain("attached Spec v2.pdf"); expect(sums).toContain("removed attachment x.io/del");
     expect(sums[sums.length - 1]).toBe("created the issue");
     const upd = body.items.find((x: { action: string; entity: string }) => x.entity === "issue" && x.action === "update");

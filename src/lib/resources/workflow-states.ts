@@ -73,7 +73,7 @@ export const patchState = (req: Request, slug: string, rawTeam: string, rawId: s
   if (recat) { // re-derive the legacy status of the issues in this state (state_id unchanged => trigger keeps it)
     const prev = await ctx.tx<Row[]>`select id, status from issues where state_id = ${id} and deleted_at is null`;
     const now = await ctx.tx<Row[]>`update issues set status = workflow_state_status(${b.category!}::workflow_state_category, null), version = version + 1, updated_at = now()
-      where state_id = ${id} returning id, status`;
+      where state_id = ${id} and deleted_at is null returning id, status`;
     const was = new Map(prev.map((r) => [r.id as string, r.status]));
     for (const r of now) if (was.has(r.id as string) && was.get(r.id as string) !== r.status)
       await audit(ctx, "issue", r.id as string, "update", { status: { before: was.get(r.id as string), after: r.status } });

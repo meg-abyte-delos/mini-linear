@@ -1,12 +1,12 @@
 'use client';
-// Issue page header (Linear parity): prev/next with position, favorite, "..." menu holding the lifecycle actions.
+// Issue page header actions (Linear parity): prev/next with position, favorite, and the full "..." menu built on the Menu primitive.
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
+import { Menu, Tooltip, type MenuEntry } from '@/components/ui';
 
 export interface HeaderNav { index: number; total: number; prev: string | null; next: string | null }
 interface Props {
-  ident: string; nav: HeaderNav | null; archived: boolean; readOnly: boolean;
-  onCopyLink: () => void; onCopyBranch: () => void; onArchive: () => void; onUnarchive: () => void; onDelete: () => void; onRestore: () => void;
+  ident: string; nav: HeaderNav | null; readOnly: boolean; entries: MenuEntry[]; moreRef: RefObject<HTMLButtonElement | null>; onRestore: () => void;
 }
 
 const svg = (d: string, filled = false) => (<svg width='16' height='16' viewBox='0 0 16 16' fill={filled ? 'currentColor' : 'none'} stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true' focusable='false'><path d={d} /></svg>);
@@ -22,49 +22,23 @@ function useFavorite(ident: string) {
   return [on, toggle] as const;
 }
 
-export function IssueHeaderBar({ ident, nav, archived, readOnly, onCopyLink, onCopyBranch, onArchive, onUnarchive, onDelete, onRestore }: Props) {
+export function IssueHeaderBar({ ident, nav, readOnly, entries, moreRef, onRestore }: Props) {
   const [fav, toggleFav] = useFavorite(ident);
   const [menu, setMenu] = useState(false);
-  const wrap = useRef<HTMLDivElement>(null);
-  const btn = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!menu) return;
-    wrap.current?.querySelector<HTMLElement>('[role=menuitem]')?.focus();
-    const onDown = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setMenu(false); };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.stopPropagation(); setMenu(false); btn.current?.focus(); return; }
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-      e.preventDefault();
-      const items = Array.from(wrap.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? []);
-      const at = items.indexOf(document.activeElement as HTMLElement);
-      items[(at + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
-    };
-    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey, true);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey, true); };
-  }, [menu]);
-  const run = (fn: () => void) => () => { setMenu(false); fn(); };
+  const favLabel = fav ? 'Remove from favorites' : 'Add to favorites';
   return (
     <div className='idh' role='toolbar' aria-label='Issue actions'>
       {nav && (
         <div className='idh-nav'>
           <span className='idh-pos' aria-label={`Issue ${nav.index + 1} of ${nav.total}`}>{nav.index + 1} <span className='idh-of'>/ {nav.total}</span></span>
-          {nav.prev ? <Link className='idh-btn' href={nav.prev} aria-label='Previous issue' title='Previous issue'>{svg(UP)}</Link> : <span className='idh-btn' aria-disabled='true' aria-label='Previous issue' role='link'>{svg(UP)}</span>}
-          {nav.next ? <Link className='idh-btn' href={nav.next} aria-label='Next issue' title='Next issue'>{svg(DOWN)}</Link> : <span className='idh-btn' aria-disabled='true' aria-label='Next issue' role='link'>{svg(DOWN)}</span>}
+          {nav.prev ? <Tooltip label='Previous issue'><Link className='idh-btn' href={nav.prev} aria-label='Previous issue'>{svg(UP)}</Link></Tooltip> : <span className='idh-btn' aria-disabled='true' aria-label='Previous issue' role='link'>{svg(UP)}</span>}
+          {nav.next ? <Tooltip label='Next issue'><Link className='idh-btn' href={nav.next} aria-label='Next issue'>{svg(DOWN)}</Link></Tooltip> : <span className='idh-btn' aria-disabled='true' aria-label='Next issue' role='link'>{svg(DOWN)}</span>}
         </div>
       )}
-      <button className={`idh-btn idh-fav${fav ? ' on' : ''}`} aria-pressed={fav} aria-label={fav ? 'Remove from favorites' : 'Add to favorites'} title={fav ? 'Remove from favorites' : 'Add to favorites'} onClick={toggleFav}>{svg(STAR, fav)}</button>
+      <Tooltip label={favLabel}><button className={`idh-btn idh-fav${fav ? ' on' : ''}`} aria-pressed={fav} aria-label={favLabel} onClick={toggleFav}>{svg(STAR, fav)}</button></Tooltip>
       {readOnly && <button className='idh-text' onClick={onRestore}>Restore</button>}
-      <div className='idh-more' ref={wrap}>
-        <button ref={btn} className='idh-btn' aria-label='More actions' title='More actions' aria-haspopup='menu' aria-expanded={menu} onClick={() => setMenu((m) => !m)}>{svg(DOTS)}</button>
-        {menu && (
-          <div className='idh-menu' role='menu' aria-label={`${ident} actions`}>
-            <button role='menuitem' onClick={run(onCopyLink)}><span>Copy link</span><kbd>⌘.</kbd></button>
-            <button role='menuitem' onClick={run(onCopyBranch)}><span>Copy branch</span><kbd>⌘⇧.</kbd></button>
-            {!readOnly && <button role='menuitem' onClick={run(archived ? onUnarchive : onArchive)}><span>{archived ? 'Unarchive' : 'Archive'}</span></button>}
-            {!readOnly && <><div className='idh-sep' role='separator' /><button role='menuitem' className='danger' onClick={run(onDelete)}><span>Delete</span></button></>}
-          </div>
-        )}
-      </div>
+      <Tooltip label='More actions'><button ref={moreRef} className='idh-btn' aria-label='More actions' aria-haspopup='menu' aria-expanded={menu} onClick={() => setMenu((m) => !m)}>{svg(DOTS)}</button></Tooltip>
+      <Menu open={menu} anchorRef={moreRef} onClose={() => setMenu(false)} label={`${ident} actions`} entries={entries} align='end' />
     </div>
   );
 }

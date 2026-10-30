@@ -51,16 +51,23 @@ test('inline title, properties and activity', async ({ page }) => {
   await expect(page.getByRole('complementary', { name: 'Properties' }).locator('.due-flag')).toHaveText('Overdue');
 });
 
-test('markdown editor is safe: no script/raw html, unsafe links dropped', async ({ page }) => {
+test('description editor is WYSIWYG and safe: no tabs, no script/raw html, unsafe links dropped', async ({ page }) => {
   await ready(page);
-  await page.getByRole('tab', { name: 'Write' }).click();
-  await page.getByLabel('Description (markdown)').fill('**bold** <img src=x onerror=window.__x=1> [bad](javascript:alert(1)) [ok](https://linear.app)');
-  await page.getByRole('tab', { name: 'Preview' }).click();
-  const view = page.locator('.md-view');
-  await expect(view.locator('strong')).toHaveText('bold');
-  await expect(view.locator('img')).toHaveCount(0);
-  await expect(view.getByRole('link', { name: 'bad' })).toHaveCount(0);
-  await expect(view.getByRole('link', { name: 'ok' })).toHaveAttribute('rel', /noopener/);
+  await expect(page.getByRole('tab', { name: 'Write' })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Preview' })).toHaveCount(0);
+  const ed = page.getByRole('textbox', { name: 'Description' });
+  await ed.click();
+  await page.keyboard.press('Control+b'); await page.keyboard.type('bold'); await page.keyboard.press('Control+b');
+  await page.keyboard.type(' <img src=x onerror=window.__x=1> [bad](javascript:alert(1)) [ok](https://linear.app)');
+  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'));
+  await page.getByLabel('Title', { exact: true }).click(); // blur saves
+  expect((await saved).status()).toBe(200);
+  await page.reload(); await page.waitForSelector('html[data-ready]');
+  await expect(ed.locator('strong')).toHaveText('bold');
+  await expect(ed.locator('img')).toHaveCount(0);
+  await expect(ed.getByRole('link', { name: 'bad' })).toHaveCount(0);
+  await expect(ed).toContainText('[bad](javascript:alert(1))'); // typed syntax stays literal text
+  await expect(ed).toContainText('<img src=x onerror=window.__x=1>');
   expect(await page.evaluate(() => (window as unknown as { __x?: number }).__x)).toBeUndefined();
 });
 
@@ -124,9 +131,9 @@ test('copy branch shortcut, archive and unarchive', async ({ page, context }) =>
 
 test('delete and restore', async ({ page }) => {
   await ready(page);
-  page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
   await expect(page.locator('.idp-banner')).toContainText('trash');
   await expect(page.getByLabel('Title', { exact: true })).toHaveAttribute('readonly', '');
   await page.getByRole('button', { name: 'Restore' }).click();
