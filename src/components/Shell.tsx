@@ -461,13 +461,24 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (d.label_ids.length) extra.label_ids = d.label_ids;
     if (d.project_id) extra.project_id = d.project_id;
     let made: Issue | null | undefined;
+    let patchFailed = false;
     if (api) {
       const row = await apiCreate(api.slug, api.teamId, d.title);
       if (!row) { setToast('Could not create the issue.'); return false; }
       versions.current.set(row.id, row.version);
       store.current.upsert({ ...row, sort_key: String(Date.now()) });
       const patch = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
-      if (Object.keys(patch).length) { store.current.update(row.id, patch); push(row.id, patch); }
+      if (Object.keys(patch).length) {
+        store.current.update(row.id, patch);
+        // Await the follow-up PATCH here (not push()) so a failure is reported instead of being overwritten by the "Created" toast.
+        const r = await apiPatch(api.slug, row, row.version, patch);
+        if (r.issue) {
+          versions.current.set(row.id, r.issue.version);
+          const local = store.current.list().find((x) => x.id === row.id);
+          store.current.upsert(r.kind === 'ok' && local ? { ...local, version: r.issue.version, identifier: r.issue.identifier } : { ...r.issue, sort_key: row.sort_key });
+        }
+        if (r.kind !== 'ok') patchFailed = true;
+      }
       made = store.current.list().find((x) => x.id === row.id);
     } else {
       made = store.current.create({ title: d.title, description: d.description, status: d.status, priority: d.priority, assignee_id: d.assignee_id });
@@ -479,7 +490,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (view === 'cycles' || view === 'projects') setView('list');
     if (made && activeCount(filters) > 0 && applyFilters([made], filters).length === 0) setFilters(emptyFilters());
     if (made) setSelId(made.id);
-    setToast(`Created ${made?.identifier ?? d.title}`);
+    setToast(patchFailed ? `Created ${made?.identifier ?? d.title}, but some properties could not be saved.` : `Created ${made?.identifier ?? d.title}`);
     return true;
   }
   // Mock mode: the current user is the first mock user. API mode needs the session user + members API (same gap as the A picker).

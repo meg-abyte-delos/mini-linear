@@ -27,6 +27,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
   const [project, setProject] = useState<string | null>(null);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false); // sync guard: state alone lets a double Cmd+Enter through before re-render
   const [invalid, setInvalid] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
   const [pick, setPick] = useState<Kind | null>(null);
@@ -45,7 +46,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) { setTitle(''); setStatus(initialStatus ?? 'todo'); setPriority(0); setAssignee(null); setLabelIds([]); setProject(null); setBusy(false); setInvalid(false); setPick(null); setEditorKey((k) => k + 1); desc.current = ''; }
+    if (open) { setTitle(''); setStatus(initialStatus ?? 'todo'); setPriority(0); setAssignee(null); setLabelIds([]); setProject(null); busyRef.current = false; setBusy(false); setInvalid(false); setPick(null); setEditorKey((k) => k + 1); desc.current = ''; }
   }
 
   useEffect(() => {
@@ -74,12 +75,14 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, o
   }, [open, mounted]);
 
   async function submit() {
-    if (busy) return;
+    if (busyRef.current) return;
     const t = title.trim();
     if (!t) { setInvalid(true); titleEl.current?.focus(); return; }
+    busyRef.current = true;
     setBusy(true);
-    const ok = await onSubmit({ title: t.slice(0, 255), description: desc.current, status, priority, assignee_id: assignee, label_ids: labelIds, project_id: project });
-    setBusy(false);
+    let ok = false;
+    try { ok = await onSubmit({ title: t.slice(0, 255), description: desc.current, status, priority, assignee_id: assignee, label_ids: labelIds, project_id: project }); }
+    finally { busyRef.current = false; setBusy(false); }
     if (!ok) return;
     if (!more) { onClose(); return; }
     setTitle(''); setInvalid(false); desc.current = ''; setEditorKey((k) => k + 1); titleEl.current?.focus();
