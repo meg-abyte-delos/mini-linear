@@ -5,6 +5,8 @@ export type Notif = {
   read_at: string | null; archived_at: string | null; snoozed_until: string | null; created_at: string;
   issue: { id: string; number: number; title: string; status: string; team_id: string; identifier: string } | null;
   actor: { id: string; email: string } | null;
+  /** 'system' = no actor (e.g. due_soon). Optional: older servers omit it. */
+  kind?: 'system' | 'user';
 };
 export type InboxAction = 'read' | 'unread' | 'archive' | 'unarchive' | 'snooze';
 export type InboxTab = 'all' | 'unread' | 'archived' | 'snoozed';
@@ -103,4 +105,40 @@ export function relTime(iso: string, nowMs = Date.now()): string {
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
   return `${Math.floor(s / 86400)}d`;
+}
+
+
+/** Who did it: "Due soon" for system notifications (no actor), else "name <verb>". */
+export function whoLabel(n: Notif): string {
+  if (n.kind === 'system') return 'Due soon';
+  return `${n.actor?.email.split('@')[0] ?? 'Someone'} ${TYPE_LABEL[n.type]}`;
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** Short Linear-style timestamp: "just now", "5m ago", "3h ago", then "Oct 30, 10:00" (year added when not the current one). */
+export function shortWhen(iso: string, nowMs = Date.now()): string {
+  const d = new Date(iso);
+  const s = Math.max(0, Math.round((nowMs - d.getTime()) / 1000));
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const yr = d.getFullYear() === new Date(nowMs).getFullYear() ? '' : `, ${d.getFullYear()}`;
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}${yr}, ${hm}`;
+}
+
+/** One row per issue: the latest notification represents the group; it is unread if any member is. */
+export function groupByIssue(items: Notif[]): { rows: Notif[]; members: Map<string, Notif[]> } {
+  const by = new Map<string, Notif[]>();
+  for (const n of items) by.set(n.issue_id, [...(by.get(n.issue_id) ?? []), n]);
+  const members = new Map<string, Notif[]>();
+  const rows = [...by.values()].map((g) => {
+    const latest = g.reduce((a, b) => (new Date(b.created_at) > new Date(a.created_at) ? b : a));
+    const anyUnread = g.some((x) => !x.read_at);
+    const row = { ...latest, read_at: anyUnread ? null : latest.read_at };
+    members.set(row.id, g);
+    return row;
+  });
+  rows.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return { rows, members };
 }

@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
-import { PRIORITY_LABEL, STATUS_LABEL, type Issue } from '@/lib/issues';
-import { TABS, TYPE_LABEL, relTime, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
+import { StatusIcon } from '@/components/icons';
+import { PRIORITY_LABEL, STATUS_LABEL, type Issue, type Status } from '@/lib/issues';
+import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
 
 /**
  * Inbox. Two panes: notification list on the left, preview of the selected notification's issue on the right (no List/Board toggle).
@@ -29,7 +30,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
     const t = setTimeout(() => { void client.list(tab).then((r) => { setItems(r.items); onUnread(r.unread_count); }).catch(() => undefined); }, 400);
     return () => clearTimeout(t);
   }, [refreshKey]);
-  const list = items ?? [];
+  // One row per issue (latest event); the unread count is the number of unread rows, i.e. the dots.
+  const { rows: list, members } = useMemo(() => groupByIssue(items ?? []), [items]);
   const unread = list.filter((n) => !n.read_at).length;
   const presets = useMemo(() => snoozePresets(), [snoozeOpen]);
   const sel = list[cur] as Notif | undefined;
@@ -40,14 +42,15 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
   async function actMany(ns: Notif[], action: InboxAction, until?: string) {
     if (ns.length === 0) return;
     const prev = items ?? [];
-    const ids = new Set(ns.map((n) => n.id));
+    const all = ns.flatMap((n) => members.get(n.id) ?? [n]); // an action on a row applies to every event of its issue
+    const ids = new Set(all.map((n) => n.id));
     const t = new Date().toISOString();
     const leaves = action === 'archive' || action === 'snooze' || action === 'unarchive';
     // Optimistic update; the list is reloaded if any request fails.
     setItems(leaves ? prev.filter((x) => !ids.has(x.id)) : prev.map((x) => ids.has(x.id) ? { ...x, read_at: action === 'read' ? t : null } : x));
     setChecked(new Set());
-    if (leaves) setCur((c) => Math.max(0, Math.min(c, prev.length - ids.size - 1)));
-    const res = await Promise.all(ns.map((n) => client.act(n.id, action, until)));
+    if (leaves) setCur((c) => Math.max(0, Math.min(c, list.length - ns.length - 1)));
+    const res = await Promise.all(all.map((n) => client.act(n.id, action, until)));
     const failed = res.filter((r) => !r).length;
     if (failed) { setFail(`${failed} action${failed > 1 ? 's' : ''} failed`); await load(); } else setFail(null);
     onUnread(await client.unreadCount());
@@ -120,8 +123,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
                 <span className={`rowsel${checked.has(n.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }}>{checked.has(n.id) ? '☑' : '☐'}</span>
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
                 <span className='nid'>{n.issue?.identifier ?? 'Deleted'}</span>
-                <span className='ntitle'>{n.issue?.title ?? ''}</span>
-                <span className='nwho'>{n.actor?.email.split('@')[0] ?? 'Someone'} {TYPE_LABEL[n.type]}</span>
+                <span className='ntitle' title={n.issue?.title ?? ''}>{n.issue?.title ?? ''}</span>
+                <span className='nwho' title={whoLabel(n)}>{whoLabel(n)}</span>
                 <span className='ntime'>{relTime(n.created_at)}</span>
               </li>
             ))}
@@ -130,12 +133,12 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
       </div>
       {sel && (
         <aside className='inbox-detail' aria-label='Notification detail'>
-          <h2>{sel.issue ? `${sel.issue.identifier} ${sel.issue.title}` : 'Issue deleted'}</h2>
+          <h2 title={sel.issue ? `${sel.issue.identifier} ${sel.issue.title}` : undefined}>{sel.issue ? `${sel.issue.identifier} ${sel.issue.title}` : 'Issue deleted'}</h2>
           <dl>
-            <dt>Event</dt><dd>{sel.actor?.email.split('@')[0] ?? 'Someone'} {TYPE_LABEL[sel.type]}</dd>
-            {sel.issue && <><dt>Status</dt><dd>{sel.issue.status}</dd></>}
-            <dt>When</dt><dd>{new Date(sel.created_at).toLocaleString()}</dd>
-            {sel.snoozed_until && <><dt>Snoozed until</dt><dd>{new Date(sel.snoozed_until).toLocaleString()}</dd></>}
+            <dt>Event</dt><dd>{whoLabel(sel)}</dd>
+            {sel.issue && <><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></>}
+            <dt>When</dt><dd title={new Date(sel.created_at).toLocaleString()}>{shortWhen(sel.created_at)}</dd>
+            {sel.snoozed_until && <><dt>Snoozed until</dt><dd>{shortWhen(sel.snoozed_until)}</dd></>}
           </dl>
           {selIssue && (
             <section className='inbox-preview' aria-label='Issue preview'>
@@ -144,10 +147,10 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
             </section>
           )}
           <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
+            {sel.issue && <button className='primary' onClick={() => open(sel)}>Open issue</button>}
             <button aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
             <button aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>
             <button aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</button>
-            {sel.issue && <button onClick={() => open(sel)}>Open issue</button>}
           </div>
         </aside>
       )}
