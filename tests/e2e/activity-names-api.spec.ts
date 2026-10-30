@@ -11,6 +11,14 @@ async function patch(req: APIRequestContext, id: string, version: number, data: 
   return ((await r.json()) as { version: number }).version;
 }
 
+// DELETE needs If-Match with the current version (see deleteProject/deleteIssue): read it first, then assert the delete landed.
+async function del(req: APIRequestContext, path: string) {
+  const cur = await req.get(path);
+  if (!cur.ok()) return;
+  const v = ((await cur.json()) as { version: number }).version;
+  expect((await req.delete(path, { headers: { 'If-Match': etag(v) } })).status()).toBeLessThan(300);
+}
+
 test('rendered feed shows names, never raw ids, for assignee/project/cycle/labels/status', async ({ page }) => {
   const req = page.request;
   const teams = (await (await req.get('/api/v1/w/demo/teams')).json()).items as { id: string }[];
@@ -51,10 +59,10 @@ test('rendered feed shows names, never raw ids, for assignee/project/cycle/label
   expect(items.length).toBeGreaterThanOrEqual(5);
   for (const t of items) expect(t).not.toMatch(UUID);
   } finally {
-    await req.delete(`/api/v1/w/demo/issues/${it.id}`);
-    await req.delete(`/api/v1/w/demo/projects/${project.id}`);
-    await req.delete(`/api/v1/w/demo/cycles/${cycle.id}`);
-    await req.delete(`/api/v1/w/demo/labels/${label.id}`);
+    await del(req, `/api/v1/w/demo/issues/${it.id}`);
+    await del(req, `/api/v1/w/demo/projects/${project.id}`);
+    await del(req, `/api/v1/w/demo/cycles/${cycle.id}`);
+    await del(req, `/api/v1/w/demo/labels/${label.id}`);
   }
 });
 
@@ -75,6 +83,6 @@ test('feed refreshes after an edit without a reload: server wording replaces the
   await expect(feed).toContainText(`changed title from ${old} to ${old} edited`, { timeout: 5000 });
   await expect(feed.getByText('changed the title', { exact: false })).toHaveCount(0);
   } finally {
-    await page.request.delete(`/api/v1/w/demo/issues/${it.id}`);
+    await del(page.request, `/api/v1/w/demo/issues/${it.id}`);
   }
 });
