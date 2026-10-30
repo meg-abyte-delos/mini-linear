@@ -12,7 +12,7 @@ test.describe.configure({ mode: 'serial' });
 test.use({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark', reducedMotion: 'reduce' });
 
 const TODAY = 'today=2026-10-27';
-const SHOT = { maxDiffPixelRatio: 0.015, animations: 'disabled' as const, caret: 'hide' as const };
+const SHOT = { maxDiffPixelRatio: 0.002, animations: 'disabled' as const, caret: 'hide' as const };
 
 async function ready(page: Page, url: string, waitFor: () => Promise<unknown>) {
   await page.goto(url);
@@ -50,7 +50,7 @@ test('visual: board', async ({ page }) => {
 
 test('visual: issue page', async ({ page }) => {
   await ready(page, `/w/demo/issue/DEM-1?${TODAY}`, () => expect(page.getByRole('complementary', { name: 'Properties' })).toBeVisible());
-  await check(page, 'issue');
+  await check(page, 'issue', [page.locator('.ev-age')]); // relative age ticks (1h, 2h): masked, else the baseline rots hourly
 });
 
 test('visual: projects', async ({ page }) => {
