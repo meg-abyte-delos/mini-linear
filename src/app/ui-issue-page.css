@@ -23,6 +23,10 @@
 /* Title */
 .idp-title { font-size:var(--fs-xl); }
 
+/* Issue page (#265): toolbar floats above the editor instead of reserving a row; scoped so the New issue modal keeps the shared bar. */
+.idp .re-bar { position:absolute; z-index:2; right:0; bottom:calc(100% + var(--sp-1)); display:flex; align-items:center; gap:2px; min-height:var(--re-bar-h); padding:0 2px; background:var(--raised); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-pop); opacity:0; pointer-events:none; transition:opacity var(--dur-fast) var(--ease-out); }
+.idp .re:focus-within .re-bar, .idp .re-bar:focus-within { opacity:1; pointer-events:auto; }
+.idp .re[data-readonly] .re-bar { display:none; }
 
 @media (max-width:860px) { .idp { grid-template-columns:1fr; } }
-@media (prefers-reduced-motion: reduce) { .re-bar, .re-link, .idh-btn, .idh-status, .re-btn, .re-surface ul[data-tasks] > li::before { transition:none; animation:none; } .re-bar { opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .re-bar, .re-link, .idh-btn, .idh-status, .re-btn, .re-surface ul[data-tasks] > li::before { transition:none; animation:none; } }
