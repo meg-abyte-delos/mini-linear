@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { StatusIcon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
+import { AppSidebar } from '@/components/AppSidebar';
 import { STATUSES, STATUS_LABEL, type Issue, type Status } from '@/lib/issues';
-import { MIN_QUERY, searchApi, searchLocal, snippetParts, type HitKind, type SearchHit } from '@/lib/search-client';
+import { MIN_QUERY, searchApi, searchLocal, highlightParts, snippetParts, type HitKind, type SearchHit } from '@/lib/search-client';
 
 const TABS: { id: HitKind | null; label: string }[] = [{ id: null, label: 'All' }, { id: 'issue', label: 'Issues' }, { id: 'comment', label: 'Comments' }, { id: 'project', label: 'Projects' }];
 const isStatus = (s: string | null): s is Status => !!s && (STATUSES as readonly string[]).includes(s);
@@ -49,8 +50,17 @@ export function SearchView({ initialQuery, initialKind, slug, mockIssues }: { in
 
   const href = (h: SearchHit) => (h.kind === 'project' ? `/?view=projects` : `/?issue=${encodeURIComponent(h.issue_id ?? h.id)}`);
   const term = q.trim();
+  const marked = (parts: { text: string; mark: boolean }[]) => parts.map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>));
+  // An issue's snippet repeats its title when the match is only in the title: show it only when it adds text (description match).
+  const snippetOf = (h: SearchHit) => {
+    if (!h.snippet) return null;
+    const parts = snippetParts(h.snippet);
+    if (h.kind === 'issue' && parts.map((p) => p.text).join('').replace(/…/g, '').trim() && h.title.toLowerCase().includes(parts.map((p) => p.text).join('').replace(/…/g, '').trim().toLowerCase())) return null;
+    return parts;
+  };
   return (
     <div className='shell'>
+      <AppSidebar slug={slug} current='search' />
       <main className='main search-page'>
         <header className='head'><div className='crumbs'><Link href='/'>Issues</Link><span className='sep'>/</span><h1 className='crumb-title'>Search</h1></div></header>
         <div className='search-bar'>
@@ -70,9 +80,9 @@ export function SearchView({ initialQuery, initialKind, slug, mockIssues }: { in
                 <Link href={href(h)} className='search-link'>
                   {isStatus(h.status) && <StatusIcon status={h.status} />}
                   {h.identifier && <b className='hit-id'>{h.identifier}</b>}
-                  <span className='search-title'>{h.title}</span>
+                  <span className='search-title'>{marked(highlightParts(h.title, term))}</span>
                   <span className='search-kind'>{h.kind === 'issue' && isStatus(h.status) ? STATUS_LABEL[h.status] : h.kind}</span>
-                  {h.kind !== 'issue' && h.snippet && <span className='search-snippet'>{snippetParts(h.snippet).map((p, k) => (p.mark ? <mark key={k}>{p.text}</mark> : <span key={k}>{p.text}</span>))}</span>}
+                  {(() => { const sn = snippetOf(h); return sn ? <span className='search-snippet' data-testid='search-snippet'>{marked(sn)}</span> : null; })()}
                 </Link>
               </li>
             ))}

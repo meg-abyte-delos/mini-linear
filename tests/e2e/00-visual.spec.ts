@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { settled } from './helpers/settled';
 import { resetInbox } from './reset-inbox';
@@ -22,22 +22,22 @@ async function ready(page: Page, url: string, waitFor: () => Promise<unknown>) {
   await settled(page);
   await page.mouse.move(0, 0);
 }
-async function check(page: Page, name: string) {
-  await expect(page).toHaveScreenshot(`${name}-1280.png`, SHOT);
+async function check(page: Page, name: string, mask: Locator[] = []) {
+  await expect(page).toHaveScreenshot(`${name}-1280.png`, { ...SHOT, mask });
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(r.violations.map((v) => `${name}: ${v.id} x${v.nodes.length} ${v.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' | ')}`), `axe ${name}`).toEqual([]);
 }
 
 test('visual: list', async ({ page }) => {
   await ready(page, `/?${TODAY}`, () => expect(page.getByRole('option').first()).toBeVisible());
-  await check(page, 'list');
+  await check(page, 'list', [page.locator('.date')]); // created date = seed day: masked, else the baseline ages daily
 });
 
 test('visual: list with Display popover', async ({ page }) => {
   await ready(page, `/?${TODAY}`, () => expect(page.getByRole('option').first()).toBeVisible());
   await page.getByRole('button', { name: /display/i }).click();
   await settled(page);
-  await check(page, 'list-display');
+  await check(page, 'list-display', [page.locator('.date')]); // created date = seed day: masked, else the baseline ages daily
 });
 
 test('visual: board', async ({ page }) => {
