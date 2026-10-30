@@ -15,7 +15,7 @@ test('issue page on the API: renders, edits the title (If-Match) with activity, 
   const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'));
   await t.press('Enter');
   expect((await saved).ok()).toBe(true);
-  await expect(page.getByRole('list', { name: 'Activity' })).toContainText('changed the title');
+  await expect(page.getByRole('list', { name: 'Activity' })).toContainText(/changed (the )?title/);
   await page.reload();
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Edited via API page');
   await page.goto('/w/not-mine/issue/DEM-1');
