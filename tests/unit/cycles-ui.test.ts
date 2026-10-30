@@ -6,8 +6,8 @@ describe('cycles-ui', () => {
     { cycle_id: 'c', status: 'done' }, { cycle_id: 'c', status: 'canceled' }, { cycle_id: 'c', status: 'in_progress' },
     { cycle_id: 'c', status: 'todo' }, { cycle_id: 'x', status: 'done' }, { cycle_id: null, status: 'done' },
   ] as const;
-  it('scope counts done + canceled as closed, in progress / review as started', () => {
-    expect(cycleScope(iss as never, 'c')).toEqual({ total: 4, started: 1, done: 2, pct: 50 });
+  it('scope excludes canceled, in progress / review as started', () => {
+    expect(cycleScope(iss as never, 'c')).toEqual({ total: 3, started: 1, done: 1, pct: 33 });
   });
   it('empty cycle: 0%, no NaN', () => { expect(cycleScope([], 'c')).toEqual({ total: 0, started: 0, done: 0, pct: 0 }); });
   it('timing: days left (end inclusive), starts in, none for past', () => {
