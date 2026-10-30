@@ -492,10 +492,32 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // Delete (# / Delete / Backspace / bar button): confirm, then soft-delete the selection. API mode: DELETE /issues/<id> (If-Match);
   // rows the server refuses are put back.
   const [confirmDel, setConfirmDel] = useState<string[] | null>(null);
+  const [undoDel, setUndoDel] = useState<{ msg: string; items: Issue[] } | null>(null);
+  const confirmTarget = confirmDel?.length === 1 ? store.current.list().find((x) => x.id === confirmDel[0]) : undefined;
+  // Delete only acts in the list and board, on an explicit target: the multi-selection, or the cursor row the user moved to (no fallback to the first row).
   function askDelete() {
+    if (view !== 'list' && view !== 'board') return;
     if (readOnly) { setToast('Guests have read-only access.'); return; }
-    const ids = targetIds().filter((id) => store.current.list().some((x) => x.id === id && !x.deleted_at));
+    const explicit = multiRef.current.length ? multiRef.current : selId && ordered.some((i) => i.id === selId) ? [selId] : [];
+    const ids = explicit.filter((id) => store.current.list().some((x) => x.id === id && !x.deleted_at));
     if (ids.length) setConfirmDel(ids);
+    else setToast('Select an issue first (J/K to move, X to select).');
+  }
+  async function undoDelete() {
+    const u = undoDel; if (!u) return;
+    setUndoDel(null); setToast(null);
+    let failed = 0;
+    for (const it of u.items) {
+      if (api) {
+        const r = await detailApi(api.slug).restore(it.id);
+        if (!r.ok) { failed += 1; continue; }
+        const row = (r as { data?: unknown }).data as Partial<Issue> | null | undefined;
+        store.current.upsert({ ...it, ...(row && typeof row === 'object' ? row : {}), deleted_at: null });
+        if (row && typeof row.version === 'number') versions.current.set(it.id, row.version);
+      } else store.current.upsert({ ...it, deleted_at: null });
+    }
+    sync();
+    setToast(failed ? `Could not restore ${failed} of ${u.items.length} issues` : `${u.items.length} issue${u.items.length === 1 ? '' : 's'} restored`);
   }
   async function deleteIssues(ids: string[]) {
     const items = ids.map((id) => store.current.list().find((x) => x.id === id)).filter((x): x is Issue => !!x);
@@ -505,21 +527,24 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     setMulti([]); setSelId(keep[Math.min(Math.max(at, 0), keep.length - 1)]?.id ?? '');
     sync();
     let failed = 0;
+    const gone: Issue[] = [];
     if (api) {
       await Promise.all(ids.map((id) => chains.current.get(id)).filter(Boolean));
       const client = detailApi(api.slug);
       await Promise.all(items.map(async (it) => {
         const r = await client.remove(it.id, versions.current.get(it.id) ?? it.version);
-        if (r.ok) versions.current.delete(it.id);
+        if (r.ok) { versions.current.delete(it.id); gone.push(it); }
         else { failed += 1; store.current.upsert(it); }
       }));
       sync();
-    }
+    } else gone.push(...items);
     const done = items.length - failed;
-    setToast(failed ? `Deleted ${done} of ${items.length}, ${failed} could not be deleted` : `${done} issue${done === 1 ? '' : 's'} deleted`);
+    const msg = failed ? `Deleted ${done} of ${items.length}, ${failed} could not be deleted` : `${done} issue${done === 1 ? '' : 's'} deleted`;
+    setToast(msg);
+    setUndoDel(gone.length ? { msg, items: gone } : null);
   }
 
-  function selectAll() { const list = orderedRef.current; setMulti(list.map((i) => i.id)); if (list.length) setSelId(currentIdRef.current ?? list[0]!.id); }
+  function selectAll() { if (view !== 'list' && view !== 'board') return; const list = orderedRef.current; setMulti(list.map((i) => i.id)); if (list.length) setSelId(currentIdRef.current ?? list[0]!.id); }
   function toggleSelect(id: string | undefined) { if (id) setMulti((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id])); }
   // Shift+J/K: move the cursor and add both ends to the selection.
   function extend(dir: 1 | -1) {
@@ -854,8 +879,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </aside>
       )}
       {multi.length > 1 && !readOnly && <SelectionBar count={multi.length} canUndo={!!undo} openKind={pick && pick.ids.length > 1 ? (pick.kind as BulkKind) : null} onAction={(k, r) => openPick(k, r)} onUndo={() => void undoBulk()} onClear={() => setMulti([])} onDelete={askDelete} />}
-      <ConfirmDialog open={!!confirmDel} title={`Delete ${confirmDel?.length ?? 0} issue${confirmDel?.length === 1 ? '' : 's'}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDel(null)} onConfirm={() => { const ids = confirmDel ?? []; setConfirmDel(null); void deleteIssues(ids); }}>
-        They move to the trash and can be restored from there.
+      <ConfirmDialog open={!!confirmDel} title={confirmDel?.length === 1 ? `Delete ${confirmTarget ? (confirmTarget.identifier ?? confirmTarget.id) : 'issue'}?` : `Delete ${confirmDel?.length ?? 0} issues?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDel(null)} onConfirm={() => { const ids = confirmDel ?? []; setConfirmDel(null); void deleteIssues(ids); }}>
+        {confirmDel?.length === 1 && confirmTarget && <p>{confirmTarget.title}</p>}Use Undo right after, or the issue page, to restore.
       </ConfirmDialog>
       {multi.length > 0 && <div className='toast' role='status'>{multi.length} selected, Esc to clear</div>}
       {help && (
@@ -867,7 +892,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         </div>
       )}
-      {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}</div>}
+      {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
       {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}
       {filterPick && <Picker title={`Filter by ${FILTER_LABEL[filterPick.kind].toLowerCase()}`} multi anchor={filterPick.rect} options={filterOptions(filterPick.kind)} onPick={(id) => toggleFilter(filterPick.kind, id)} onClose={() => { const k = filterPick.kind; setFilterPick(null); setTimeout(() => document.getElementById(`fb-${k}`)?.focus(), 0); }} />}

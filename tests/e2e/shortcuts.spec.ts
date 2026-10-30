@@ -173,3 +173,26 @@ test.describe('guest (read-only)', () => {
     await expect(page.getByText('Guests have read-only access.')).toBeVisible();
   });
 });
+
+test('Delete and Backspace open no dialog outside list and board (projects)', async ({ page }) => {
+  await page.keyboard.press('g'); await page.keyboard.press('p');
+  await expect(page.locator('main[data-view=projects]')).toBeVisible();
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Delete');
+  await page.keyboard.press('#');
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+});
+
+test('Delete dialog names the issue; Undo restores it', async ({ page }) => {
+  await newIssue(page);
+  const before = await page.locator('[role=option]').count();
+  await page.keyboard.press('Delete');
+  const d = page.getByRole('alertdialog');
+  await expect(d).toBeVisible();
+  await expect(d.getByRole('heading').first()).toContainText(/^Delete \S+\?$/);
+  await d.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.locator('[role=option]')).toHaveCount(before - 1);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('[role=option]')).toHaveCount(before);
+  await expect(page.getByText('1 issue restored')).toBeVisible();
+});
