@@ -19,6 +19,12 @@ describe('shortcut registry', () => {
     expect(m.feed('p')).toBe('go-projects');
     expect(m.feed('p')).toBe('priority');
   });
+  it('maps delete and select-all keys', () => {
+    const m = createMatcher();
+    expect(m.feed('#')).toBe('delete'); expect(m.feed('Delete')).toBe('delete-key'); expect(m.feed('Backspace')).toBe('delete-bs');
+    expect(m.feed('s')).toBe('status');
+    expect(keyOf(ev('a', { ctrlKey: true }))).toBe('Mod+A');
+  });
   it('drops the prefix on timeout or a non-matching key', () => {
     let t = 0; const m = createMatcher(SHORTCUTS, () => t);
     m.feed('g'); t = 5000; expect(m.feed('i')).toBeNull();
