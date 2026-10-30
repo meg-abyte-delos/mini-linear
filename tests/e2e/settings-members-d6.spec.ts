@@ -70,3 +70,16 @@ test('members page: row menu offers role changes and a red Remove that asks to c
   await dlg.getByRole('button', { name: 'Cancel' }).click();
   await expect(dlg).toHaveCount(0);
 });
+
+// Team settings page: its native controls used to keep the browser button face under themed text (1.08:1). Axe AA in both themes.
+for (const theme of ['dark', 'light'] as const) {
+  test(`team settings: controls pass axe AA contrast (${theme})`, async ({ page, context, baseURL }) => {
+    await context.addCookies([{ name: 'ml_theme', value: theme, url: baseURL! }]);
+    const teams = await (await page.request.get('/api/v1/w/demo/teams?limit=100')).json() as { items: { id: string }[] };
+    test.skip(teams.items.length === 0, 'demo workspace has no team');
+    await page.goto(`/settings/teams/${teams.items[0]!.id}?w=demo`);
+    await expect(page.getByRole('button', { name: 'Add state' })).toBeVisible();
+    const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    expect(r.violations.map((v) => `${v.id} x${v.nodes.length}`)).toEqual([]);
+  });
+}
