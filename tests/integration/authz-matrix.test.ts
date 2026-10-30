@@ -227,7 +227,8 @@ function pathFor(route: string, slug: string, real: boolean, actor?: U): string 
     if (real && s === '[id]' && parent === 'issues') return W.i1;
     if (real && s === '[id]' && parent === 'teams') return W.t1;
     const fx: Record<string, string> = { webhooks: 'webhook', invites: 'invite', 'api-keys': 'apikey', comments: 'comment', labels: 'label', views: 'view' };
-    if (real && s === '[id]' && fx[parent]) return R[fx[parent]]!;
+    const fk = parent ? fx[parent] : undefined;
+    if (real && s === '[id]' && fk) return R[fk]!;
     if (real && s === '[userId]' && parent === 'members') return actor && actor.id === W.M2.id ? W.M1.id : W.M2.id;
     return randomUUID();
   });
