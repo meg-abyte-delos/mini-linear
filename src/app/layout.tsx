@@ -20,6 +20,7 @@ import './ui-new-issue.css';
 import './tokens.css';
 import './ui-light.css';
 import './ui-review-2100.css';
+import './ui-review-1900.css';
 import { cookies } from 'next/headers';
 
 export const metadata = { title: 'Mini-Linear' };
