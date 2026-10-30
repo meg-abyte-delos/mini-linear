@@ -12,7 +12,7 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
 
 (haveDb ? describe : describe.skip)("search snippets are plain text; cycles list newest past first", { timeout: 60000 }, () => {
   const owner = ownerSql(); let seed: Seed; let team = "";
-  const issueId = randomUUID(), projId = randomUUID();
+  const issueId = randomUUID(), projId = randomUUID(), crlfId = randomUUID();
   const search = async (q: string) => {
     setSessionResolver(async () => seed.a.admin);
     const r = await searchWorkspace(new Request(`http://localhost/api/v1/w/${seed.a.slug}/search?q=${q}&limit=50`), seed.a.slug);
@@ -31,6 +31,8 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
       await tx`insert into teams (id, workspace_id, name, key) values (${team}, ${seed.a.id}, 'Alpha', 'ALP')`;
       const desc = "Retry by email.\n\n## Behaviour\n\n- 5 attempts per minute\n- **quokka** limit with `code` and [a link](https://x.test)\n\n```ts\nconst a = 1;\n```\n> quoted line";
       await tx`insert into issues (id, workspace_id, team_id, number, title, description, sort_key, created_by) values (${issueId}, ${seed.a.id}, ${team}, 1, 'Rate limit quokka', ${desc}, 'a1', ${seed.a.admin})`;
+      const crlf = "Intro.\r\n\r\n## Zebrafish heading\r\n\r\n- crlfneedle in a list item\r\n";
+      await tx`insert into issues (id, workspace_id, team_id, number, title, description, sort_key, created_by) values (${crlfId}, ${seed.a.id}, ${team}, 900, 'CRLF issue', ${crlf}, 'a2', ${seed.a.admin})`;
       await tx`insert into projects (id, workspace_id, name, description) values (${projId}, ${seed.a.id}, 'Quokka project', '# Heading\n\n- *bold* quokka plan')`;
       await tx`insert into project_teams (workspace_id, project_id, team_id) values (${seed.a.id}, ${projId}, ${team})`;
       await tx`insert into cycles (id, workspace_id, team_id, name, start_date, end_date) values
@@ -51,7 +53,11 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
     expect(plain).not.toMatch(/[#*`>\[\]\n]|\(https|```/);
     expect(plain.startsWith("Rate limit quokka")).toBe(false);
     const all = (await search("retry")).find((x) => x.id === issueId)!.snippet;
-    expect(all).toMatch(/^<mark>Retry<\/mark> by email\. Behaviour\. 5 attempts per minute/);
+    expect(all).toMatch(/^<mark>Retry<\/mark> by email/);
+    expect(all).not.toContain("Behaviour"); // the heading is never glued into the sentence
+    const att = (await search("attempts")).find((x) => x.id === issueId)!.snippet.replace(/<\/?mark>/g, "");
+    expect(att).toMatch(/^attempts per minute/); // comes from the list item that holds the match, not from the heading before it
+    expect(att).not.toContain("Behaviour");
   });
 
   it("a stripped heading or bold label keeps a separator (. or :), without doubling existing punctuation", async () => {
@@ -67,9 +73,16 @@ type Hit = { id: string; kind: string; title: string; snippet: string };
     expect(h.snippet.replace(/<\/?mark>/g, "")).toContain("Note: ");
   });
 
+  it("CRLF descriptions: headings are dropped like with LF", async () => {
+    const h = (await search("zebrafish")).find((x) => x.id === crlfId);
+    expect(h?.snippet.includes("Zebrafish") ?? false).toBe(false);
+    const c = (await search("crlfneedle")).find((x) => x.id === crlfId)!;
+    expect(c.snippet.replace(/<\/?mark>/g, "")).toBe("crlfneedle in a list item");
+  });
+
   it("project snippet is plain description text", async () => {
     const h = (await search("quokka")).find((x) => x.id === projId)!;
-    expect(h.snippet.replace(/<\/?mark>/g, "")).toBe("Heading. bold quokka plan");
+    expect(h.snippet.replace(/<\/?mark>/g, "")).toBe("bold quokka plan");
   });
 
   it("cycles: upcoming soonest first, then past cycles most recent first, cursor pages consistently", async () => {
