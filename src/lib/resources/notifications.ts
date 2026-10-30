@@ -22,7 +22,7 @@ const ACTIVE = (ctx: Ctx) => ctx.tx`n.archived_at is null and (n.snoozed_until i
 const SEL = (ctx: Ctx) => ctx.tx`select n.id, n.type, n.issue_id, n.comment_id, n.actor_id, n.read_at, n.archived_at, n.snoozed_until, n.created_at, n.coalesced_count, n.last_event_at, n.meta, case when n.actor_id is null then 'system' else 'user' end as kind,
   (select jsonb_build_object('id', i.id, 'number', i.number, 'title', i.title, 'status', i.status, 'team_id', i.team_id, 'identifier', tm.key || '-' || i.number)
      from issues i join teams tm on tm.id = i.team_id where i.id = n.issue_id) as issue,
-  (select jsonb_build_object('id', u.id, 'email', u.email) from users u where u.id = n.actor_id) as actor
+  (select jsonb_build_object('id', u.id, 'email', u.email, 'display_name', u.display_name) from users u where u.id = n.actor_id) as actor
   from notifications n`;
 
 const bool = z.enum(['true', 'false']).transform((v) => v === 'true');
