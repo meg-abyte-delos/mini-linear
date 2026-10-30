@@ -4,7 +4,7 @@
 import pg from 'pg';
 import { hashPassword } from '../src/lib/auth/password';
 import { id, USERS, PROJECTS, CYCLES, LABELS } from './demo-ids';
-import { RICH_ISSUES, RICH_COMMENTS, RICH_USERS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, STATE_KEYS, atDay, commentAt, lastStateChangeAt, issueByKey, mentionsOf, type Who, type TeamKey } from './demo-rich-data';
+import { RICH_ISSUES, RICH_COMMENTS, RICH_USERS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, STATE_KEYS, atDay, commentAt, commentAuditAt, issueCreatedAt, issueEventTimes, issueByKey, mentionsOf, type Who, type TeamKey } from './demo-rich-data';
 
 const url = process.env.DATABASE_OWNER_URL;
 if (!url) throw new Error('DATABASE_OWNER_URL is required');
@@ -81,13 +81,13 @@ try {
   let ev = 0;
   // Reseeds rewrite the trail: audit rows of seeded issues and comments left by older seed versions (other ids or timestamps) would otherwise stay and leave a half history.
   const seeded = [...RICH_ISSUES.map((r) => (r.team === 'DEM' ? id(100 + r.n) : id(3000 + r.key))), ...RICH_COMMENTS.map((m) => id(2000 + m.k))];
-  await c.query("delete from audit_events where workspace_id = $1 and entity in ('issue','comment') and entity_id = any($2::uuid[]) and id >= $3 and id < $4", [W, seeded, id(50000), id(120000)]);
+  await c.query("delete from audit_events where workspace_id = $1 and entity in ('issue','comment') and entity_id = any($2::uuid[])", [W, seeded]);
   const audit = (n: number, actor: string, entity: string, entityId: string, action: string, at: string, diff: object) =>
     c.query('insert into audit_events (id, workspace_id, actor_id, entity, entity_id, action, diff, created_at) values ($1,$2,$3,$4,$5,$6,$7,$8) on conflict (id) do nothing', [id(50000 + n * 20 + ev++), W, actor, entity, entityId, action, JSON.stringify(diff), at]);
   // Ids: DEM-n keeps id(100+n) (base seed + earlier rich seed); other teams use id(3000 + key). `key` also numbers the audit events.
   const issueId = (r: { team: TeamKey; key: number; n: number }) => (r.team === 'DEM' ? id(100 + r.n) : id(3000 + r.key));
   for (const r of RICH_ISSUES) {
-    const iid = issueId(r), created = atDay(r.day, 0, (r.n * 7) % 50), creator = uid[r.by], team = TEAMS[r.team].id;
+    const iid = issueId(r), created = issueCreatedAt(r), creator = uid[r.by], team = TEAMS[r.team].id;
     const assignee = r.who ? uid[r.who] : null;
     await c.query(`insert into issues (id, workspace_id, team_id, number, title, description, state_id, priority, sort_key, created_by, assignee_id, project_id, cycle_id, estimate, due_date, created_at, updated_at)
       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) on conflict (id) do update set title = excluded.title, description = excluded.description, state_id = excluded.state_id, priority = excluded.priority,
@@ -111,11 +111,8 @@ try {
       steps.push([r.who ? uid[r.who] : creator, { status: { before: STATE_KEYS[prev], after: STATE_KEYS[s] }, state_id: { before: stateId(r.team, prev), after: stateId(r.team, s) } }]);
       prev = s;
     }
-    const t0 = Date.parse(created), t1 = Math.max(Date.parse(lastStateChangeAt(r)), t0 + steps.length * 60000);
-    for (const [j, [actor, diff]] of steps.entries()) {
-      const ms = j === steps.length - 1 ? t1 : t0 + Math.round((((j + 1) / steps.length) * (t1 - t0)) / 60000) * 60000;
-      await audit(r.key, actor, 'issue', iid, 'update', new Date(ms).toISOString(), diff);
-    }
+    const times = issueEventTimes(r, steps.length);
+    for (const [j, [actor, diff]] of steps.entries()) await audit(r.key, actor, 'issue', iid, 'update', times[j]!, diff);
   }
   for (const t of Object.values(TEAMS)) await c.query('update teams set issue_seq = greatest(issue_seq, $2) where id = $1', [t.id, RICH_ISSUES.filter((x) => TEAMS[x.team].id === t.id).reduce((a, r) => Math.max(a, r.n), 0)]);
   // Comments: roots first, then replies (parent FK). {who} tokens become @[Name](uuid) mentions, recorded in comment_mentions like the app does.
@@ -131,7 +128,7 @@ try {
     await c.query('delete from comment_mentions where comment_id = $1', [cid(m.k)]);
     for (const w of new Set(mentionsOf(m.body))) await c.query('insert into comment_mentions (workspace_id, comment_id, user_id, created_at) values ($1,$2,$3,$4) on conflict do nothing', [W, cid(m.k), uid[w], at]);
     ev = 0;
-    await audit(900 + m.k, uid[m.by], 'comment', cid(m.k), 'create', at, { body: { before: null, after: body }, issue_id: { before: null, after: iid } });
+    await audit(900 + m.k, uid[m.by], 'comment', cid(m.k), 'create', commentAuditAt(m), { body: { before: null, after: body }, issue_id: { before: null, after: iid } });
   }
   // Inbox of the demo admin (notifications are recipient-only under RLS). Newest = highest id, so ids follow created_at.
   await c.query("select set_config('app.user_id', $1, true)", [uid.admin]);

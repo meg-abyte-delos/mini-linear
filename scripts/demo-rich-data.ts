@@ -195,6 +195,17 @@ export const RICH_COMMENTS: RichComment[] = [
 export const mentionsOf = (body: string): Who[] => [...body.matchAll(/\{(admin|mate|maya|jonas|priya|leo)\}/g)].map((m) => m[1] as Who);
 export const commentAt = (m: RichComment) => atDay(issueByKey('DEM', m.n).day + m.after, 4 + (m.k % 4));
 export const lastStateChangeAt = (r: RichIssue) => { const len = r.state === 5 ? 2 : r.state; return atDay(r.day + r.age, 3 + len - 1); };
+export const issueCreatedAt = (r: RichIssue) => atDay(r.day, 0, (r.n * 7) % 50);
+// Instants of the `steps` audit events after an issue's creation: evenly spread (whole minutes) between creation and last state change, strictly increasing, the last being the last state change itself.
+export const issueEventTimes = (r: RichIssue, steps: number): string[] => {
+  const t0 = Date.parse(issueCreatedAt(r)), t1 = Math.max(Date.parse(lastStateChangeAt(r)), t0 + steps * 60000);
+  return Array.from({ length: steps }, (_, j) => new Date(j === steps - 1 ? t1 : t0 + Math.round((((j + 1) / steps) * (t1 - t0)) / 60000) * 60000).toISOString());
+};
+// Instant of a comment's audit event: never before the last state change of its issue (else the feed shows the comment above the final status). The comment row and its notifications keep commentAt.
+export const commentAuditAt = (m: RichComment) => {
+  const last = Date.parse(lastStateChangeAt(issueByKey('DEM', m.n))), c = Date.parse(commentAt(m));
+  return new Date(c > last ? c : last + (m.k + 1) * 60000).toISOString();
+};
 
 /** Inbox of the demo admin. Time-ordered by the seed so that ids (newest = highest) match created_at. */
 export type RichNotif = { type: 'assigned' | 'mention' | 'comment' | 'status_change' | 'due_soon'; n: number; actor: Who | null; comment?: number; read: boolean; archived?: boolean; at: string };
