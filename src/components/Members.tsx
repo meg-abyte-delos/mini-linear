@@ -39,11 +39,14 @@ function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: bool
       <form className='set-invite' onSubmit={(e) => void submit(e)}>
         <p className='set-invite-h'>Invite to workspace</p>
         <label className='set-field'><span className='set-label'>Email</span><input className='set-input' type='email' required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com' /></label>
-        <label className='set-field'><span className='set-label'>Role</span>
-          <select className='set-select' value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'member' | 'guest')}>
-            {roles.map((r) => <option key={r} value={r}>{cap(r)}</option>)}
-          </select>
-        </label>
+        <div className='set-field' role='radiogroup' aria-label='Role'>
+          <span className='set-label' aria-hidden='true'>Role</span>
+          <div className='set-seg'>
+            {roles.map((r) => (
+              <button key={r} type='button' role='radio' aria-checked={role === r} className='set-seg-btn' onClick={() => setRole(r as 'admin' | 'member' | 'guest')}>{cap(r)}</button>
+            ))}
+          </div>
+        </div>
         {err && <p role='alert' className='set-error'>{err}</p>}
         <div className='set-actions'>
           <button type='button' className='set-btn' onClick={onClose}>Cancel</button>

@@ -27,11 +27,9 @@ const SCREENS: Screen[] = [
 ];
 
 
-// Known defect: the app shell applies inline styles that the CSP (style-src 'self') blocks, on every shell screen (8 violations per load on main 5a85d82).
-// Only this exact signature is tolerated, and only on shell screens: any other pageerror / CSP violation / console error still fails, and the gate flips RED once the
-// defect is fixed (stale tolerance), so the entry gets removed with the fix.
+// No known defects tolerated: the shell CSP style-src defect is fixed (inline styles moved to CSS / CSSOM custom properties).
+const KNOWN: Record<string, string> = {};
 const KNOWN_RE = /Applying inline style violates the following Content Security Policy directive 'style-src/;
-const KNOWN: Record<string, string> = Object.fromEntries(['list', 'list-display-popover', 'palette', 'board', 'projects', 'cycles', 'inbox', 'issue-page'].map((n) => [n, 'shell inline styles blocked by CSP style-src']));
 
 for (const s of SCREENS) {
   test.describe(`console ${s.name}`, () => {

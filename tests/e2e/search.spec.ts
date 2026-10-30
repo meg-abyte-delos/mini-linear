@@ -22,7 +22,7 @@ test('Search all goes to /search with the query and lists results', async ({ pag
   await page.getByRole('option', { name: /Search all for/ }).click();
   await expect(page).toHaveURL(/\/search\?q=cronkit/);
   const results = page.getByRole('list', { name: 'Results' });
-  await expect(results.getByRole('listitem').first()).toContainText('Cronkit parser port');
+  await expect(results.getByRole('listitem').filter({ hasText: 'Cronkit parser port' }).first()).toBeVisible(); // a Cronkit project may rank above the issue
   await page.getByRole('tab', { name: 'Comments' }).click();
   await expect(page.getByText(/No results/)).toBeVisible();
 });

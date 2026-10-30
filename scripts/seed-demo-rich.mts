@@ -51,6 +51,21 @@ try {
   for (const t of Object.values(TEAMS)) for (const p of [P3, PROJECTS.p1, PROJECTS.p2]) await c.query('insert into project_teams (workspace_id, project_id, team_id) values ($1,$2,$3) on conflict do nothing', [W, p, t.id]);
   await c.query(`update projects set description = 'The issue tracker itself: lists, boards, issue page, inbox' where id = $1 and description = 'Demo project'`, [PROJECTS.p1]);
   const PJ = { p1: PROJECTS.p1, p2: PROJECTS.p2, p3: P3 } as const;
+  // Project priority and health posts (the health on the list is the latest update). Fixed ids, upserted; older posts give a trend.
+  const PJ_PRIO: [string, number][] = [[PJ.p1, 1], [PJ.p2, 3], [PJ.p3, 2]];
+  for (const [pid, prio] of PJ_PRIO) await c.query('update projects set priority = $2 where id = $1 and priority <> $2', [pid, prio]);
+  const UPDATES: [number, string, Who, string, string, number][] = [
+    [6000, PJ.p1, 'mate', 'on_track', 'Issue page and inbox shipped. Board polish is the last stretch.', 20],
+    [6001, PJ.p1, 'priya', 'on_track', 'Cycle 3 is on plan: members page and invites are in review.', 6],
+    [6002, PJ.p2, 'mate', 'on_track', 'Parser covers ranges, steps and lists.', 18],
+    [6003, PJ.p2, 'jonas', 'at_risk', 'Next-run preview slipped: time zone handling needs a second pass.', 5],
+    [6004, PJ.p3, 'maya', 'at_risk', 'Dark tokens done, light theme contrast still open.', 14],
+    [6005, PJ.p3, 'maya', 'off_track', 'Motion and empty-state work blocked on the icon set; target date will move.', 3],
+  ];
+  for (const [k, pid, by, health, body, daysAgo] of UPDATES) {
+    const at = new Date(Date.now() - daysAgo * 86400000).toISOString();
+    await c.query('insert into project_updates (id, workspace_id, project_id, author_id, health, body, created_at, updated_at) values ($1,$2,$3,$4,$5::project_health,$6,$7,$7) on conflict (id) do update set health = excluded.health, body = excluded.body, author_id = excluded.author_id, created_at = excluded.created_at, updated_at = excluded.updated_at', [id(k), W, pid, uid[by], health, body, at]);
+  }
   const LABEL_IDS: Record<string, number> = { improvement: 63, design: 64, performance: 65, docs: 66, security: 67, a11y: 68, techdebt: 69, triage: 70 };
   const grp: Record<string, string> = {};
   for (const [i, [key, name, color]] of LABEL_GROUPS.entries()) {
