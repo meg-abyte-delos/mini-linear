@@ -314,7 +314,7 @@ describe.runIf(runIntegration)('attachments', () => {
   it('creation and deletion show up in the issue activity feed', async () => {
     const iss = (await ok(M1)).body.id;
     const a = await (await add(M1, { url: 'https://example.com/act', title: 'activity-attach' }, iss)).json();
-    const entries = async () => { const j = await (await api(M1, 'GET', `${P}/issues/${iss}/activity`)).json(); return (j.items ?? j) as unknown[]; };
+    const entries = async () => { const j = await (await api(M1, 'GET', `${P}/issues/${iss}/activity`)).json(); const list = j.items ?? j; if (!Array.isArray(list)) throw new Error(`activity feed is not a list: ${JSON.stringify(j).slice(0, 200)}`); return list as unknown[]; };
     const mine = async () => (await entries()).filter((e) => JSON.stringify(e).includes('activity-attach'));
     const before = (await mine()).length;
     expect(before).toBeGreaterThanOrEqual(1);
