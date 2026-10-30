@@ -41,3 +41,15 @@
 .row .labels .chip.proj::before { background:var(--lb-project); }
 .row .labels { flex:none; max-width:none; overflow:visible; justify-content:flex-end; }
 .row .title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Wave B list: Linear measurements on tokens (tokens.css, #187). */
+.row { height:var(--row-h); gap:var(--row-gap); transition:background-color var(--dur-instant) var(--ease-out); }
+.row .id { width:var(--id-w); font-size:var(--fs-base); font-weight:var(--fw-regular); letter-spacing:var(--tracking-id); font-variant-numeric:normal; color:var(--muted); }
+.row .title { font-size:var(--fs-base); font-weight:var(--fw-medium); color:var(--fg); }
+.row .labels .chip { height:var(--chip-h); color:var(--muted-strong); border-color:var(--line-soft); }
+.row .rowsel { transition:opacity var(--dur-instant) var(--ease-out); }
+.row[aria-selected=true] { box-shadow:inset 2px 0 0 var(--accent); }
+/* Sticky header needs an opaque fill so rows do not show through while scrolling. */
+.group h2 { height:var(--group-h); position:sticky; top:0; z-index:2; background:color-mix(in srgb, var(--fg) 5%, var(--bg)); }
+.group h2 .chev { transition:transform var(--dur-fast) var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .row, .row .rowsel, .group h2 .chev { transition:none; } }
