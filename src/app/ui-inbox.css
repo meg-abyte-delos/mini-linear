@@ -79,3 +79,27 @@
 .inbox-bar button { border-color:transparent; background:transparent; color:var(--muted-strong); }
 .inbox-bar button:hover:not(:disabled) { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; }
 @media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }
+
+/* Detail pane fills the width and height like Linear's inbox issue view:
+   top bar (ID + actions), then a readable main column and a properties column on the right. */
+.inbox-detail { display:flex; flex-direction:column; padding:0; overflow:hidden; }
+.idp-bar { display:flex; align-items:center; gap:8px; height:44px; flex:none; padding:0 16px 0 24px; border-bottom:1px solid var(--line-soft); }
+.idp-id { color:var(--muted-strong); font-size:var(--fs-sm); font-weight:500; white-space:nowrap; }
+.idp-bar .inbox-detail-actions { display:flex; flex-wrap:nowrap; margin:0 0 0 auto; padding:0; border:0; gap:4px; }
+.idp-bar .inbox-detail-actions button:first-child { margin-left:0; }
+.idp-bar .inbox-detail-actions button:last-child { margin-left:0; border-color:transparent; color:var(--muted-strong); }
+.idp-bar .inbox-detail-actions button.primary { border-color:var(--line); color:var(--fg); background:var(--raised); }
+.idp-body { display:flex; flex:1; min-height:0; }
+.idp-main { flex:1; min-width:0; overflow-y:auto; padding:32px 40px 48px; }
+.idp-main > * { max-width:760px; }
+.idp-main h2 { margin:0 0 6px; font-size:22px; font-weight:600; line-height:1.3; letter-spacing:-.01em; overflow-wrap:anywhere; }
+.idp-event { margin:0; color:var(--muted-strong); font-size:var(--fs-sm); }
+.idp-main .inbox-preview { margin-top:20px; padding-top:20px; }
+.idp-main .inbox-preview .md { font-size:var(--fs-base); color:var(--fg); }
+.inbox-detail dl.idp-props { flex:0 0 248px; align-content:start; grid-template-columns:84px minmax(0,1fr); row-gap:6px; padding:20px 16px; overflow-y:auto; border-left:1px solid var(--line-soft); }
+.idp-props dt { color:var(--muted-strong); }
+.idp-val { display:inline-flex; align-items:center; gap:6px; }
+.inbox-detail dd.idp-labels { display:flex; flex-wrap:wrap; gap:4px; white-space:normal; padding:2px 0; line-height:20px; }
+@media (max-width:1180px) { .inbox-detail dl.idp-props { flex-basis:200px; } .idp-main { padding:24px 24px 40px; } }
+/* list: the issue ID never wraps ("DEM-" / "36") */
+.nrow .nid { flex:none; width:auto; min-width:56px; white-space:nowrap; }
