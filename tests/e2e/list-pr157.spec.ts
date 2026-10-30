@@ -40,13 +40,13 @@ test('row: checkbox is hidden until hover/focus, then visible; selecting keeps i
   await expect(box).toHaveCSS('opacity', '0');
 });
 
-test('row: project chip, API assignee avatar with name tooltip, contextual date "Today" with full date in title', async ({ page }) => {
+test('row: project chip, API assignee avatar with name tooltip, short date with full date in title', async ({ page }) => {
   await home(page);
   const row = rowOf(page, T.rich);
   await expect(row.locator('.chip.proj')).toHaveText('Mini Linear');
   await expect(row.locator('[title="Demo Admin"]')).toBeVisible();
   await expect(row.locator('.av-none-ic')).toHaveCount(0);
-  await expect(row.locator('.date')).toHaveText('Today');
+  await expect(row.locator('.date')).toHaveText(/^[A-Z][a-z]{2} [0-9]{1,2}$/);
   expect(await row.locator('.date').getAttribute('title')).toBeTruthy();
   const none = rowOf(page, T.plain);
   await expect(none.locator('[title="Unassigned"] .av-none-ic')).toBeVisible();
