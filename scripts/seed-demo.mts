@@ -67,7 +67,8 @@ try {
   for (const [n, title, s, prio, who_, pj, cy, labs] of ISSUES) {
     const iid = id(100 + n);
     await c.query(`insert into issues (id, workspace_id, team_id, number, title, state_id, priority, sort_key, created_by, assignee_id, project_id, cycle_id)
-      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) on conflict (id) do update set title = excluded.title, state_id = excluded.state_id, priority = excluded.priority, assignee_id = excluded.assignee_id, project_id = excluded.project_id, cycle_id = excluded.cycle_id`,
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) on conflict (id) do update set title = excluded.title, state_id = excluded.state_id, priority = excluded.priority, assignee_id = excluded.assignee_id, project_id = excluded.project_id, cycle_id = excluded.cycle_id, sort_key = excluded.sort_key
+      where (issues.title, issues.state_id, issues.priority, issues.sort_key, issues.assignee_id, issues.project_id, issues.cycle_id) is distinct from (excluded.title, excluded.state_id, excluded.priority, excluded.sort_key, excluded.assignee_id, excluded.project_id, excluded.cycle_id)`,
       [iid, W, T, n, title, stateId(s), prio, `a${String(n).padStart(2, '0')}`, admin, who_ ? who[who_] : null, pj ? PROJECTS[pj] : null, cy ? CYCLES[cy] : null]);
     for (const l of labs) await c.query('insert into issue_labels (workspace_id, issue_id, label_id) values ($1,$2,$3) on conflict do nothing', [W, iid, LABELS[l]]);
   }

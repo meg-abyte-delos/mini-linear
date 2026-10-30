@@ -4,7 +4,7 @@
 import pg from 'pg';
 import { hashPassword } from '../src/lib/auth/password';
 import { id, USERS, PROJECTS, CYCLES, LABELS } from './demo-ids';
-import { RICH_ISSUES, RICH_COMMENTS, RICH_USERS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, STATE_KEYS, atDay, commentAt, commentAuditAt, issueCreatedAt, issueEventTimes, issueByKey, mentionsOf, type Who, type TeamKey } from './demo-rich-data';
+import { RICH_ISSUES, RICH_COMMENTS, RICH_USERS, RICH_NOTIFS, ALL_LABELS, LABEL_GROUPS, PERSONA_NAMES, STATE_KEYS, atDay, commentAt, commentAuditAt, issueCreatedAt, issueEventTimes, issueStepCount, issueByKey, mentionsOf, type Who, type TeamKey } from './demo-rich-data';
 
 const url = process.env.DATABASE_OWNER_URL;
 if (!url) throw new Error('DATABASE_OWNER_URL is required');
@@ -112,6 +112,7 @@ try {
       steps.push([r.who ? uid[r.who] : creator, { status: { before: STATE_KEYS[prev], after: STATE_KEYS[s] }, state_id: { before: stateId(r.team, prev), after: stateId(r.team, s) } }]);
       prev = s;
     }
+    if (steps.length !== issueStepCount(r)) throw new Error(`step count mismatch for ${r.team}-${r.n}: ${steps.length} vs ${issueStepCount(r)}`);
     const times = issueEventTimes(r, steps.length);
     for (const [j, [actor, diff]] of steps.entries()) await audit(r.key, actor, 'issue', iid, 'update', times[j]!, diff);
   }
