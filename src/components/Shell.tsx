@@ -897,11 +897,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         {loadError ? (
           <div className='state error' role='alert'>
             <p>{loadError}. Check your connection and try again.</p>
-            <button onClick={() => router.refresh()}>Retry</button>
+            <button className='btn' onClick={() => router.refresh()}>Retry</button>
           </div>
         ) : allIssues.length === 0 ? (
           <EmptyState icon='issues' title='No issues yet' hint='Issues track the work your team is doing. Create one to get started.'
-            action={!readOnly && <button className='primary' onClick={() => create()}>Create issue <kbd>C</kbd></button>} />
+            action={!readOnly && <button className='btn' data-variant='primary' onClick={() => create()}>Create issue <kbd>C</kbd></button>} />
         ) : view === 'inbox' ? (
           <Inbox client={inboxClient} refreshKey={rtTick} getIssue={getIssue} lookup={inboxLookup} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
@@ -915,7 +915,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <CyclesList cycles={CYCLES} issues={allIssues} today={today} slug={api?.slug ?? null} onViewIssues={(id) => { setFilters({ ...emptyFilters(), cycle: [id] }); setView('list'); }} />
         ) : issues.length === 0 ? (
           <EmptyState icon='filter' title='No issues match these filters.' hint='Try removing a filter or broadening your search.'
-            action={<button onClick={() => setFilters(emptyFilters())}>Clear filters</button>} />
+            action={<button className='btn' onClick={() => setFilters(emptyFilters())}>Clear filters</button>} />
         ) : view === 'list' ? (
           <div className='scroll'>
             {groups.map(({ key, status, items }) => {

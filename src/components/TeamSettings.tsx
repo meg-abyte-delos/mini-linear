@@ -72,13 +72,13 @@ export function TeamSettings({ slug, teamId }: { slug: string; teamId: string })
         {pendingDelete && <p role="group" className="ts-row" data-testid="replace-state">
           <label>Move its issues to <select aria-label="Replacement state" value={pendingDelete.replacement} onChange={(e) => setPendingDelete({ ...pendingDelete, replacement: e.target.value })}>
             {sorted.filter((x) => x.id !== pendingDelete.state.id).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-          <button type="button" onClick={() => void removeState(pendingDelete.state, pendingDelete.replacement)}>Delete {pendingDelete.state.name}</button>
-          <button type="button" onClick={() => setPendingDelete(null)}>Cancel</button></p>}
+          <button type="button" className="btn" data-tone="danger" onClick={() => void removeState(pendingDelete.state, pendingDelete.replacement)}>Delete {pendingDelete.state.name}</button>
+          <button type="button" className="btn" data-variant="ghost" onClick={() => setPendingDelete(null)}>Cancel</button></p>}
         <form className="ts-row" onSubmit={(e) => { e.preventDefault(); if (newState.name.trim()) void run(api.createState(teamId, { ...newState, name: newState.name.trim() })).then((ok) => { if (ok) setNewState((n) => ({ ...n, name: '' })); }); }}>
           <input aria-label="New state name" placeholder="New state" value={newState.name} onChange={(e) => setNewState({ ...newState, name: e.target.value })} />
           <select aria-label="New state category" value={newState.category} onChange={(e) => setNewState({ ...newState, category: e.target.value as StateCategory })}>{CATEGORIES.map((t) => <option key={t} value={t}>{CAT_LABEL[t]}</option>)}</select>
           <input type="color" aria-label="New state colour" value={newState.color} onChange={(e) => setNewState({ ...newState, color: e.target.value })} />
-          <button type="submit">Add state</button>
+          <button type="submit" className="btn">Add state</button>
         </form>
       </section>
 
@@ -118,12 +118,12 @@ export function TeamSettings({ slug, teamId }: { slug: string; teamId: string })
           <input type="color" aria-label="New label colour" value={newLabel.color} onChange={(e) => setNewLabel({ ...newLabel, color: e.target.value })} />
           <select aria-label="New label scope" value={newLabel.scope} onChange={(e) => setNewLabel({ ...newLabel, scope: e.target.value as 'team' | 'workspace' })}><option value="team">This team</option><option value="workspace">Workspace</option></select>
           <select aria-label="New label group" value={newLabel.group_id} onChange={(e) => setNewLabel({ ...newLabel, group_id: e.target.value })}><option value="">No group</option>{groups.map((x) => <option key={x.id} value={x.id}>{x.name} ({x.team_id ? 'team' : 'workspace'})</option>)}</select>
-          <button type="submit">Add label</button>
+          <button type="submit" className="btn">Add label</button>
         </form>
         <form className="ts-row" onSubmit={(e) => { e.preventDefault(); if (!newGroup.name.trim()) return; void run(api.createGroup({ name: newGroup.name.trim(), team_id: newGroup.scope === 'team' ? teamId : null })).then(() => setNewGroup((n) => ({ ...n, name: '' }))); }}>
           <input aria-label="New group name" placeholder="New label group" value={newGroup.name} onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })} />
           <select aria-label="New group scope" value={newGroup.scope} onChange={(e) => setNewGroup({ ...newGroup, scope: e.target.value as 'team' | 'workspace' })}><option value="team">This team</option><option value="workspace">Workspace</option></select>
-          <button type="submit">Add group</button>
+          <button type="submit" className="btn">Add group</button>
         </form>
       </section>
     </main>

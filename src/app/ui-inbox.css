@@ -28,12 +28,7 @@
 .inbox-detail h2 { font-size:var(--fs-lg); font-weight:600; }
 
 /* Inbox action buttons on tokens (no native UA #efefef): bar, bulk toolbar, detail actions. */
-.inbox-bar button, .inbox-detail-actions button { height:24px; padding:0 var(--sp-2); border:1px solid var(--line); border-radius:6px; background:var(--raised); color:var(--fg); font:inherit; font-size:var(--fs-sm); cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
-.inbox-bar button:hover:not(:disabled), .inbox-detail-actions button:hover { background:var(--hover); border-color:var(--muted); }
-.inbox-bar button:focus-visible, .inbox-detail-actions button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-.inbox-bar button:disabled { color:var(--muted); cursor:default; } /* no opacity: --muted on --raised stays 6:1 (with .7 it fell to 3.6:1) */
 .inbox-bar .bulk { display:inline-flex; align-items:center; gap:6px; }
-@media (prefers-reduced-motion: reduce) { .inbox-bar button, .inbox-detail-actions button { transition:none; } }
 
 /* Inbox polish (Pierre 18:46): each element inspected at 1280, dark + light. */
 .side { min-width:0; }
@@ -69,15 +64,9 @@
 .inbox-preview .md-empty { color:var(--muted); }
 /* Actions: Linear ghost buttons, 28px, text aligned on the content edge; Open issue keeps a hairline border. */
 .inbox-detail-actions { gap:4px; margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft); }
-.inbox-detail-actions button { height:28px; padding:0 10px; border-color:transparent; background:transparent; color:var(--muted-strong); font-weight:500; }
-.inbox-detail-actions button:hover { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; color:var(--fg); }
-.inbox-detail-actions button.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
-.inbox-detail-actions button.primary:hover { background:var(--accent-hover); border-color:var(--accent-hover); color:var(--accent-fg); }
 /* Status pill in the detail grid (Linus #277 markup). */
 .inbox-detail .inbox-status { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border:1px solid var(--line); border-radius:11px; font-size:var(--fs-sm); color:var(--fg); vertical-align:middle; }
 .inbox-detail .inbox-status svg { width:12px; height:12px; flex:none; }
-.inbox-bar button { border-color:transparent; background:transparent; color:var(--muted-strong); }
-.inbox-bar button:hover:not(:disabled) { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; }
 @media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }
 
 /* Detail pane fills the width and height like Linear's inbox issue view:
@@ -87,8 +76,6 @@
 .inbox-detail .idp-id { color:var(--muted-strong); font-size:var(--fs-sm); font-weight:500; white-space:nowrap; }
 .inbox-detail .idp-bar .inbox-detail-actions { display:flex; flex-wrap:nowrap; margin:0 0 0 auto; padding:0; border:0; gap:4px; }
 .inbox-detail .idp-bar .inbox-detail-actions button:last-child { margin-left:0; border-color:transparent; color:var(--muted-strong); }
-.inbox-detail .idp-bar .inbox-detail-actions button.primary { border-color:var(--line); color:var(--fg); background:var(--raised); }
-.inbox-detail .idp-bar .inbox-detail-actions button.primary:hover { background:var(--hover); border-color:var(--muted); }
 .inbox-detail .idp-body { display:flex; flex:1; min-height:0; }
 .inbox-detail .idp-main { flex:1; min-width:0; overflow-y:auto; padding:32px 40px 48px; }
 .inbox-detail .idp-main > * { max-width:760px; }

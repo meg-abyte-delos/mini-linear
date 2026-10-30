@@ -52,17 +52,7 @@
 .set-check:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 
 /* Buttons: default, primary, ghost; destructive actions are red (data-tone='danger'). */
-.set-btn { display:inline-flex; align-items:center; justify-content:center; gap:var(--sp-2); height:var(--set-ctl-h); padding:0 var(--sp-3); font:inherit; font-weight:var(--fw-medium); color:var(--fg); background:var(--raised); border:1px solid var(--line); border-radius:var(--r-sm); cursor:pointer; white-space:nowrap; transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
-.set-btn:hover:not(:disabled) { background:var(--hover); border-color: color-mix(in srgb, var(--fg) 24%, transparent); }
-.set-btn:focus-visible, .set-icon-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-.set-btn:disabled { color:var(--dim); cursor:default; }
-.set-btn[data-variant='primary'] { color:var(--accent-fg); background:var(--accent); border-color:var(--accent); }
-.set-btn[data-variant='primary']:hover:not(:disabled) { background:var(--accent-hover); border-color:var(--accent-hover); }
-.set-btn[data-variant='primary']:disabled { color:var(--accent-fg); opacity:.55; }
-.set-btn[data-variant='ghost'] { background:transparent; border-color:transparent; color:var(--muted-strong); }
-.set-btn[data-variant='ghost']:hover:not(:disabled) { background:var(--hover); color:var(--fg); }
-.set-btn[data-tone='danger'] { color:color-mix(in srgb, var(--danger) 65%, var(--fg)); background:transparent; border-color:color-mix(in srgb, var(--danger) 45%, transparent); }
-.set-btn[data-tone='danger']:hover:not(:disabled) { background:color-mix(in srgb, var(--danger) 14%, transparent); border-color:var(--danger); }
+.set-icon-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .set-icon-btn { display:inline-flex; align-items:center; justify-content:center; width:var(--set-ctl-h); height:var(--set-ctl-h); padding:0; color:var(--muted-strong); background:transparent; border:0; border-radius:var(--r-sm); cursor:pointer; transition:background-color var(--dur-instant) var(--ease-out); }
 .set-icon-btn:hover, .set-icon-btn[aria-expanded='true'] { background:var(--hover); color:var(--fg); }
 

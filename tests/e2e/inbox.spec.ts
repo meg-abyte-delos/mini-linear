@@ -139,7 +139,7 @@ test('inbox: detail shows a status pill, a short date, a primary Open issue, and
   // Open issue is the first, primary action
   const first = detail.getByRole('toolbar', { name: 'Notification actions' }).getByRole('button').first();
   await expect(first).toHaveText('Open issue');
-  await expect(first).toHaveClass(/primary/);
+  await expect(first).toHaveAttribute('data-variant', 'primary');
   // truncated text keeps a tooltip with the full value
   const row = page.getByRole('option').first();
   await expect(row.locator('.ntitle')).toHaveAttribute('title', /.+/);
