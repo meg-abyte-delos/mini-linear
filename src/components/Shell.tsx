@@ -25,6 +25,7 @@ import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilters, type FilterKey, type Filters } from '@/lib/filters';
 import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
+import { DisplayPick } from '@/components/DisplayPick';
 
 type View = 'list' | 'board' | 'cycles' | 'projects' | 'inbox';
 const FILTER_LABEL: Record<FilterKey, string> = { status: 'Status', priority: 'Priority', assignee: 'Assignee', label: 'Label', project: 'Project', cycle: 'Cycle' };
@@ -719,8 +720,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                 <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></button>
                 {tbMenu === 'display' && (
                   <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
-                    <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><select aria-label='Grouping' autoFocus value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>{(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => <option key={g} value={g}>{GROUPING_LABEL[g]}</option>)}</select></div>
-                    <div className='dp-row'><span className='dp-k'><Icon name='views' />Ordering</span><select aria-label='Ordering' value={ordering} onChange={(e) => setOrdering(e.target.value as Ordering)}>{(Object.keys(ORDERING_LABEL) as Ordering[]).map((o) => <option key={o} value={o}>{ORDERING_LABEL[o]}</option>)}</select></div>
+                    <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><DisplayPick label='Grouping' autoFocus value={grouping} labels={GROUPING_LABEL} onChange={setGrouping} /></div>
+                    <div className='dp-row'><span className='dp-k'><Icon name='views' />Ordering</span><DisplayPick label='Ordering' value={ordering} labels={ORDERING_LABEL} onChange={setOrdering} /></div>
                     <div className='dp-sep' role='separator' />
                     <label className='dp-row dp-switch'><span className='dp-k'>Show empty groups</span><input type='checkbox' role='switch' checked={showEmpty} disabled={grouping === 'none'} onChange={(e) => setShowEmpty(e.target.checked)} /><i aria-hidden='true' /></label>
                     <div className='dp-sep' role='separator' />

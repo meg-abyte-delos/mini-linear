@@ -144,6 +144,13 @@ test('filter from URL with no match leaves an empty list and a working Filter bu
   await expect(page.locator('#fb-add')).toBeVisible();
 });
 
+async function pick(page: import('@playwright/test').Page, dlg: import('@playwright/test').Locator, which: string, value: string) {
+  await dlg.getByLabel(which).click();
+  await page.getByRole('menu', { name: which }).locator(`[role=menuitem]`).filter({ hasText: LABELS[value] }).click();
+  await expect(dlg.getByLabel(which)).toHaveAttribute('data-value', value);
+}
+const LABELS: Record<string, string> = { status: 'Status', none: 'No grouping', manual: 'Manual', priority: 'Priority', created: 'Created' };
+
 test('Display: popover dialog; Grouping "No grouping" -> single "All issues" group without "+"; back to Status restores groups', async ({ page }) => {
   await home(page);
   const btn = page.locator('#fb-display');
@@ -152,15 +159,15 @@ test('Display: popover dialog; Grouping "No grouping" -> single "All issues" gro
   const dlg = page.getByRole('dialog', { name: 'Display options' });
   await expect(dlg).toBeVisible();
   await expect(dlg.getByLabel('Grouping')).toBeFocused();
-  await expect(dlg.getByLabel('Grouping')).toHaveValue('status');
-  await dlg.getByLabel('Grouping').selectOption('none');
+  await expect(dlg.getByLabel('Grouping')).toHaveAttribute('data-value', 'status');
+  await pick(page, dlg, 'Grouping', 'none');
   await expect(page.getByRole('heading', { name: /All issues/ })).toBeVisible();
   await expect(page.locator('section.group')).toHaveCount(1);
   await expect(page.getByRole('button', { name: /^Add issue to / })).toHaveCount(0);
   await expect(rowOf(page, T.plain)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dlg).toBeHidden(); await expect(btn).toBeFocused();
-  await btn.click(); await dlg.getByLabel('Grouping').selectOption('status');
+  await btn.click(); await pick(page, dlg, 'Grouping', 'status');
   expect(await page.locator('section.group').count()).toBeGreaterThan(1);
 });
 
@@ -168,20 +175,20 @@ test('Display: Ordering Priority puts Urgent before Low/none inside a group; Cre
   await home(page);
   await page.locator('#fb-display').click();
   const dlg = page.getByRole('dialog', { name: 'Display options' });
-  await dlg.getByLabel('Ordering').selectOption('priority');
+  await pick(page, dlg, 'Ordering', 'priority');
   await page.keyboard.press('Escape');
   const titles = async () => (await group(page, 'Todo').locator('.row .title').allInnerTexts());
   let t = await titles();
   expect(t.indexOf(T.urgent), 'urgent before low-priority').toBeLessThan(t.indexOf(T.rich));
   expect(t.indexOf(T.rich), 'low before none').toBeLessThan(t.indexOf(T.plain));
   await page.locator('#fb-display').click();
-  await dlg.getByLabel('Ordering').selectOption('created');
+  await pick(page, dlg, 'Ordering', 'created');
   await page.keyboard.press('Escape');
   t = await titles();
   expect(t.indexOf(T.plain), 'newest first').toBeLessThan(t.indexOf(T.urgent));
   await page.locator('#fb-display').click();
-  await dlg.getByLabel('Ordering').selectOption('manual');
-  await expect(dlg.getByLabel('Ordering')).toHaveValue('manual');
+  await pick(page, dlg, 'Ordering', 'manual');
+  await expect(dlg.getByLabel('Ordering')).toHaveAttribute('data-value', 'manual');
 });
 
 test('Display button only exists in list view (not board)', async ({ page }) => {
