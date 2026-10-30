@@ -106,7 +106,6 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .state.empty, .state.error { flex:1; justify-content:center; padding-top:16px; padding-bottom:16px; }
 .state.empty { color:var(--muted-strong); }
 .state.error { color:var(--danger); }
-.state button { background:transparent; color:inherit; border:1px solid currentColor; border-radius:6px; padding:6px 12px; cursor:pointer; }
 .col-empty { color:var(--muted); font-size:12px; padding:8px; }
 .skeleton { pointer-events:none; }
 .col-list { padding-top:var(--pad-top, 0); padding-bottom:var(--pad-bottom, 0); }

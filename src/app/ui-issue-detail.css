@@ -24,7 +24,6 @@
 /* Comments and composer */
 .cmt{background:color-mix(in srgb,var(--fg) 2%,transparent);border-color:var(--line-soft);padding:var(--sp-3)}
 .composer textarea{min-height:72px;line-height:1.5}
-.composer-actions button{height:28px;padding:0 12px}
 .feed .ev{font-size:var(--fs-sm);line-height:1.5}
 
 /* Wave 1 / L1 (Iris): header bar (prev/next, favorite, "..." menu) */
@@ -66,4 +65,3 @@
 .feed .ev .ev-status{display:inline-flex;vertical-align:middle;margin-right:4px}
 .branch-btn .branch-copy{flex:none;display:inline-flex;margin-left:auto;padding-left:6px;color:var(--muted)}
 .branch-btn:hover .branch-copy,.branch-btn:focus-visible .branch-copy{color:var(--fg)}
-.idp .composer-actions .primary:disabled{opacity:.5;cursor:default}

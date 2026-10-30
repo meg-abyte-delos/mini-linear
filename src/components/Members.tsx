@@ -49,8 +49,8 @@ function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: bool
         </div>
         {err && <p role='alert' className='set-error'>{err}</p>}
         <div className='set-actions'>
-          <button type='button' className='set-btn' onClick={onClose}>Cancel</button>
-          <button type='submit' className='set-btn' data-variant='primary' disabled={busy || !email.trim()}>Send invite</button>
+          <button type='button' className='btn' data-size='32' onClick={onClose}>Cancel</button>
+          <button type='submit' className='btn' data-size='32' data-variant='primary' disabled={busy || !email.trim()}>Send invite</button>
         </div>
       </form>
     </Popover>
@@ -105,7 +105,7 @@ export function Members({ slug }: { slug: string }) {
         <h1 className='set-h1'>Members</h1>
         {rows && <p className='set-desc'>{rows.length} {rows.length === 1 ? 'member' : 'members'} in this workspace</p>}
       </div>
-      {admin && <button ref={inviteBtn} type='button' className='set-btn' data-variant='primary' aria-haspopup='dialog' aria-expanded={inviteOpen} onClick={() => setInviteOpen((o) => !o)}>Invite</button>}
+      {admin && <button ref={inviteBtn} type='button' className='btn' data-size='32' data-variant='primary' aria-haspopup='dialog' aria-expanded={inviteOpen} onClick={() => setInviteOpen((o) => !o)}>Invite</button>}
     </div>
   );
   if (err) return <SettingsShell slug={slug} current='members' header={<h1 className='set-h1'>Members</h1>}><p role='alert' className='set-error'>{err}</p></SettingsShell>;
@@ -114,7 +114,7 @@ export function Members({ slug }: { slug: string }) {
   return (
     <SettingsShell slug={slug} current='members' header={header}>
       <div data-testid='members-page'>
-        {msg && <p role='status' className='toast'>{msg} <button type='button' className='set-btn' data-variant='ghost' onClick={() => setMsg(null)}>Dismiss</button></p>}
+        {msg && <p role='status' className='toast'>{msg} <button type='button' className='btn' data-size='32' data-variant='ghost' onClick={() => setMsg(null)}>Dismiss</button></p>}
         <div className='set-toolbar'>
           <input type='search' className='set-input set-search' aria-label='Search members' placeholder='Search by name or email' value={q} onChange={(e) => setQ(e.target.value)} />
         </div>

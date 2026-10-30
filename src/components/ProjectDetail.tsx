@@ -48,7 +48,7 @@ export function ProjectDetail({ refreshKey = 0, slug, projectId, canWrite, onBac
     try { await f(); await load(); } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save'); } finally { setBusy(false); }
   }
 
-  if (err && !proj) return <div className='state error' role='alert'><p>Could not load the project ({err}).</p><button onClick={onBack}>Back to projects</button></div>;
+  if (err && !proj) return <div className='state error' role='alert'><p>Could not load the project ({err}).</p><button className='btn' onClick={onBack}>Back to projects</button></div>;
   if (!proj) return <div className='state' role='status'>Loading project…</div>;
   const pct = proj.progress_pct;
   // No 'Unknown' flash while members load: blank until resolved.
@@ -57,7 +57,7 @@ export function ProjectDetail({ refreshKey = 0, slug, projectId, canWrite, onBac
   return (
     <div className='scroll cycles pdetail' data-project={proj.id}>
       <div className='pd-head'>
-        <button onClick={onBack}>← Projects</button>
+        <button className='btn' data-variant='ghost' onClick={onBack}>← Projects</button>
         <h2>{proj.name}</h2>
         {canWrite ? (
           <select aria-label='Project status' className='pd-status' value={proj.status} disabled={busy} onChange={(e) => void run(() => client.patch(proj.version, { status: e.target.value }))}>
@@ -65,7 +65,7 @@ export function ProjectDetail({ refreshKey = 0, slug, projectId, canWrite, onBac
           </select>
         ) : <span className='pd-status'>{statusLabel(proj.status)}</span>}
         {proj.health && <span className={`pd-health ${proj.health}`}>{HEALTH_LABEL[proj.health]}</span>}
-        <button onClick={() => onViewIssues(proj.id)}>View issues</button>
+        <button className='btn' onClick={() => onViewIssues(proj.id)}>View issues</button>
       </div>
       {err && <p role='alert' className='pd-err'>{err}</p>}
       {proj.description && <p className='pd-desc'>{proj.description}</p>}
@@ -89,7 +89,7 @@ export function ProjectDetail({ refreshKey = 0, slug, projectId, canWrite, onBac
           <form onSubmit={(e) => { e.preventDefault(); const n = msName.trim(); if (!n) return; void run(async () => { await client.addMilestone(n, msDate || null); setMsName(''); setMsDate(''); }); }}>
             <input aria-label='Milestone name' placeholder='New milestone' value={msName} onChange={(e) => setMsName(e.target.value)} />
             <input aria-label='Milestone target date' type='date' value={msDate} onChange={(e) => setMsDate(e.target.value)} />
-            <button type='submit' disabled={busy || !msName.trim()}>Add milestone</button>
+            <button type='submit' className='btn' disabled={busy || !msName.trim()}>Add milestone</button>
           </form>
         )}
       </section>
@@ -99,7 +99,7 @@ export function ProjectDetail({ refreshKey = 0, slug, projectId, canWrite, onBac
           <form onSubmit={(e) => { e.preventDefault(); void run(async () => { await client.addUpdate(health, body.trim()); setBody(''); }); }}>
             <select aria-label='Health' value={health} onChange={(e) => setHealth(e.target.value as Health)}>{(Object.keys(HEALTH_LABEL) as Health[]).map((h) => <option key={h} value={h}>{HEALTH_LABEL[h]}</option>)}</select>
             <textarea aria-label='Update' placeholder='Post an update' value={body} onChange={(e) => setBody(e.target.value)} />
-            <button type='submit' disabled={busy}>Post update</button>
+            <button type='submit' className='btn' data-variant='primary' disabled={busy}>Post update</button>
           </form>
         )}
         {ups.length === 0 ? <p className='col-empty'>No updates yet</p> : <ul>{newestFirst(ups).map((u) => <li key={u.id}><span className={`pd-health ${u.health}`}>{HEALTH_LABEL[u.health]}</span> <span className='cy-dates'>{u.created_at.slice(0, 10)}</span><p>{u.body}</p></li>)}</ul>}

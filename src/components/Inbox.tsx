@@ -86,7 +86,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
       {TABS.map((x) => <button key={x.id} role='tab' aria-selected={tab === x.id} className={tab === x.id ? 'on' : ''} onClick={() => setTab(x.id)}>{x.label}</button>)}
     </div>
   );
-  if (err) return <div className='state error' role='alert'><p>Could not load notifications.</p><button onClick={() => void load()}>Retry</button></div>;
+  if (err) return <div className='state error' role='alert'><p>Could not load notifications.</p><button className='btn' onClick={() => void load()}>Retry</button></div>;
   if (!items) return <div className='state' role='status'><p>Loading…</p></div>;
   const empty = tab === 'all' ? { t: 'Inbox zero', h: 'Nothing needs your attention. Notifications about issues you follow land here.' } : tab === 'unread' ? { t: 'No unread notifications', h: 'You are all caught up.' } : tab === 'archived' ? { t: 'Nothing archived', h: 'Archived notifications show up here.' } : { t: 'Nothing snoozed', h: 'Snoozed notifications come back when their time is up.' };
   return (
@@ -97,14 +97,14 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
           {checked.size > 0 ? (
             <span className='bulk' role='toolbar' aria-label='Bulk actions'>
               <span>{checked.size} selected</span>
-              <button onClick={() => void actMany(targets(), 'read')}>Mark read</button>
-              <button onClick={() => void actMany(targets(), 'unread')}>Mark unread</button>
-              <button onClick={() => void actMany(targets(), tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
-              <button onClick={() => setSnoozeOpen(true)}>Snooze…</button>
-              <button onClick={() => setChecked(new Set())}>Clear</button>
+              <button className='btn' data-size='24' onClick={() => void actMany(targets(), 'read')}>Mark read</button>
+              <button className='btn' data-size='24' onClick={() => void actMany(targets(), 'unread')}>Mark unread</button>
+              <button className='btn' data-size='24' onClick={() => void actMany(targets(), tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
+              <button className='btn' data-size='24' onClick={() => setSnoozeOpen(true)}>Snooze…</button>
+              <button className='btn' data-size='24' onClick={() => setChecked(new Set())}>Clear</button>
             </span>
           ) : <span>{unread} unread</span>}
-          {tab === 'all' && checked.size === 0 && <button disabled={unread === 0} onClick={async () => { if (await client.readAll()) { await load(); } }}>Mark all as read</button>}
+          {tab === 'all' && checked.size === 0 && <button className='btn' data-size='24' disabled={unread === 0} onClick={async () => { if (await client.readAll()) { await load(); } }}>Mark all as read</button>}
         </div>
         {snoozeOpen && (
           <div className='snooze-menu' role='menu' aria-label='Snooze until'>
@@ -145,10 +145,10 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, refreshKey = 0 
             </section>
           )}
           <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
-            <button aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
-            <button aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>
-            <button aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</button>
-            {sel.issue && <button onClick={() => open(sel)}>Open issue</button>}
+            <button className='btn' data-variant='ghost' aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
+            <button className='btn' data-variant='ghost' aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>
+            <button className='btn' data-variant='ghost' aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</button>
+            {sel.issue && <button className='btn' onClick={() => open(sel)}>Open issue</button>}
           </div>
         </aside>
       )}

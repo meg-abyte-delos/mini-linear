@@ -28,12 +28,7 @@
 .inbox-detail h2 { font-size:var(--fs-lg); font-weight:600; }
 
 /* Inbox action buttons on tokens (no native UA #efefef): bar, bulk toolbar, detail actions. */
-.inbox-bar button, .inbox-detail-actions button { height:24px; padding:0 var(--sp-2); border:1px solid var(--line); border-radius:6px; background:var(--raised); color:var(--fg); font:inherit; font-size:var(--fs-sm); cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
-.inbox-bar button:hover:not(:disabled), .inbox-detail-actions button:hover { background:var(--hover); border-color:var(--muted); }
-.inbox-bar button:focus-visible, .inbox-detail-actions button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-.inbox-bar button:disabled { color:var(--muted); cursor:default; } /* no opacity: --muted on --raised stays 6:1 (with .7 it fell to 3.6:1) */
 .inbox-bar .bulk { display:inline-flex; align-items:center; gap:6px; }
-@media (prefers-reduced-motion: reduce) { .inbox-bar button, .inbox-detail-actions button { transition:none; } }
 
 /* Inbox polish (Pierre 18:46): each element inspected at 1280, dark + light. */
 /* Shell: 1fr is minmax(auto,1fr), so wide inbox content pushed the grid past the viewport and the page scrolled sideways (sidebar cut left, detail bleeding right). */
@@ -67,11 +62,7 @@
 .inbox-preview .md ul.tasks { list-style:none; padding-left:0; }
 .inbox-preview .md-empty { color:var(--muted); }
 /* Actions: Linear ghost buttons, 28px, text aligned on the content edge; Open issue keeps a hairline border. */
-.inbox-detail-actions { gap:4px; margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft); }
-.inbox-detail-actions button { height:28px; padding:0 10px; border-color:transparent; background:transparent; color:var(--muted-strong); font-weight:500; }
-.inbox-detail-actions button:first-child { margin-left:-10px; }
-.inbox-detail-actions button:hover { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; color:var(--fg); }
-.inbox-detail-actions button:last-child { margin-left:auto; border-color:var(--line); color:var(--fg); }
 .inbox-bar button { border-color:transparent; background:transparent; color:var(--muted-strong); }
 .inbox-bar button:hover:not(:disabled) { background:color-mix(in srgb, var(--fg) 6%, transparent); border-color:transparent; }
 @media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }
+.inbox-detail-actions { gap:4px; margin-top:20px; padding-top:16px; border-top:1px solid var(--line-soft); }

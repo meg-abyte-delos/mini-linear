@@ -20,7 +20,7 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
     <section aria-labelledby={`team-${team.id}`} className='set-card set-team'>
       <div className='set-card-head'>
         <h3 id={`team-${team.id}`} className='set-card-title'>{team.name} <span className='set-key'>{team.key}</span></h3>
-        {canAdmin && <button type='button' className='set-btn' data-tone='danger' onClick={onDelete}>Delete {team.name}</button>}
+        {canAdmin && <button type='button' className='btn' data-size='32' data-tone='danger' onClick={onDelete}>Delete {team.name}</button>}
       </div>
       <table className='set-table'>
         <thead><tr><th scope='col'>Member</th><th scope='col'>Team role</th><th scope='col'><span className='sr-only'>Actions</span></th></tr></thead>
@@ -32,7 +32,7 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
                 <Select className='set-select' label={`Team role for ${r.email}`} value={r.role} disabled={!canAdmin} options={TEAM_ROLES}
                   onChange={(id) => run(S.setTeamRole(slug, team.id, r.user_id, id as S.TeamRole))} />
               </td>
-              <td className='set-end'>{canAdmin && <button type='button' className='set-btn' data-variant='ghost' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
+              <td className='set-end'>{canAdmin && <button type='button' className='btn' data-size='32' data-variant='ghost' onClick={() => run(S.removeTeamMember(slug, team.id, r.user_id))}>Remove</button>}</td>
             </tr>
           ))}
         </tbody>
@@ -41,7 +41,7 @@ function TeamPanel({ slug, team, members, canAdmin, onChanged, onDelete }: { slu
         <form className='set-inline' onSubmit={(e) => { e.preventDefault(); if (!add) return; const m = members.find((x) => x.user_id === add); void run(S.addTeamMember(slug, team.id, add, m?.role === 'guest' ? 'guest' : 'member')); setAdd(''); }}>
           <span className='set-inline-label'>Add member</span>
           <Select className='set-select' searchable label='Add member' value={add} placeholder='Choose…' options={outside.map((m) => ({ id: m.user_id, label: m.email }))} onChange={setAdd} />
-          <button type='submit' className='set-btn' disabled={!add}>Add</button>
+          <button type='submit' className='btn' data-size='32' disabled={!add}>Add</button>
         </form>
       )}
     </section>
@@ -128,7 +128,7 @@ export function Settings({ slug }: { slug: string }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {ws.logo_url && <img className='set-logo' src={ws.logo_url} alt={`${ws.name} logo`} width={32} height={32} />}
           </span></label>
-          {admin && <div className='set-actions'><button type='submit' className='set-btn' data-variant='primary'>Save changes</button></div>}
+          {admin && <div className='set-actions'><button type='submit' className='btn' data-size='32' data-variant='primary'>Save changes</button></div>}
         </form>
       </section>
       <section id='teams' aria-labelledby='teams-h' className='set-section'>
@@ -137,7 +137,7 @@ export function Settings({ slug }: { slug: string }) {
           <form className='set-card set-form set-form-row' onSubmit={async (e) => { e.preventDefault(); try { await S.createTeam(slug, newTeam.name.trim(), newTeam.key); setNewTeam({ name: '', key: '' }); void reload(); } catch (err) { setMsg((err as Error).message); } }}>
             <label className='set-field set-grow'><span className='set-label'>Team name</span><input className='set-input' placeholder='e.g. Design' value={newTeam.name} required maxLength={100} onChange={(e) => setNewTeam({ name: e.target.value, key: S.suggestKey(e.target.value) })} /></label>
             <label className='set-field set-key-field'><span className='set-label'>Key</span><input className='set-input' placeholder='DES' value={newTeam.key} required pattern='[A-Z]{2,5}' onChange={(e) => setNewTeam({ ...newTeam, key: e.target.value.toUpperCase() })} /></label>
-            <button type='submit' className='set-btn' data-variant='primary'>Create team</button>
+            <button type='submit' className='btn' data-size='32' data-variant='primary'>Create team</button>
           </form>
         )}
         {teams.map((t) => <TeamPanel key={t.id} slug={slug} team={t} members={members} canAdmin={admin} onChanged={setMsg} onDelete={() => setDelTeam(t)} />)}
