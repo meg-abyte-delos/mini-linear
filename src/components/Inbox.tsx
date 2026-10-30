@@ -140,7 +140,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, refresh
           <div className='idp-bar'>
             <span className='idp-id'>{sel.issue?.identifier ?? 'Deleted'}</span>
             <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
-              {sel.issue && <button className='btn' onClick={() => open(sel)}>Open issue</button>}
+              {sel.issue && <button className='btn' data-variant='primary' onClick={() => open(sel)}>Open issue</button>}
               <button className='btn' data-variant='ghost' aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</button>
               <button className='btn' data-variant='ghost' aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>
               <button className='btn' data-variant='ghost' aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
