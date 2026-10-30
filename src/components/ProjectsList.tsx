@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar } from '@/components/icons';
+import { Avatar, UnassignedIcon } from '@/components/icons';
 import { ProgressRing } from '@/components/ProgressRing';
 import { MOCK_PEOPLE, findPerson, type Person } from '@/lib/people';
 import { fmtDate, type Issue, type ProjectMeta } from '@/lib/issues';
@@ -78,7 +78,7 @@ export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, ca
                     const u = findPerson(people, p.lead_id);
                     return (
                       <div key={p.id} className='rm-row' data-project={p.id}>
-                        <span className='rm-name'>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av av-none' aria-hidden='true' />}<span className='rm-name-t'>{p.name}</span><ProgressRing pct={pr.pct} size={14} label={`${p.name} progress ${pr.pct}%`} /></span>
+                        <span className='rm-name'>{u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='av-wrap' title='No lead'><UnassignedIcon /></span>}<span className='rm-name-t'>{p.name}</span><ProgressRing pct={pr.pct} size={14} label={`${p.name} progress ${pr.pct}%`} /></span>
                         <div className='rm-track'>
                           {gridTicks.map((t) => <span key={t.label} className='rm-grid' style={{ left: `${t.leftPct}%` }} aria-hidden='true' />)}
                           {tp !== null && <span className='rm-today' data-testid='rm-today' style={{ left: `${tp}%` }} aria-hidden='true' />}
