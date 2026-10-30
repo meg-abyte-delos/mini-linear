@@ -1,13 +1,13 @@
 /* Cycles list rows (CyclesList.tsx), modelled on Linear's Cycles page:
    glyph + name + Current badge | dates + timing | scope | ring + % + done/total | actions (quiet until hover/focus).
    Scoped to .cycles so the Projects rows (.cycle.project) keep their own grid. */
-.cycles .cycle { grid-template-columns:minmax(180px,1.3fr) minmax(200px,1.2fr) minmax(130px,.8fr) 132px 56px; gap:16px; min-height:44px; padding:0 16px 0 20px; cursor:default; transition:background .12s; }
+.cycles .cycle { grid-template-columns:minmax(180px,1.3fr) minmax(200px,1.2fr) minmax(130px,.8fr) 132px 56px; gap:16px; min-height:44px; padding:0 16px 0 20px; cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out); }
 .cycles .cycle:hover, .cycles .cycle:focus-within { background:var(--hover); }
 .cycles .cy-name { display:flex; align-items:center; gap:8px; min-width:0; font-weight:500; }
 .cycles .cy-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cy-glyph { flex:none; stroke:var(--muted-strong); fill:var(--muted-strong); }
 .cy-glyph[data-bucket='active'] { stroke:var(--accent); fill:var(--accent); }
-.cy-badge { flex:none; height:18px; padding:0 6px; display:inline-flex; align-items:center; border-radius:4px; font-size:11px; font-weight:500; color:var(--fg); background:color-mix(in srgb, var(--accent) 22%, transparent); border:1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.cy-badge { flex:none; height:18px; padding:0 6px; display:inline-flex; align-items:center; border-radius:var(--r-sm); font-size:11px; font-weight:500; color:var(--fg); background:color-mix(in srgb, var(--accent) 22%, transparent); border:1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
 .cycles .cy-dates { display:flex; align-items:center; gap:8px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .cy-timing { color:var(--muted-strong); font-size:12px; }
 .cy-timing::before { content:'\00b7'; margin-right:8px; }
@@ -17,7 +17,7 @@
 .cycles .cy-count { color:var(--muted-strong); min-width:28px; }
 .cycles .cy-actions { display:flex; gap:4px; justify-content:flex-end; }
 /* Actions are quiet icon buttons (no text links, like Linear): revealed on row hover or keyboard focus. */
-.cycles .cycle button { width:24px; height:24px; padding:0; display:inline-grid; place-items:center; border:1px solid transparent; border-radius:4px; background:none; color:var(--muted-strong); opacity:0; transition:opacity .12s, background .12s; }
+.cycles .cycle button { width:24px; height:24px; padding:0; display:inline-grid; place-items:center; border:1px solid transparent; border-radius:var(--r-sm); background:none; color:var(--muted-strong); opacity:0; transition:opacity var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
 .cycles .cycle:hover button, .cycles .cycle:focus-within button, .cycles .cycle button[aria-expanded='true'] { opacity:1; }
 .cycles .cycle button:hover { background:var(--hover); color:var(--fg); border-color:var(--line); }
 .cycles .cycle button:focus-visible { opacity:1; outline:2px solid var(--accent); outline-offset:1px; }
@@ -29,3 +29,7 @@
 .cy-empty-hint { grid-column:2; margin:2px 0 0; color:var(--muted-strong); font-size:12px; }
 @media (max-width:900px) { .cycles .cycle { grid-template-columns:1fr auto auto; } .cycles .cy-scope, .cycles .cy-timing { display:none; } }
 @media (prefers-reduced-motion: reduce) { .cycles .cycle { transition:none; } .cycles .cycle button { transition:none; } }
+
+/* Title is the row's accessible 'View issues' control (Linear: the whole row opens the cycle). */
+.cycles .cycle button.cy-title { width:auto; height:auto; opacity:1; display:inline; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cycles .cycle button.cy-title:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
