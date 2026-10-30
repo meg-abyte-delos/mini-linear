@@ -400,16 +400,17 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         </section>
 
         <section className='idp-sec' aria-labelledby='h-att'>
-          <h2 id='h-att'>Attachments</h2>
+          <h2 id='h-att'>Attachments
+            {!readOnly && <button className='sec-add' aria-label='Add link' onClick={() => setLinkForm((f) => f ?? { url: '', title: '' })}>+</button>}</h2>
           <ul className='idp-rows'>{attachments.map((a) => <li key={a.id}><a href={safeHref(a.url) ?? '#'} target='_blank' rel='noopener noreferrer nofollow'>{a.title}</a>{!readOnly && <button className='x' aria-label={`Remove attachment ${a.title}`} onClick={() => void removeAttachment(a)}>×</button>}</li>)}</ul>
-          {!readOnly && (linkForm ? <form className='inline-add' onSubmit={(e) => { e.preventDefault(); void addLink(); }}><label className='sr-only' htmlFor='att-url'>Link URL</label><input id='att-url' type='url' placeholder='https://…' value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} /><label className='sr-only' htmlFor='att-title'>Link title</label><input id='att-title' placeholder='Title (optional)' value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} /><button type='submit'>Attach</button><button type='button' onClick={() => setLinkForm(null)}>Cancel</button></form> : <button onClick={() => setLinkForm({ url: '', title: '' })}>Add link</button>)}
+          {!readOnly && linkForm && (<form className='inline-add' onSubmit={(e) => { e.preventDefault(); void addLink(); }}><label className='sr-only' htmlFor='att-url'>Link URL</label><input id='att-url' type='url' placeholder='https://…' value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} /><label className='sr-only' htmlFor='att-title'>Link title</label><input id='att-title' placeholder='Title (optional)' value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} /><button type='submit'>Attach</button><button type='button' onClick={() => setLinkForm(null)}>Cancel</button></form>)}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-act'>
           <h2 id='h-act'>Activity</h2>
           <ol className='feed' aria-label='Activity'>
             {timeline.map((t) => t.kind === 'event'
-              ? <li key={t.at.id} className='ev'><span className='dot' aria-hidden='true' /><span className='who'>{who(t.at.actor_id)?.name ?? 'Someone'}</span> {t.at.summary ?? t.at.action} <time dateTime={t.at.created_at}>{fmtTime(t.at.created_at)}</time></li>
+              ? <li key={t.at.id} className='ev'>{(() => { const u = who(t.at.actor_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : <span className='dot' aria-hidden='true' />; })()}<span className='who'>{who(t.at.actor_id)?.name ?? 'Someone'}</span> {t.at.summary ?? t.at.action} <time dateTime={t.at.created_at}>{fmtTime(t.at.created_at)}</time></li>
               : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={(x) => (client ? !!viewer?.userId && x.author_id === viewer.userId : x.author_id === ME)} canDelete={(x) => (client ? !!viewer?.userId && (x.author_id === viewer.userId || viewer.role === 'owner' || viewer.role === 'admin') : x.author_id === ME)} readOnly={readOnly} /></li>)}
           </ol>
           {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} />}
@@ -463,7 +464,7 @@ function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, 
   const [editing, setEditing] = useState<string | null>(null);
   const one = (x: Comment) => (
     <article className='cmt' aria-label={`Comment by ${who(x.author_id)?.name ?? 'Someone'}`}>
-      <header><span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time>{x.edited_at && <span className='dim'> (edited)</span>}
+      <header>{(() => { const u = who(x.author_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}<span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <time dateTime={x.created_at}>{fmtTime(x.created_at)}</time>{x.edited_at && <span className='dim'> (edited)</span>}
         {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <button aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</button>}{canDelete(x) && <button aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</button>}</span>}</header>
       {editing === x.id ? <Composer label='Edit comment' initial={x.body} autoFocus submitLabel='Save' onSubmit={async (b) => { const ok = await onEdit(x, b); if (ok) setEditing(null); return ok; }} onCancel={() => setEditing(null)} /> : <Markdown source={x.body} empty='' />}
       <div className='reacts' role='group' aria-label='Reactions'>
