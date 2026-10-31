@@ -31,3 +31,35 @@ test('New issue: estimate, due date and an attached link are saved with the issu
   const a = await page.request.get(`/api/v1/w/${DEMO.slug}/issues/${row.id}/attachments`);
   expect((await a.json()).items.map((x: { title: string }) => x.title)).toEqual(['Brief']);
 });
+
+test('New issue: a refused property is named in the toast and the others are still saved; Create more resets the extra chips', async ({ page }) => {
+  await page.route(/\/issues\/[0-9a-f-]{36}$/, async (route) => {
+    const req = route.request();
+    if (req.method() === 'PATCH' && 'estimate' in (req.postDataJSON() ?? {})) { await route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: { code: 'validation_failed' } }) }); return; }
+    await route.fallback();
+  });
+  await page.goto('/');
+  await page.waitForSelector('html[data-ready]');
+  await page.keyboard.press('c');
+  const d = page.getByRole('dialog', { name: 'New issue' });
+  const title = `partial-${Date.now()}`;
+  await d.getByRole('textbox', { name: 'Issue title' }).fill(title);
+  const props = d.getByRole('group', { name: 'Properties' });
+  await props.getByRole('button', { name: 'More properties' }).click();
+  await page.locator('.combo-opt').filter({ hasText: /^Estimate$/ }).click();
+  await page.locator('.combo-opt').filter({ hasText: /^5 pts$/ }).click();
+  await props.getByRole('button', { name: 'More properties' }).click();
+  await page.locator('.combo-opt').filter({ hasText: /^Due date$/ }).click();
+  await props.getByLabel('Due date').fill('2026-12-25');
+  await d.getByLabel('Create more').check();
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByText(/could not save estimate\./)).toBeVisible();
+  // Create more: the extra chips are reset for the next issue
+  await expect(d.getByRole('textbox', { name: 'Issue title' })).toHaveValue('');
+  await expect(props.getByLabel('Due date')).toHaveCount(0);
+  await expect(props.getByRole('button', { name: /5 pts/ })).toHaveCount(0);
+  const q = await page.request.get(`/api/v1/w/${DEMO.slug}/issues?q=${encodeURIComponent(title)}&team_id=${DEMO.teamId}`);
+  const row = (await q.json()).items.find((i: { title: string }) => i.title === title);
+  expect(row.estimate).toBeNull();
+  expect(row.due_date).toBe('2026-12-25');
+});
