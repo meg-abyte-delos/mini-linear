@@ -321,11 +321,22 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const x = new URLSearchParams(window.location.search).get('view');
     return x === 'board' || x === 'cycles' || x === 'projects' ? x : 'list';
   };
+  // Next restores its own tree for the entry on popstate (and may re-render it with the view it was rendered for, e.g. the inbox page); that can land after our handler on a slow runner.
+  // So for a short window after a traversal the URL wins: re-derive after Next's tick, and again whenever the view changes while the window is open.
+  const popUntil = useRef(0);
   useEffect(() => {
-    const onPop = () => setViewState(viewFromLocation());
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const onPop = () => {
+      popUntil.current = Date.now() + 1500;
+      setViewState(viewFromLocation());
+      for (const ms of [0, 50, 200, 600]) timers.push(setTimeout(() => setViewState(viewFromLocation()), ms));
+    };
     window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    return () => { window.removeEventListener('popstate', onPop); timers.forEach(clearTimeout); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (Date.now() < popUntil.current && view !== viewFromLocation()) setViewState(viewFromLocation());
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
   const navPath = usePathname();
   const navView = useSearchParams()?.get('view') ?? null;
   const navSeen = useRef(`${navPath}|${navView}`);
