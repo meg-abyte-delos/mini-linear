@@ -178,3 +178,13 @@ test('inbox: the options menu (Mark all as read marks everything) is only on the
   await page.getByRole('tab', { name: 'All' }).click();
   await expect(page.getByRole('button', { name: 'Inbox options' })).toBeVisible();
 });
+
+test('inbox: dedicated /w/<slug>/inbox route renders the inbox, Inbox is the only active sidebar item and links to it', async ({ page }) => {
+  await page.goto('/w/demo/inbox');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('option').first()).toBeVisible();
+  await expect(page.locator('aside.side [aria-current=page]')).toHaveCount(1);
+  const link = page.getByRole('link', { name: /^Inbox/ });
+  await expect(link).toHaveAttribute('aria-current', 'page');
+  await expect(link).toHaveAttribute('href', '/w/demo/inbox');
+});
