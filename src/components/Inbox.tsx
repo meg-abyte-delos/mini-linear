@@ -130,11 +130,11 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
           ) : <span>{unread} unread</span>}
           {checked.size === 0 && tab === 'all' && (
             <>
-              <IconButton ref={moreRef} label='Inbox options' size={24} aria-haspopup='menu' aria-expanded={moreOpen} onClick={() => { if (!moreOpen) void client.unreadCount().then(setTotalUnread); setMoreOpen((o) => !o); }}>
+              <IconButton ref={moreRef} label='Inbox options' size={24} aria-haspopup='menu' aria-expanded={moreOpen} onClick={() => { if (!moreOpen) void client.unreadCount().then(setTotalUnread).catch(() => {}); setMoreOpen((o) => !o); }}>
                 <svg width='16' height='16' viewBox='0 0 16 16' aria-hidden='true' focusable='false'><path d='M3.5 8h.01M8 8h.01M12.5 8h.01' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' /></svg>
               </IconButton>
               <Menu open={moreOpen} anchorRef={moreRef} onClose={() => setMoreOpen(false)} label='Inbox options' align='end'
-                entries={[{ id: 'read-all', label: 'Mark all as read', disabled: (totalUnread ?? unread) === 0, onSelect: () => { void (async () => { if (await client.readAll()) await load(); })(); } }]} />
+                entries={[{ id: 'read-all', label: 'Mark all as read', disabled: (totalUnread ?? unread) === 0, onSelect: () => { void (async () => { if (await client.readAll()) { await load(); setTotalUnread(0); } })(); } }]} />
             </>
           )}
         </div>
