@@ -116,7 +116,7 @@
 .btn[data-tone='danger']:hover:not(:disabled) { background:color-mix(in srgb, var(--danger) 14%, transparent); border-color:var(--danger); }
 /* Button loading: label hidden (width kept), spinner overlaid. */
 .btn-label { display:inline-flex; align-items:center; gap:inherit; }
-.btn[aria-busy='true'] .btn-label { visibility:hidden; }
+.btn[aria-busy='true'] .btn-label { opacity:0; }
 .btn-spin { position:absolute; inset:0; margin:auto; width:12px; height:12px; border-radius:50%; border:1.5px solid currentColor; border-right-color:transparent; animation:btn-spin .7s linear infinite; }
 @keyframes btn-spin { to { transform:rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .btn-spin { animation-duration:1.6s; } }

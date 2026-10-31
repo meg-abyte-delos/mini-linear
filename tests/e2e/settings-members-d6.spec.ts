@@ -69,7 +69,7 @@ test('members page: row menu offers role changes and a red Remove that asks to c
   test.skip((await others.count()) === 0, 'demo workspace has no other member');
   await others.first().getByRole('button', { name: /^Actions for/ }).click();
   await expect(page.getByRole('menuitem', { name: 'Make guest' })).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: 'Remove from workspace' })).toHaveAttribute('data-tone', 'danger');
+  await expect(page.getByRole('menuitem', { name: 'Remove from workspace' })).toHaveAttribute('data-destructive', 'true');
   await page.getByRole('menuitem', { name: 'Remove from workspace' }).click();
   const dlg = page.getByRole('alertdialog');
   await expect(dlg).toContainText('loses access');
