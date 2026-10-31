@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { safeNext } from '@/lib/auth/guard';
+import { Button, Input } from '@/components/ui';
 
 function Logo() {
   return <svg className='auth-logo' width='32' height='32' viewBox='0 0 32 32' aria-hidden='true'><rect width='32' height='32' rx='8' fill='var(--accent)'/><path d='M9 21.5 21.5 9M9 16.5 16.5 9M13.5 23 23 13.5' stroke='var(--accent-fg)' strokeWidth='2.2' strokeLinecap='round'/></svg>;
@@ -32,10 +33,10 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
       <form className='auth-card' onSubmit={submit} aria-labelledby='auth-title'>
         <Logo />
         <h1 id='auth-title'>{login ? 'Sign in to Mini-Linear' : 'Create your account'}</h1>
-        <label>Email<input type='email' name='email' placeholder='name@company.com' aria-invalid={error ? true : undefined} autoComplete='email' required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-        <label>Password<input type='password' name='password' aria-invalid={error ? true : undefined} autoComplete={login ? 'current-password' : 'new-password'} required minLength={login ? 1 : 8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        <label>Email<Input size={32} type='email' name='email' placeholder='name@company.com' invalid={!!error} autoComplete='email' required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+        <label>Password<Input size={32} type='password' name='password' invalid={!!error} autoComplete={login ? 'current-password' : 'new-password'} required minLength={login ? 1 : 8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         {error && <p role='alert' className='auth-err'><svg width='14' height='14' viewBox='0 0 16 16' aria-hidden='true'><circle cx='8' cy='8' r='7' fill='none' stroke='currentColor' strokeWidth='1.5'/><path d='M8 4.5v4M8 11h.01' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round'/></svg>{error}</p>}
-        <button type='submit' className='btn' data-variant='primary' data-size='32' disabled={busy}>{busy ? 'Please wait…' : login ? 'Sign in' : 'Sign up'}</button>
+        <Button type='submit' variant='primary' size={32} className='auth-submit' loading={busy}>{login ? 'Sign in' : 'Sign up'}</Button>
         <p className='auth-sub'>{login ? <>No account? <a href='/signup'>Sign up</a></> : <>Already registered? <a href='/login'>Sign in</a></>}</p>
       </form>
     </main>
