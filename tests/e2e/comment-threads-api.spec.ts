@@ -49,7 +49,7 @@ test('threads render with a rail, collapse, resolve and reopen from the root hea
 
   // Reply composer sits at the bottom of the thread.
   await again.getByRole('button', { name: 'Reply', exact: true }).click();
-  const box = again.getByRole('combobox', { name: 'Reply' });
+  const box = again.getByRole('textbox', { name: 'Reply' });
   await box.fill('Third reply');
   const posted = page.waitForResponse((r) => /\/issues\/[^/]+\/comments$/.test(r.url()) && r.request().method() === 'POST');
   await again.getByRole('button', { name: 'Reply', exact: true }).last().click();

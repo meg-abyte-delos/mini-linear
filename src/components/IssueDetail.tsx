@@ -606,7 +606,7 @@ function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = ''
   return (
     <div className={inline ? 'composer composer-inline' : 'composer'}>
       <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}…`} title='@ to mention, ⌘↵ to send' rows={3} value={text}
-        role='combobox' aria-expanded={list.length > 0} aria-controls={list.length > 0 ? listId : undefined} aria-autocomplete='list' aria-activedescendant={list[idx] ? `${listId}-${list[idx].id}` : undefined}
+        aria-controls={list.length > 0 ? listId : undefined} aria-autocomplete='list' aria-activedescendant={list[idx] ? `${listId}-${list[idx].id}` : undefined}
         onChange={(e) => { setText(e.target.value); setCaret(e.target.selectionStart); setSel(0); }}
         onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
         onKeyDown={(e) => {

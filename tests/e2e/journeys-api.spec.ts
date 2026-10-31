@@ -140,7 +140,7 @@ test('mention in a comment reaches the mentioned member Inbox; the author gets n
   const title = `Journey mention ${stamp}`;
   const it = await mk(page, title);
   await open(page, it.identifier);
-  const box = page.getByRole('combobox', { name: 'Leave a comment' });
+  const box = page.getByRole('textbox', { name: 'Leave a comment' });
   await box.click();
   await box.pressSequentially('ping @mate please');
   const posted = page.waitForResponse((r) => /\/issues\/[^/]+\/comments$/.test(r.url()) && r.request().method() === 'POST');
