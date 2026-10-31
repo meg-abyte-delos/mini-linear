@@ -7,13 +7,13 @@
 
 /* 2. Display popover: 24px chips 12px/500, gap 8px, popover padding 12px, 11px/500 dim heading. */
 .tb-menu.display { padding:var(--sp-3); }
-.tb-menu.display .dp-h { padding:0 0 var(--sp-2); font-size:var(--fs-xs); font-weight:var(--fw-medium); color:var(--dim); }
+.tb-menu.display .dp-h { padding:0 0 var(--sp-2); font-size:var(--fs-xs); font-weight:var(--fw-medium); color:var(--muted); }
 .tb-menu.display .dp-props { gap:var(--sp-2); padding:0 0 var(--sp-2); }
 /* Display properties: active = filled accent chip, inactive = outline only, dim text (AA on --raised). */
-.dp-chip { height:24px; padding:0 var(--sp-2); font-size:var(--fs-sm); font-weight:var(--fw-medium); color:var(--dim); border-color:var(--line); background:none; }
+.dp-chip { height:24px; padding:0 var(--sp-2); font-size:var(--fs-sm); font-weight:var(--fw-medium); color:var(--muted); border-color:var(--line); background:none; }
 .dp-chip:hover { color:var(--muted-strong); background:var(--hover); }
-.dp-chip.on { background:var(--accent); border-color:transparent; color:var(--accent-fg); }
-.dp-chip.on:hover { background:color-mix(in srgb, var(--accent) 88%, black); color:var(--accent-fg); } /* same as primary .btn hover: white stays >= 4.5:1 in both themes */
+.dp-chip.on { background:var(--sel); border-color:var(--line); color:var(--fg); }
+.dp-chip.on:hover { background:var(--hover); color:var(--fg); } /* Linear: selected = quiet --sel fill, no accent */
 
 /* 3. Cmd+K: readable group labels and footer keycaps (12px, AA), quiet 12px ID, heavier title. */
 .palette li.pal-group { font-size:var(--fs-sm); color:var(--muted-strong); }
