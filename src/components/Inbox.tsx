@@ -5,6 +5,7 @@ import { Button, CheckMark, EmptyState, IconButton, Kbd, Menu } from '@/componen
 import { Markdown } from '@/components/Markdown';
 import { IssueActivity } from '@/components/IssueDetail';
 import { IssueProperties } from '@/components/IssueProperties';
+import { PropIcon } from '@/components/PropIcons';
 import type { Person } from '@/lib/people';
 import '@/app/ui-inbox-activity.css';
 import { Avatar, StatusIcon } from '@/components/icons';
@@ -29,6 +30,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, props, slug, re
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  // Narrow detail pane (container query in ui-inbox.css): the Properties rail becomes a drawer opened from the bar, like the issue page under 1024px.
+  const [propsOpen, setPropsOpen] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
   const [fail, setFail] = useState<string | null>(null);
   const load = useCallback(async () => {
@@ -50,6 +53,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, props, slug, re
   const presets = useMemo(() => snoozePresets(), [snoozeOpen]);
   const sel = list[cur] as Notif | undefined;
   const selIssue = sel?.issue ? getIssue?.(sel.issue_id) : undefined;
+  const selId = sel?.id;
+  useEffect(() => { setPropsOpen(false); }, [selId]);
   // Targets of an action: the checked rows, else the focused row.
   const targets = (): Notif[] => (checked.size > 0 ? list.filter((n) => checked.has(n.id)) : sel ? [sel] : []);
 
@@ -85,7 +90,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, props, slug, re
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       if (document.querySelector('[role=dialog]')) return;
-      if (e.key === 'Escape') { setSnoozeOpen(false); setChecked(new Set()); return; }
+      if (e.key === 'Escape') { setPropsOpen(false); setSnoozeOpen(false); setChecked(new Set()); return; }
       if (snoozeOpen) {
         const p = presets[Number(e.key) - 1];
         if (p) { e.preventDefault(); setSnoozeOpen(false); void actMany(targets(), 'snooze', p.until); }
@@ -170,9 +175,10 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, props, slug, re
         )}
       </div>
       {sel && (
-        <aside className='inbox-detail' aria-label='Notification detail'>
+        <aside className='inbox-detail' aria-label='Notification detail' data-props={propsOpen ? 'open' : undefined}>
           <div className='idp-bar'>
             <span className='idp-id'>{sel.issue?.identifier ?? 'Deleted'}</span>
+            <IconButton className='inbox-props-toggle' label='Properties' aria-controls='inbox-props' aria-expanded={propsOpen} onClick={() => setPropsOpen((o) => !o)}><PropIcon name='panel' /></IconButton>
             <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
               {sel.issue && <Button variant='ghost' onClick={() => open(sel)}>Open issue</Button>}
               <IconButton label={`${sel.read_at ? 'Mark unread' : 'Mark read'} ${sel.issue?.identifier ?? ''}`.trim()} title={sel.read_at ? 'Mark unread (u)' : 'Mark read (u)'} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? <svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><circle cx='8' cy='8' r='3' fill='currentColor' stroke='none' /></svg> : <svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><path d='M3.5 8.5l3 3 6-7' /></svg>}</IconButton>
@@ -191,7 +197,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, props, slug, re
               )}
               {slug && sel.issue && <IssueActivity key={sel.issue_id} refreshKey={selIssue?.version ?? 0} slug={slug} issueId={sel.issue_id} identifier={sel.issue.identifier} readOnly={readOnly} />}
             </article>
-            <div className='idp-side inbox-props' role='complementary' aria-label='Properties'>
+            <div className='inbox-scrim' aria-hidden='true' onClick={() => setPropsOpen(false)} />
+            <div id='inbox-props' className='idp-side inbox-props' role='complementary' aria-label='Properties'>
               {selIssue && props ? <IssueProperties issue={selIssue} meta={props.meta} people={props.people} readOnly={readOnly} today={props.today} onChange={(patch) => props.onUpdate(selIssue.id, patch)} />
                 : sel.issue && <section className='side-group'><dl><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></dl></section>}
               {sel.snoozed_until && <section className='side-group'><dl><dt>Snoozed until</dt><dd>{shortWhen(sel.snoozed_until)}</dd></dl></section>}

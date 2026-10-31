@@ -2,6 +2,12 @@ import { test, expect } from '@playwright/test';
 import { resetInbox } from './reset-inbox';
 import { INBOX_STATE } from './global-setup';
 
+// At 1280 the detail pane is under 760px: the Properties rail is a drawer opened from the bar (fix/inbox-detail-reading-width).
+async function openRail(page: import('@playwright/test').Page) {
+  const toggle = page.getByRole('complementary', { name: 'Notification detail' }).getByRole('button', { name: 'Properties', exact: true });
+  if (await toggle.isVisible() && (await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+}
+
 // Own persona and inbox: other specs run as the admin and never touch these notifications.
 test.use({ storageState: INBOX_STATE });
 
@@ -138,6 +144,7 @@ test('inbox: detail shows the issue Properties rail (no Event/When rows), a ghos
   const detail = page.getByRole('complementary', { name: 'Notification detail' });
   // Linear's rail: the issue page's Properties component, with no Event / When rows (the event is in the row and the activity)
   const rail = detail.getByRole('complementary', { name: 'Properties' });
+  await openRail(page);
   await expect(rail.getByRole('heading')).toHaveText(['Properties', 'Planning', 'Organization']);
   await expect(rail.locator('dt')).not.toContainText(['Event', 'When']);
   const statusBtn = rail.getByRole('button', { name: /^(Backlog|Todo|In progress|In review|Done|Canceled)$/i });
@@ -232,6 +239,7 @@ test('inbox: the Properties rail edits the issue; the list row follows and a rel
   await page.waitForSelector('html[data-ready]');
   const detail = page.getByRole('complementary', { name: 'Notification detail' });
   const rail = detail.getByRole('complementary', { name: 'Properties' });
+  await openRail(page);
   await rail.getByRole('button', { name: /^(Backlog|Todo|In progress|In review|Done|Canceled)$/i }).click();
   await page.getByRole('combobox', { name: /Change status/ }).fill('done');
   await page.keyboard.press('Enter');
@@ -239,6 +247,7 @@ test('inbox: the Properties rail edits the issue; the list row follows and a rel
   await expect(page.getByRole('option').first().locator('.nstatus')).toHaveAttribute('data-status', 'done');
   await page.reload();
   await page.waitForSelector('html[data-ready]');
+  await openRail(page);
   await expect(page.getByRole('complementary', { name: 'Notification detail' }).getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: 'Done', exact: true })).toBeVisible();
 });
 
@@ -251,6 +260,7 @@ test('inbox: editing the rail keeps an unsent comment draft', async ({ page }) =
   // Mark the node: a remount (sessionStorage restoring the text) would drop the marker.
   await box.evaluate((el) => { (el as HTMLElement).dataset.sameNode = '1'; });
   const rail = detail.getByRole('complementary', { name: 'Properties' });
+  await openRail(page);
   await rail.getByRole('button', { name: /^(Backlog|Todo|In progress|In review|Done|Canceled)$/i }).click();
   await page.getByRole('combobox', { name: /Change status/ }).fill('done');
   await page.keyboard.press('Enter');
