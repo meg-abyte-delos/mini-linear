@@ -798,7 +798,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       // Bare modifier / navigation keydowns (Shift, Control, Tab...) must not reset a pending g sequence.
       if (e.key.length > 1 && !['Enter', 'Escape', 'Delete', 'Backspace'].includes(e.key)) return;
       // The inbox owns its list keys while it is the current view.
-      if (document.querySelector('main[data-view=inbox]') && ['j', 'k', 'u', 'e', 'h', 's', 'x', '1', '2', '3', 'Enter'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) return;
+      if (document.querySelector('main[data-view=inbox]') && ['j', 'k', 'u', 'e', 'h', 's', 'x', '1', '2', '3', 'Enter', ' '].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) return;
       const key = keyOf(e); if (!key) return;
       if ((key === 'Enter' || key === ' ') && t.closest('button, a, [role="button"], select')) { matcher.reset(); return; }
       const id = matcher.feed(key);
@@ -821,7 +821,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         case 'extend-prev': e.preventDefault(); actions.current.extend(-1); break;
         case 'toggle-select': actions.current.toggleSelect(currentIdRef.current); break;
         case 'open': actions.current.openCurrent(); break;
-        case 'peek': e.preventDefault(); setOpen((o) => !o); break;
+        case 'peek': if (!document.querySelector('main[data-view=list], main[data-view=board]')) break; e.preventDefault(); setOpen((o) => !o); break; // only the views that have the panel
         case 'create': e.preventDefault(); if (!readOnlyRef.current) actions.current.create(); break;
         case 'status': e.preventDefault(); actions.current.openPick('status'); break;
         case 'delete': case 'delete-key': case 'delete-bs': e.preventDefault(); actions.current.askDelete(); break;

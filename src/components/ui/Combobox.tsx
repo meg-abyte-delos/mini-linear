@@ -32,7 +32,7 @@ export function Combobox({ open, anchorRef, onClose, label, options, onPick, mul
             else if (e.key === 'ArrowUp') { e.preventDefault(); setI(Math.max(moveIndex(results, active, -1), 0)); }
             else if (e.key === 'Home') { e.preventDefault(); setI(Math.max(firstEnabled(results), 0)); }
             else if (e.key === 'End') { e.preventDefault(); setI(Math.max(lastEnabled(results), 0)); }
-            else if (numbered && q === '' && /^[1-9]$/.test(e.key) && results[Number(e.key) - 1]) { e.preventDefault(); pick(results[Number(e.key) - 1]!); }
+            else if (numbered && q === '' && !e.metaKey && !e.ctrlKey && !e.altKey && /^[1-9]$/.test(e.key) && results[Number(e.key) - 1] && !results[Number(e.key) - 1]!.disabled) { e.preventDefault(); pick(results[Number(e.key) - 1]!); }
             else if (e.key === 'Enter') { e.preventDefault(); const o = results[active]; if (o) pick(o); }
           }}
         />

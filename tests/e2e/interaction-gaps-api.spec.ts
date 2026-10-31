@@ -45,3 +45,18 @@ test('creating an issue shows a clickable View issue in the toast', async ({ pag
   await toast.getByRole('link', { name: 'View issue' }).click();
   await expect(page).toHaveURL(/\/w\/[^/]+\/issue\/[A-Z]+-\d+$/);
 });
+
+test('Cmd+1 does not pick a status; Space does not peek in the Inbox', async ({ page, browser }) => {
+  await withSession(browser, page);
+  const it = await apiCreateIssue(page, `Gap guards ${Date.now()}`);
+  await page.goto(`/w/${DEMO.slug}/issue/${it.identifier}`); await page.waitForSelector('html[data-ready]');
+  await page.getByRole('button', { name: /Backlog|Todo/ }).first().click();
+  const list = page.getByRole('listbox', { name: 'Change status' });
+  await expect(list).toBeVisible();
+  await page.keyboard.press('Control+3');
+  await expect(list).toBeVisible(); // a modified digit is left to the browser, nothing picked
+  await page.keyboard.press('Escape');
+  await page.goto('/?view=inbox'); await page.waitForSelector('html[data-ready]');
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('button', { name: 'Close detail panel' })).toBeHidden();
+});
