@@ -17,6 +17,15 @@ test('members page lists the workspace members from the API and is axe clean', a
     await expect(row).toHaveCount(1);
     await expect(row).toContainText(new RegExp(m.role, 'i'));
   }
+  await expect(page.getByRole('columnheader', { name: 'Joined' })).toBeVisible();
+  // Row actions are a square 32x32 target in their own column, never squeezed by the role cell.
+  const btns = rows.getByRole('button', { name: /^Actions for / });
+  const n = await btns.count();
+  for (let i = 0; i < n; i++) {
+    const b = await btns.nth(i).boundingBox();
+    expect(Math.round(b!.width)).toBe(32);
+    expect(Math.round(b!.height)).toBe(32);
+  }
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(r.violations.map((v) => `${v.id} x${v.nodes.length}`)).toEqual([]);
 });

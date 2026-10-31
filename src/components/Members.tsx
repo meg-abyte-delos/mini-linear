@@ -145,7 +145,7 @@ export function Members({ slug }: { slug: string }) {
         </div>
         <section id='mem-panel' role='tabpanel' aria-labelledby={`mem-tab-${tab}`} className='set-card set-flush'>
                     <table className='set-table'>
-            <thead><tr><th scope='col' className='set-col-name'>Name</th><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th></tr></thead>
+            <thead><tr><th scope='col' className='set-col-name'>Name</th><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th><th scope='col' className='set-col-state'>Joined</th><th scope='col' className='set-col-end'><span className='sr-only'>Actions</span></th></tr></thead>
             <tbody>
               {shown.map((m) => {
                 const name = personName(m);
@@ -164,13 +164,14 @@ export function Members({ slug }: { slug: string }) {
                           ? <Select className='set-select set-role-select' label={`Role for ${name}`} value={m.role} options={S.assignableRoles(role).map((r: S.AssignableRole) => ({ id: r, label: cap(r) }))}
                               onChange={(id) => void act(S.setMemberRole(slug, m.user_id, id as S.WorkspaceRole), `${name} is now ${id}`)} />
                           : <span className='set-role-text'>{cap(m.role)}</span>}
-                        {manage && <RowMenu label={`Actions for ${name}`} entries={entries} />}
                       </span>
                     </td>
+                    <td className='set-muted'>{m.created_at ? dateFmt.format(new Date(m.created_at)) : ''}</td>
+                    <td className='set-end'>{manage && <RowMenu label={`Actions for ${name}`} entries={entries} />}</td>
                   </tr>
                 );
               })}
-              {shown.length === 0 && <tr><td colSpan={3} className='set-empty'>{q ? <>No members match “{q}”.</> : `No ${tabDef.label.toLowerCase()} yet.`}</td></tr>}
+              {shown.length === 0 && <tr><td colSpan={5} className='set-empty'>{q ? <>No members match “{q}”.</> : `No ${tabDef.label.toLowerCase()} yet.`}</td></tr>}
             </tbody>
           </table>
         </section>
