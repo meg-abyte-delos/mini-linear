@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import * as S from '@/lib/settings-client';
+import { Input } from '@/components/ui';
 import { NameConfirmDialog } from '@/components/SettingsBits';
 import { SettingsShell } from '@/components/SettingsShell';
 import { TeamPanel } from '@/components/SettingsTeamPanel';
@@ -36,8 +37,8 @@ export function SettingsTeams({ slug }: { slug: string }) {
       <section aria-label='Teams' className='set-section'>
         {admin && (
           <form className='set-card set-form set-form-row' onSubmit={async (e) => { e.preventDefault(); try { await S.createTeam(slug, newTeam.name.trim(), newTeam.key); setNewTeam({ name: '', key: '' }); void reload(); } catch (err) { setMsg((err as Error).message); } }}>
-            <label className='set-field set-grow'><span className='set-label'>Team name</span><input className='set-input' placeholder='e.g. Design' value={newTeam.name} required maxLength={100} onChange={(e) => setNewTeam({ name: e.target.value, key: S.suggestKey(e.target.value) })} /></label>
-            <label className='set-field set-key-field'><span className='set-label'>Key</span><input className='set-input' placeholder='DES' value={newTeam.key} required pattern='[A-Z]{2,5}' onChange={(e) => setNewTeam({ ...newTeam, key: e.target.value.toUpperCase() })} /></label>
+            <label className='set-field set-grow'><span className='set-label'>Team name</span><Input size={32} placeholder='e.g. Design' value={newTeam.name} required maxLength={100} onChange={(e) => setNewTeam({ name: e.target.value, key: S.suggestKey(e.target.value) })} /></label>
+            <label className='set-field set-key-field'><span className='set-label'>Key</span><Input size={32} placeholder='DES' value={newTeam.key} required pattern='[A-Z]{2,5}' onChange={(e) => setNewTeam({ ...newTeam, key: e.target.value.toUpperCase() })} /></label>
             <button type='submit' className='btn' data-size='32' data-variant='primary'>Create team</button>
           </form>
         )}
