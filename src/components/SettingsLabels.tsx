@@ -22,7 +22,7 @@ export function SettingsLabels({ slug }: { slug: string }) {
   }, [api, slug]);
   useEffect(() => { void reload(); }, [reload]);
   const admin = isAdmin(role);
-  const run = async (p: Promise<{ ok: boolean; message?: string }>, ok: string) => { const r = await p; if (r.ok) { setErr(null); show(ok); await reload(); } else setErr(r.message ?? 'Request failed'); };
+  const run = async (p: Promise<{ ok: boolean; message?: string }>, ok: string) => { const r = await p; if (r.ok) { setErr(null); show(ok); await reload(); return true; } setErr(r.message ?? 'Request failed'); return false; };
   const header = <><h1 className='set-h1'>Labels</h1><p className='set-desc'>Workspace labels are available to every team.</p></>;
   return (
     <SettingsShell slug={slug} current='labels' header={header}>
@@ -30,7 +30,7 @@ export function SettingsLabels({ slug }: { slug: string }) {
       {err && <p role='alert' className='set-error'>{err}</p>}
       <section aria-label='Workspace labels' className='set-section'>
         {admin && (
-          <form className='set-card set-form set-form-row' onSubmit={(e) => { e.preventDefault(); if (!draft.name.trim()) return; void run(api.createLabel({ name: draft.name.trim(), color: draft.color, team_id: null }), `Label ${draft.name.trim()} created`).then(() => setDraft({ ...draft, name: '' })); }}>
+          <form className='set-card set-form set-form-row' onSubmit={(e) => { e.preventDefault(); if (!draft.name.trim()) return; void run(api.createLabel({ name: draft.name.trim(), color: draft.color, team_id: null }), `Label ${draft.name.trim()} created`).then((ok) => { if (ok) setDraft({ ...draft, name: '' }); }); }}>
             <label className='set-field set-grow'><span className='set-label'>New label</span><input className='set-input' value={draft.name} maxLength={50} placeholder='e.g. Bug' onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
             <label className='set-field'><span className='set-label'>Color</span><input className='set-color' type='color' aria-label='New label color' value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} /></label>
             <button type='submit' className='btn' data-size='32' data-variant='primary' disabled={!draft.name.trim()}>Add label</button>
@@ -45,7 +45,7 @@ export function SettingsLabels({ slug }: { slug: string }) {
                   : <span>{l.name}</span>}
                 {admin && <>
                   <input className='set-color' type='color' aria-label={`Color of ${l.name}`} defaultValue={l.color} onBlur={(e) => { if (e.target.value !== l.color) void run(api.patchLabel(l, { color: e.target.value }), 'Label color saved'); }} />
-                  <button type='button' className='btn' data-size='32' data-variant='ghost' data-tone='danger' aria-label={`Delete label ${l.name}`} onClick={() => void run(api.deleteLabel(l), `Label ${l.name} deleted`)}>Delete</button>
+                  <button type='button' className='btn' data-size='32' data-variant='ghost' data-tone='danger' aria-label={`Delete label ${l.name}`} onClick={() => { if (window.confirm(`Delete label ${l.name}? It is removed from every issue.`)) void run(api.deleteLabel(l), `Label ${l.name} deleted`); }}>Delete</button>
                 </>}
               </li>
             ))}

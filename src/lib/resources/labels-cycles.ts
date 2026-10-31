@@ -35,10 +35,8 @@ export const listLabels = (req: Request, slug: string) => withWorkspaceCtx(req, 
 export const createLabel = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   requireRole(ctx, "member");
   const b = await parseJson(req, labelBody.partial({ color: true, team_id: true, group_id: true, description: true })), id = uuidv7();
-  if (b.team_id) {
-    await assertTeamVisible(ctx, b.team_id);
-    await assertScopeAdmin(ctx, b.team_id);
-  }
+  if (b.team_id) await assertTeamVisible(ctx, b.team_id);
+  await assertScopeAdmin(ctx, b.team_id ?? null);
   await assertGroup(ctx, b.group_id);
   await ctx.tx`insert into labels (id, workspace_id, team_id, group_id, name, color, description)
     values (${id}, ${ctx.workspaceId}, ${b.team_id ?? null}, ${b.group_id ?? null}, ${b.name}, ${b.color ?? "#888888"}, ${b.description ?? ""})`;
@@ -51,7 +49,7 @@ export const patchLabel = (req: Request, slug: string, rawId: string) => withWor
   requireRole(ctx, "member");
   const id = parseId(rawId), want = ifMatchVersion(req), b = await parseJson(req, labelBody.omit({ team_id: true }).partial()); // scope is immutable
   const before = await getLabel(ctx, id);
-  if (before.team_id) await assertScopeAdmin(ctx, before.team_id as string);
+  await assertScopeAdmin(ctx, before.team_id as string | null);
   if (Number(before.version) !== want) throw stale(before);
   await assertGroup(ctx, b.group_id);
   const group = b.group_id === undefined ? (before.group_id as string | null) : b.group_id;

@@ -147,9 +147,8 @@
 .set-label-row { display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); }
 .set-label-row + .set-label-row { border-top:1px solid var(--line); }
 .set-label-name { flex:1; max-width:320px; }
-.set-label-row > span:not(.set-swatch) { flex:1; }
+.set-label-row > span { flex:1; }
 .set-label-row .btn { margin-left:auto; }
-.set-swatch { width:12px; height:12px; border-radius:50%; flex:none; }
 .set-color { width:32px; height:var(--set-ctl-h); padding:2px; background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); }
 .dlg-confirm:disabled { opacity:.4; cursor:not-allowed; filter:saturate(.5); }
 .set-label-row .set-color { margin-left:auto; }

@@ -117,6 +117,11 @@ test('labels: workspace labels are created, renamed and deleted; a member sees t
   await expect(mate.getByText(label, { exact: true })).toBeVisible();
   await expect(mate.getByRole('button', { name: 'Add label' })).toHaveCount(0);
   await expect(mate.getByRole('button', { name: `Delete label ${label}` })).toHaveCount(0);
+  // Server authz: a plain member cannot create or edit a workspace label through the API either.
+  const list = (await (await mate.request.get('/api/v1/w/demo/labels?limit=100')).json()) as { items: { id: string; name: string; version: number; team_id: string | null }[] };
+  const target = list.items.find((x) => x.name === label)!;
+  expect((await mate.request.post('/api/v1/w/demo/labels', { data: { name: `${label}-x`, team_id: null } })).status()).toBe(403);
+  expect((await mate.request.patch(`/api/v1/w/demo/labels/${target.id}`, { data: { name: `${label}-y` }, headers: { 'if-match': String(target.version) } })).status()).toBe(403);
   await mate.goto('/w/demo/settings');
   await expect(mate.getByRole('heading', { name: 'Danger zone' })).toHaveCount(0);
   await expect(mate.getByRole('button', { name: 'Save changes' })).toHaveCount(0);
@@ -125,6 +130,7 @@ test('labels: workspace labels are created, renamed and deleted; a member sees t
   await page.getByLabel(`Name of label ${label}`).fill(`${label}-2`);
   await page.getByLabel(`Name of label ${label}`).blur();
   await expect(page.getByLabel(`Name of label ${label}-2`)).toBeVisible();
+  page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: `Delete label ${label}-2` }).click();
   await expect(page.getByLabel(`Name of label ${label}-2`)).toHaveCount(0);
 

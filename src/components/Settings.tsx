@@ -38,7 +38,7 @@ export function Settings({ slug }: { slug: string }) {
     setBusy(true); setErr(null);
     try {
       let w = ws;
-      if (logo.file) w = await S.uploadLogo(slug, logo.file);
+      if (logo.file) { w = await S.uploadLogo(slug, logo.file); setLogo((l) => ({ ...l, file: null })); }
       const p = S.settingsPatch(w, { name: form.name, slug: form.slug, logo_url: logo.removed ? '' : (w.logo_url ?? '') });
       if (Object.keys(p).length) w = await S.patchSettings(slug, p);
       setLogo({ file: null, preview: null, removed: false });
