@@ -162,4 +162,4 @@ Ranked by how soon a user would notice on a first session. Rank 1 is the most vi
 
 ## Maintenance
 
-Evidence was gathered from file and route presence plus targeted reads. A `present` line means the feature is wired end to end in code, not that its behaviour matches Linear pixel for pixel. Measured Linear UI values are not recorded here (no Linear account access yet). The `linear.app/docs` URLs in the table were not fetched one by one; they were checked in bulk at creation time, so a path may have moved.
+Evidence was gathered from file and route presence plus targeted reads. A `present` line means the feature is wired end to end in code, not that its behaviour matches Linear pixel for pixel. Measured Linear UI values are not recorded here (no Linear account access yet). The `linear.app/docs` URLs in the table were not verified, so a path may have moved.
