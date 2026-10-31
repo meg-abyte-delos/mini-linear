@@ -30,7 +30,7 @@
 .rel-type{color:var(--muted);min-width:84px}
 .rel-add{position:relative}.menu{position:absolute;z-index:20;top:100%;left:0;margin-top:4px;background:var(--raised);border:1px solid var(--line);border-radius:var(--r-md);padding:4px;display:flex;flex-direction:column;min-width:160px}
 .menu button{border:0;text-align:left}
-.inline-add{display:flex;gap:var(--sp-2)}.inline-add input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);color:var(--fg);padding:4px 8px;font:inherit}
+.inline-add{display:flex;gap:var(--sp-2)}.inline-add .input{flex:1;min-width:0}
 .feed{list-style:none;padding:0;margin:0 0 var(--sp-3);color:var(--muted)}.feed .ev{padding:3px 0;font-size:var(--fs-sm)}.feed .who,.cmt .who{color:var(--fg);font-weight:500}.feed time,.cmt time{color:var(--muted);margin-left:4px}
 .threads,.replies{list-style:none;padding:0;margin:0}.replies{margin-left:var(--sp-4);border-left:1px solid var(--line);padding-left:var(--sp-3)}
 .cmt{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-2)}
@@ -82,7 +82,7 @@
 .parent-crumb:hover{color:var(--fg)}
 
 .idp-rows li:has(.row-link){margin:0 -8px}.rel-type{padding:0}
-.add-row{width:calc(100% + 16px);margin:0 -8px}.inline-add{min-height:32px;align-items:center}.inline-add input{height:32px;box-sizing:border-box}
+.add-row{width:calc(100% + 16px);margin:0 -8px}.inline-add{min-height:32px;align-items:center}
 
 /* D9 residue: avatars in the activity feed, one "+" affordance for Sub-issues / Relations / Attachments, composer at the end of the feed */
 .feed .ev{display:flex;align-items:center;gap:8px;padding-left:0;min-height:24px}
