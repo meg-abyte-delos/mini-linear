@@ -1,7 +1,6 @@
 'use client';
 import { Button, Checkbox, EmptyState, IconButton, Input, Menu, Tooltip, type MenuEntry } from '@/components/ui';
 import { WIDE_MQ } from '@/lib/breakpoints';
-import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -237,6 +236,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const viewsClient = useMemo(() => (api ? httpViewsClient(api.slug) : mockViewsClient()), [api]);
   const [views, setViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const activeView = activeViewId ? views.find((x) => x.id === activeViewId) ?? null : null;
   const [saving, setSaving] = useState<{ name: string; shared: boolean; err: boolean } | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   function applyView(v: SavedView) {
@@ -306,7 +306,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const view: View = INBOX_PATH.test(navPath) ? 'inbox' : navView === 'board' || navView === 'cycles' || navView === 'projects' || navView === 'inbox' ? navView : 'list';
   // Entering and leaving the inbox pushes a history entry, so Back returns to the previous view; every other change replaces the entry.
   function setView(v: View) {
-    // The URL is computed inside write(), at execution time: withViewTransition defers the callback to the next frame, so a query read here would be stale and would overwrite synchronous URL writes that follow (applyView's ?v=, setFilters) (Rex, #401).
+    // The URL is computed inside write(), at execution time: a query read at call time would be stale and would overwrite synchronous URL writes that follow (applyView's ?v=, setFilters) (Rex, #401).
     const write = () => {
       const onInboxPath = INBOX_PATH.test(window.location.pathname);
       const sp = new URLSearchParams(window.location.search);
@@ -318,7 +318,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       const url = `${path}${qs ? `?${qs}` : ''}${window.location.hash}`;
       if (path !== window.location.pathname) window.history.pushState(null, '', url); else window.history.replaceState(null, '', url);
     };
-    if (v !== view) withViewTransition(write); else write();
+    write();
   }
   const [detailId, setDetailId] = useState<string | null>(null); // project detail page (API mode)
   const [selId, setSelId] = useState<string | null>(initialIssueId ?? null);
@@ -340,6 +340,21 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const returnFocus = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  // The view is derived from the URL, so a View Transition cannot wrap the switch (#401). Fade the new view in when `view` changes instead; CSS drops it under reduced motion.
+  const prevView = useRef(view);
+  useEffect(() => {
+    if (prevView.current === view) return;
+    prevView.current = view;
+    const m = mainRef.current; if (!m) return;
+    m.classList.remove('view-fade'); void m.offsetWidth; m.classList.add('view-fade');
+    const done = (e: AnimationEvent) => {
+      if (e.target !== m) return; // ignore animationend bubbling from descendants
+      m.classList.remove('view-fade');
+      m.removeEventListener('animationend', done);
+    };
+    m.addEventListener('animationend', done);
+    return () => m.removeEventListener('animationend', done);
+  }, [view]);
   const [navOpen, setNavOpen] = useState(false);
   const navToggleRef = useRef<HTMLButtonElement>(null);
   const navWasOpen = useRef(false);
@@ -893,7 +908,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <div className='side-scrim' aria-hidden='true' onClick={() => setNavOpen(false)} />
       <Sidebar
         slug={api?.slug ?? null} people={nlPeople} unread={unreadCount} views={views} teams={sideTeams} homeTeamId={api ? api.teamId : null}
-        active={{ kind: view === 'inbox' ? 'inbox' : view === 'cycles' ? 'cycles' : view === 'projects' ? 'projects' : 'issues', teamId: api ? teamScope : null, viewId: activeViewId }}
+        active={{ kind: view === 'inbox' ? 'inbox' : view === 'cycles' ? 'cycles' : view === 'projects' ? 'projects' : 'issues', teamId: api ? teamScope : null, viewId: view === 'list' || view === 'board' ? activeViewId : null }}
         readOnly={readOnly} copied={copied} navOpen={navOpen} onNavigate={() => setNavOpen(false)}
         onSearch={openPalette} {...(!readOnly ? { onCompose: () => create() } : {})}
         onInbox={() => setView('inbox')}
@@ -906,8 +921,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
           <button type='button' ref={navToggleRef} className='side-toggle' aria-label='Open sidebar' aria-controls='app-sidebar' aria-expanded={navOpen} onClick={() => setNavOpen((o) => !o)}><svg width='16' height='16' viewBox='0 0 16 16' aria-hidden='true' focusable='false'><rect x='1.75' y='2.75' width='12.5' height='10.5' rx='2' fill='none' stroke='currentColor' strokeWidth='1.5' /><path d='M6 3v10' stroke='currentColor' strokeWidth='1.5' /></svg></button>
-          <div className='crumbs'><span>{view === 'inbox' || !api ? 'Delos' : (sideTeams.find((t) => t.id === teamScope)?.name ?? teamName)}</span><span className='sep'>/</span><h1 className='crumb-title'>{view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
-          {(view === 'list' || view === 'board') && !loadError && allIssues.length > 0 && (
+          <div className='crumbs'><span>{view === 'inbox' || !api ? 'Delos' : (sideTeams.find((t) => t.id === teamScope)?.name ?? teamName)}</span><span className='sep'>/</span><h1 className='crumb-title'>{activeView && (view === 'list' || view === 'board') ? activeView.name : view === 'inbox' ? 'Inbox' : view === 'cycles' ? 'Cycles' : view === 'projects' ? 'Projects' : 'Issues'}</h1><span className='count'>{view === 'inbox' ? unreadCount : view === 'cycles' ? CYCLES.length : view === 'projects' ? PROJECTS.length : issues.length}</span></div>
+          {(view === 'list' || view === 'board') && !activeView && !loadError && allIssues.length > 0 && (
             <div className='vtabs' role='group' aria-label='Issue views'>
               {VIEW_TABS.map((t) => { const on = sameSet(filters.status, t.status); return (
                 <Button key={t.id} variant='ghost' size={24} className='vtab' data-testid={`vtab-${t.id}`} aria-pressed={on} onClick={() => { setActiveViewId(null); setFilters({ ...filters, status: [...t.status] }); }}>{t.label}</Button>

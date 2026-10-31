@@ -62,3 +62,8 @@
 
 /* Searching / error rows use the same grid as result rows (icon column + label), so the text does not jump when results arrive. */
 .palette li.pal-status { color: var(--muted); cursor: default; }
+
+/* View switch fade (Shell adds .view-fade to main when the view changes). */
+@keyframes view-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.main.view-fade { animation: view-fade-in var(--dur-base) var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .main.view-fade { animation: none; } }
