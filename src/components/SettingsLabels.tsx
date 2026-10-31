@@ -4,6 +4,7 @@ import * as S from '@/lib/settings-client';
 import { teamSettingsApi, type Label } from '@/lib/team-settings-client';
 import { SettingsShell } from '@/components/SettingsShell';
 import { useToast } from '@/components/SettingsBits';
+import { Input } from '@/components/ui/Input';
 
 const isAdmin = (r?: string) => r === 'owner' || r === 'admin';
 
@@ -31,7 +32,7 @@ export function SettingsLabels({ slug }: { slug: string }) {
       <section aria-label='Workspace labels' className='set-section'>
         {admin && (
           <form className='set-card set-form set-form-row' onSubmit={(e) => { e.preventDefault(); if (!draft.name.trim()) return; void run(api.createLabel({ name: draft.name.trim(), color: draft.color, team_id: null }), `Label ${draft.name.trim()} created`).then((ok) => { if (ok) setDraft({ ...draft, name: '' }); }); }}>
-            <label className='set-field set-grow'><span className='set-label'>New label</span><input className='set-input' value={draft.name} maxLength={50} placeholder='e.g. Bug' onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
+            <label className='set-field set-grow'><span className='set-label'>New label</span><Input size={32} value={draft.name} maxLength={50} placeholder='e.g. Bug' onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
             <label className='set-field'><span className='set-label'>Color</span><input className='set-color' type='color' aria-label='New label color' value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })} /></label>
             <button type='submit' className='btn' data-size='32' data-variant='primary' disabled={!draft.name.trim()}>Add label</button>
           </form>
@@ -41,7 +42,7 @@ export function SettingsLabels({ slug }: { slug: string }) {
             {labels.map((l) => (
               <li key={l.id} className='set-label-row'>
                 {admin
-                  ? <input className='set-input set-label-name' aria-label={`Name of label ${l.name}`} defaultValue={l.name} maxLength={50} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== l.name) void run(api.patchLabel(l, { name: v }), 'Label renamed'); else e.target.value = l.name; }} />
+                  ? <Input size={32} className='set-label-name' aria-label={`Name of label ${l.name}`} defaultValue={l.name} maxLength={50} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== l.name) void run(api.patchLabel(l, { name: v }), 'Label renamed'); else e.target.value = l.name; }} />
                   : <span>{l.name}</span>}
                 {admin && <>
                   <input className='set-color' type='color' aria-label={`Color of ${l.name}`} defaultValue={l.color} onBlur={(e) => { if (e.target.value !== l.color) void run(api.patchLabel(l, { color: e.target.value }), 'Label color saved'); }} />

@@ -8,7 +8,7 @@ type NavCtx = { open: boolean; toggle: () => void; toggleRef: React.RefObject<HT
 const Ctx = createContext<NavCtx | null>(null);
 export const useIssueNav = () => useContext(Ctx);
 
-export function IssueShell({ slug, children }: { slug: string; children: ReactNode }) {
+export function IssueShell({ slug, teamId, children }: { slug: string; teamId?: string | null; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement | null>(null);
   const wasOpen = useRef(false);
@@ -30,7 +30,7 @@ export function IssueShell({ slug, children }: { slug: string; children: ReactNo
   return (
     <Ctx.Provider value={{ open, toggle: () => setOpen((o) => !o), toggleRef }}>
       <div className='shell issue-shell' data-nav={open ? 'open' : undefined}>
-        <AppSidebar slug={slug} current='issue' id='app-sidebar' onNavigate={() => setOpen(false)} navOpen={open} />
+        <AppSidebar slug={slug} current='issue' teamId={teamId} id='app-sidebar' onNavigate={() => setOpen(false)} navOpen={open} />
         <div className='side-scrim' aria-hidden='true' onClick={() => setOpen(false)} />
         <div className='main idp-host' inert={open || undefined}>{children}</div>
       </div>
