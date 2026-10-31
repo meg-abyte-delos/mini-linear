@@ -44,8 +44,9 @@ for (const width of [1280, 1440]) {
       await page.waitForSelector('html[data-ready]');
       const side = page.getByRole('complementary', { name: 'Sidebar' });
       await expect(side).toBeVisible();
+      // Row click opens the issue page (#351); no dblclick fallback, it would wait out the test on a detached row.
       await page.getByRole('option').filter({ hasText: issue.identifier }).first().click();
-      await page.getByRole('option').filter({ hasText: issue.identifier }).first().dblclick().catch(() => {});
+      await page.waitForURL(new RegExp(`/issue/${issue.identifier}`));
       await expect(page.getByLabel('Title', { exact: true })).toBeVisible();
       await expect(side).toBeVisible();
     });
