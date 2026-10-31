@@ -4,7 +4,7 @@ import { WIDE_MQ } from '@/lib/breakpoints';
 import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCssVars } from '@/lib/ui/use-css-vars';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STATUSES, STATUS_LABEL, PRIORITY_LABEL, USERS, MOCK_META, fmtDate, scopeBadge, type Issue, type Meta, type Status } from '@/lib/issues';
@@ -314,16 +314,27 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const url = `${path}${qs ? `?${qs}` : ''}${window.location.hash}`;
     if (path !== window.location.pathname) window.history.pushState(null, '', url); else window.history.replaceState(null, '', url);
   }
-  // Back/Forward between those entries: derive the view from the URL (no URL write).
+  // Back/Forward between those entries: derive the view from the URL (no URL write). Two paths, because the order of Next's own history handling and ours is not guaranteed:
+  // the raw popstate listener, and Next's router location (pathname + ?view=), which updates on every history traversal.
+  const viewFromLocation = (): View => {
+    if (INBOX_PATH.test(window.location.pathname)) return 'inbox';
+    const x = new URLSearchParams(window.location.search).get('view');
+    return x === 'board' || x === 'cycles' || x === 'projects' ? x : 'list';
+  };
   useEffect(() => {
-    const onPop = () => {
-      if (INBOX_PATH.test(window.location.pathname)) { setViewState('inbox'); return; }
-      const x = new URLSearchParams(window.location.search).get('view');
-      setViewState(x === 'board' || x === 'cycles' || x === 'projects' ? x : 'list');
-    };
+    const onPop = () => setViewState(viewFromLocation());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const navPath = usePathname();
+  const navView = useSearchParams()?.get('view') ?? null;
+  const navSeen = useRef(`${navPath}|${navView}`);
+  useEffect(() => {
+    const key = `${navPath}|${navView}`;
+    if (navSeen.current === key) return;
+    navSeen.current = key;
+    setViewState(viewFromLocation());
+  }, [navPath, navView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [detailId, setDetailId] = useState<string | null>(null); // project detail page (API mode)
   const [selId, setSelId] = useState<string | null>(initialIssueId ?? null);
   // Inbox: HTTP in API mode, in-memory seed otherwise. The unread badge polls every 30s (API mode only).

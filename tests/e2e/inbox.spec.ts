@@ -204,6 +204,10 @@ test('inbox: clicking Inbox rewrites the URL to /w/<slug>/inbox, leaving it rest
   await page.goBack();
   await expect(page).toHaveURL(/\/\?view=board$/);
   await expect(page.locator('main[data-view=inbox]')).toHaveCount(0);
+  await expect(page.locator('main[data-view=board]')).toHaveCount(1);
+  await page.goForward();
+  await expect(page).toHaveURL(/\/w\/demo\/inbox$/);
+  await expect(page.locator('main[data-view=inbox]')).toHaveCount(1);
 });
 
 test('inbox: leaving the inbox from /w/<slug>/inbox puts the URL back on /?view=..., a reload stays out of the inbox', async ({ page }) => {
