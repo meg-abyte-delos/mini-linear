@@ -60,7 +60,7 @@ export function Sidebar(p: SidebarProps) {
         {!p.readOnly && p.onCompose && <IconButton className='side-icbtn compose' onClick={p.onCompose} label='New issue' title='New issue (C)' aria-keyshortcuts='C'><SideIcon name='compose' /></IconButton>}
       </div>
       <nav aria-label='Primary'>
-        <SideLink className={`side-link${on('inbox') ? ' active' : ''}`} current={on('inbox')} href={p.onInbox ? '#inbox' : '/?view=inbox'} onSelect={p.onInbox}><SideIcon name='inbox' /><span>Inbox</span>{p.unread > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${p.unread} unread notifications`}>{p.unread > 99 ? '99+' : p.unread}</span>}</SideLink>
+        <SideLink className={`side-link${on('inbox') ? ' active' : ''}`} current={on('inbox')} href={p.slug ? `/w/${p.slug}/inbox` : '/?view=inbox'} onSelect={p.onInbox}><SideIcon name='inbox' /><span>Inbox</span>{p.unread > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${p.unread} unread notifications`}>{p.unread > 99 ? '99+' : p.unread}</span>}</SideLink>
         <a className='side-link' href='#my-issues' onClick={noop}><SideIcon name='mine' /><span>My issues</span></a>
         <a className='side-link' href='#views' onClick={noop}><SideIcon name='views' /><span>Views</span></a>
         <div role='group' aria-label='Saved views' data-testid='saved-views'>
