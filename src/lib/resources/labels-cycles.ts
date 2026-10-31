@@ -66,7 +66,7 @@ export const patchLabel = (req: Request, slug: string, rawId: string) => withWor
 // Note: one audit row per affected issue (N inserts, not batched). Label deletes are rare and the per-issue rows are what the activity feed reads.
 export const deleteLabel = (req: Request, slug: string, rawId: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const id = parseId(rawId), want = ifMatchVersion(req), before = await getLabel(ctx, id);
-  if (before.team_id) await assertScopeAdmin(ctx, before.team_id as string);
+  await assertScopeAdmin(ctx, before.team_id as string | null);
   if (Number(before.version) !== want) throw stale(before);
   // issue_labels rows cascade: record the label removal on each affected issue's feed first.
   const tagged = await ctx.tx<Row[]>`select i.id, coalesce((select array_agg(label_id order by label_id) from issue_labels where issue_id = i.id), '{}') as label_ids
