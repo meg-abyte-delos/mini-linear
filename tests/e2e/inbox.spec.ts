@@ -241,3 +241,17 @@ test('inbox: the Properties rail edits the issue; the list row follows and a rel
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('complementary', { name: 'Notification detail' }).getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: 'Done', exact: true })).toBeVisible();
 });
+
+test('inbox: editing the rail keeps an unsent comment draft', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  const detail = page.getByRole('complementary', { name: 'Notification detail' });
+  const box = detail.getByRole('textbox', { name: 'Leave a comment' });
+  await box.fill('draft that must survive');
+  const rail = detail.getByRole('complementary', { name: 'Properties' });
+  await rail.getByRole('button', { name: /^(Backlog|Todo|In progress|In review|Done|Canceled)$/i }).click();
+  await page.getByRole('combobox', { name: /Change status/ }).fill('done');
+  await page.keyboard.press('Enter');
+  await expect(rail.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+  await expect(detail.getByRole('textbox', { name: 'Leave a comment' })).toContainText('draft that must survive');
+});

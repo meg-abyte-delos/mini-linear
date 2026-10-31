@@ -18,10 +18,6 @@
 .idh-btn { transition:background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
 .idh-btn:focus-visible, .idh-text:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 
-/* Properties: four labelled groups. */
-.side-group + .side-group { margin-top:var(--sp-4); padding-top:var(--sp-3); border-top:1px solid var(--line-soft); }
-.side-h { margin:0 0 var(--sp-1); padding-left:var(--sp-1); font-size:var(--fs-xs); font-weight:var(--fw-semibold);  text-transform:uppercase; color:var(--muted); }
-.idp-side dd button, .prop-pill { transition:background-color var(--dur-instant) var(--ease-out); }
 
 /* Title */
 .idp-title { font-size:var(--fs-xl); }
@@ -42,10 +38,6 @@
 .issue-shell > .idp-host { overflow:hidden; }
 .idp-host > .idp { flex:1; min-height:0; overflow-y:auto; }
 .idp { grid-template-columns:minmax(0,1fr) var(--idp-side-w); }
-.idp-side { min-width:var(--idp-side-min); }
-.idp-side dl { grid-template-columns:var(--idp-label-w) minmax(0,1fr); }
-.idp-side dd button .prop-trunc, .idp-side dd .prop-trunc { flex:1; }
-.idp-side .prop-pill { white-space:nowrap; min-width:0; }
 .idp-props-toggle, .idp-scrim { display:none; }
 /* Below 1024px: Properties becomes a right drawer opened from the header. */
 @media (max-width:1023px) {
@@ -58,7 +50,6 @@
 }
 /* With the app sidebar the writing column is narrower: the description toolbar sits under the editor so it never covers the title. Description only: the comment composer keeps its toolbar above. */
 .idp .idp-desc .re-bar { bottom:auto; top:calc(100% + var(--sp-1)); }
-.idp-side:focus { outline:none; }
 /* Description hugs its content like Linear: one line (placeholder) at rest, the editing floor only while focused. */
 .idp .idp-desc .re-surface { min-height:calc(1lh + var(--sp-1) + var(--sp-3)); }
 .idp .idp-desc .re:focus-within .re-surface { min-height:var(--re-min-h); }

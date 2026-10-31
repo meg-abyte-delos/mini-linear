@@ -19,7 +19,7 @@ import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type I
  * Keys: j/k move, x check, e archive, u toggle read, s snooze menu (1-3 pick a preset), h snooze until tomorrow, Enter open issue, Esc closes menus.
  */
 /** What the detail pane needs to show and edit the issue Properties rail (same component as the issue page). Without it the rail is read-only status only. */
-export interface InboxProps { meta: Meta; people: readonly Person[]; today: string; onUpdate: (issueId: string, patch: Partial<Issue>, label: string) => void }
+export interface InboxProps { meta: Meta; people: readonly Person[]; today: string; onUpdate: (issueId: string, patch: Partial<Issue>) => void }
 
 export function Inbox({ client, onUnread, onOpenIssue, getIssue, props, slug, refreshKey = 0, readOnly = false }: { client: InboxClient; readOnly?: boolean; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; props?: InboxProps; slug?: string; refreshKey?: number }) {
   const [tab, setTab] = useState<InboxTab>('all');
@@ -189,10 +189,10 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, props, slug, re
                   {selIssue.description.trim() ? <Markdown source={selIssue.description} /> : <p className='md-empty'>No description.</p>}
                 </section>
               )}
-              {slug && sel.issue && <IssueActivity key={`${sel.issue_id}:${selIssue?.version ?? 0}`} slug={slug} issueId={sel.issue_id} identifier={sel.issue.identifier} readOnly={readOnly} />}
+              {slug && sel.issue && <IssueActivity key={sel.issue_id} refreshKey={selIssue?.version ?? 0} slug={slug} issueId={sel.issue_id} identifier={sel.issue.identifier} readOnly={readOnly} />}
             </article>
             <div className='idp-side inbox-props' role='complementary' aria-label='Properties'>
-              {selIssue && props ? <IssueProperties issue={selIssue} meta={props.meta} people={props.people} readOnly={readOnly} today={props.today} onChange={(patch, label) => props.onUpdate(selIssue.id, patch, label)} />
+              {selIssue && props ? <IssueProperties issue={selIssue} meta={props.meta} people={props.people} readOnly={readOnly} today={props.today} onChange={(patch) => props.onUpdate(selIssue.id, patch)} />
                 : sel.issue && <section className='side-group'><dl><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></dl></section>}
               {sel.snoozed_until && <section className='side-group'><dl><dt>Snoozed until</dt><dd>{shortWhen(sel.snoozed_until)}</dd></dl></section>}
             </div>

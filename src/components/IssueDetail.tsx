@@ -574,7 +574,7 @@ function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = ''
  * Activity feed + comment composer for one issue, reusable outside the issue page (Inbox detail pane).
  * Same ActivityEvent / CommentItem / Composer as the issue page; owns its comments + activity state.
  */
-export function IssueActivity({ slug, issueId, identifier, readOnly = false }: { slug: string; issueId: string; identifier: string; readOnly?: boolean }) {
+export function IssueActivity({ slug, issueId, identifier, readOnly = false, refreshKey = 0 }: { slug: string; issueId: string; identifier: string; readOnly?: boolean; refreshKey?: number }) {
   const router = useRouter();
   const [nlPeople, setNlPeople] = useState<NlPeople>(EMPTY_PEOPLE);
   useEffect(() => {
@@ -599,6 +599,9 @@ export function IssueActivity({ slug, issueId, identifier, readOnly = false }: {
     void client.activity(issueId).then((r) => r.ok && setActivity(r.data.items));
   };
   useEffect(() => { setComments([]); setActivity([]); setToast(null); reload(); }, [client, issueId]);
+  // Re-fetch in place when the issue changed elsewhere (Inbox rail edit): no remount, so an unsent comment draft survives.
+  const seenKey = useRef(refreshKey);
+  useEffect(() => { if (seenKey.current === refreshKey) return; seenKey.current = refreshKey; reload(); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   async function postComment(body: string, parentId: string | null) {
     const r = await client.addComment(issueId, body, parentId);
     if (!r.ok) { setToast('Could not post the comment'); return false; }
