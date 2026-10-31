@@ -63,6 +63,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
     onUnread(await client.unreadCount());
   }
   const act = (n: Notif, action: InboxAction, until?: string) => actMany([n], action, until);
+  // Linear: a notification is read as soon as it is shown. Only user-driven selection (click, j/k) marks it; the initial selection does not.
+  const show = (i: number) => { setCur(i); const n = list[i]; if (n && !n.read_at && !readOnly) void act(n, 'read'); };
   const open = (n: Notif) => { if (!n.read_at) void act(n, 'read'); onOpenIssue?.(n.issue_id); };
   const toggle = (id: string) => setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
@@ -80,8 +82,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
         if (p) { e.preventDefault(); setSnoozeOpen(false); void actMany(targets(), 'snooze', p.until); }
         return;
       }
-      if (e.key === 'j') { setCur(Math.min(list.length - 1, cur + 1)); e.preventDefault(); }
-      else if (e.key === 'k') { setCur(Math.max(0, cur - 1)); e.preventDefault(); }
+      if (e.key === 'j') { show(Math.min(list.length - 1, cur + 1)); e.preventDefault(); }
+      else if (e.key === 'k') { show(Math.max(0, cur - 1)); e.preventDefault(); }
       else if (sel && e.key === 'x') { e.preventDefault(); toggle(sel.id); }
       else if (sel && e.key === 'e') { e.preventDefault(); void actMany(targets(), tab === 'archived' ? 'unarchive' : 'archive'); }
       else if (sel && e.key === 's') { e.preventDefault(); setSnoozeOpen(true); }
@@ -131,7 +133,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
         {list.length === 0 ? <EmptyState icon='inbox' title={empty.t} hint={empty.h} /> : (
           <ul role='listbox' aria-label='Notifications' aria-multiselectable='true'>
             {list.map((n, i) => (
-              <li key={n.id} role='option' aria-selected={checked.has(n.id)} aria-current={i === cur ? 'true' : undefined} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
+              <li key={n.id} role='option' aria-selected={checked.has(n.id)} aria-current={i === cur ? 'true' : undefined} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => show(i)} onDoubleClick={() => open(n)}>
                 <CheckMark className={`rowsel${checked.has(n.id) ? ' on' : ''}`} checked={checked.has(n.id)} data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }} />
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
                 {n.actor ? <Avatar initials={initialsOf(personName(n.actor))} hue={hueFor(n.actor.id)} /> : <span className='nav-av' aria-hidden='true' data-kind='system' title='Due date reminder'><svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round'><rect x='2.5' y='3.5' width='11' height='10' rx='2' /><path d='M2.5 6.5h11M5.5 2v3M10.5 2v3M8 8.5v2l1.3.8' /></svg></span>}

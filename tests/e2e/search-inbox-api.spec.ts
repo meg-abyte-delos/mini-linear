@@ -92,9 +92,11 @@ test.describe('Inbox on real notifications', () => {
     const before = await unreadCount(page);
     await expect(page.getByTestId('inbox-badge')).toHaveText(String(Math.min(before, 99)));
     // read
+    // a click shows the notification, which marks it read (Linear); u then toggles it back to unread
     await rows.first().click();
-    await page.keyboard.press('u');
     await expect.poll(() => unreadCount(page)).toBe(before - 1);
+    await page.keyboard.press('u');
+    await expect.poll(() => unreadCount(page)).toBe(before);
     // snooze one (press 1 = later today): it leaves All, appears under Snoozed
     await rows.first().click();
     await page.keyboard.press('s');

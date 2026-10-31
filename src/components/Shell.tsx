@@ -499,6 +499,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (readOnly) { setToast('Guests have read-only access.'); return; }
     setNewIssue({ ...(typeof status === 'string' ? { status } : {}) });
   }
+  // "Created DEM-67" carries a View issue link (API mode: the issue page exists). The link only shows while that exact toast is up.
+  const [toastLink, setToastLink] = useState<{ msg: string; href: string } | null>(null);
+  const announceCreated = (msg: string, ident: string | null | undefined) => { setToast(msg); setToastLink(api && ident ? { msg, href: `/w/${api.slug}/issue/${ident}` } : null); };
   const createdToast = (name: string, props: string[], links: boolean) => {
     const bad = [...(props.length ? [`could not save ${props.join(', ')}`] : []), ...(links ? ['the attached links could not be saved'] : [])];
     return bad.length ? `Created ${name}, but ${bad.join(' and ')}.` : `Created ${name}`;
@@ -547,7 +550,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         const other = { ...rest, ...srv, ...(row.status !== d.status ? { status: d.status } : {}) };
         if (Object.keys(other).length) failedProps = (await saveProps(row, other)).failed;
         linksFailed = !(await attachLinks(row.id));
-        setToast(createdToast(row.identifier ?? d.title, failedProps, linksFailed));
+        announceCreated(createdToast(row.identifier ?? d.title, failedProps, linksFailed), row.identifier);
         return true;
       }
       versions.current.set(row.id, row.version);
@@ -576,7 +579,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (view === 'cycles' || view === 'projects') setView('list');
     if (made && activeCount(filters) > 0 && applyFilters([made], filters).length === 0) setFilters(emptyFilters());
     if (made) setSelId(made.id);
-    setToast(createdToast(made?.identifier ?? d.title, failedProps, linksFailed));
+    announceCreated(createdToast(made?.identifier ?? d.title, failedProps, linksFailed), made?.identifier);
     return true;
   }
   // Mock mode: the current user is the first mock user. API mode needs the session user + members API (same gap as the A picker).
@@ -696,7 +699,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     { id: 'set-label', label: 'Set label…', hint: 'L', run: () => setTimeout(() => openPick('label'), 0) },
     { id: 'assign-me', label: 'Assign to me', run: assignToMe },
     { id: 'copy-id', label: 'Copy issue id', run: copyId },
-    { id: 'open', label: 'Open selected issue', hint: '↵', run: () => setOpen(true) },
+    { id: 'open', label: 'Open selected issue', hint: '↵', run: () => actions.current.openCurrent() },
     { id: 'list', label: 'Go to issues', hint: hint('go-issues'), run: () => setView('list') },
     { id: 'board', label: 'Go to board view', hint: hint('go-views'), run: () => setView('board') },
     { id: 'cycles', label: 'Go to cycles', run: () => setView('cycles') },
@@ -761,11 +764,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   // No hit and no command: one 'No results' line with the single 'Search all' row under it (no separate group).
   const noResults = api && q.trim().length >= MIN_QUERY && searchState === 'idle' && hits.length === 0 && matched.length === 0;
   useEffect(() => { if (palette && activeId) document.getElementById(`pc-${activeId}`)?.scrollIntoView({ block: 'nearest' }); }, [palette, activeId]);
-  const actions = useRef({ askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
+  const actions = useRef({ openCurrent: () => undefined as void, askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) });
   const paletteOpen = useRef(false);
   const helpOpen = useRef(false);
   const readOnlyRef = useRef(readOnly);
-  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
+  useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { openCurrent: () => { if (current) openIssue(current); }, askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
   // Show sub-issues OFF hides those rows: drop them from the multi-selection so a bulk action never touches hidden rows.
   useEffect(() => { if (showSub) return; const shown = new Set(withoutSubIssues(issues, false).map((x) => x.id)); setMulti((m) => (m.every((id) => shown.has(id)) ? m : m.filter((id) => shown.has(id)))); }, [showSub, issues]);
   // Roving focus: when focus is inside the issue collection, follow the selection.
@@ -797,7 +800,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       // The inbox owns its list keys while it is the current view.
       if (document.querySelector('main[data-view=inbox]') && ['j', 'k', 'u', 'e', 'h', 's', 'x', '1', '2', '3', 'Enter'].includes(e.key.length === 1 ? e.key.toLowerCase() : e.key)) return;
       const key = keyOf(e); if (!key) return;
-      if (key === 'Enter' && t.closest('button, a, [role="button"], select')) { matcher.reset(); return; }
+      if ((key === 'Enter' || key === ' ') && t.closest('button, a, [role="button"], select')) { matcher.reset(); return; }
       const id = matcher.feed(key);
       if (!id) return;
       if (id === 'pending') { e.preventDefault(); return; }
@@ -817,7 +820,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         case 'extend-next': e.preventDefault(); actions.current.extend(1); break;
         case 'extend-prev': e.preventDefault(); actions.current.extend(-1); break;
         case 'toggle-select': actions.current.toggleSelect(currentIdRef.current); break;
-        case 'open': setOpen(true); break;
+        case 'open': actions.current.openCurrent(); break;
+        case 'peek': e.preventDefault(); setOpen((o) => !o); break;
         case 'create': e.preventDefault(); if (!readOnlyRef.current) actions.current.create(); break;
         case 'status': e.preventDefault(); actions.current.openPick('status'); break;
         case 'delete': case 'delete-key': case 'delete-bs': e.preventDefault(); actions.current.askDelete(); break;
@@ -837,7 +841,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const who = (id: string | null) => findPerson(people, id);
   const inboxLookup = { person: (id: string | null) => who(id)?.name, label: (id: string) => LABELS.find((x) => x.id === id), project: (id: string | null) => (id ? PROJECTS.find((x) => x.id === id)?.name : undefined) };
   const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av-wrap' title='Unassigned'><UnassignedIcon /></span>; };
-  const select = (i: Issue, openPanel: boolean) => { setSelId(i.id); if (openPanel) setOpen(true); };
+  // Linear: a click opens the full issue page (sidebar included); Space peeks in the side panel. Without an API there is no page, so the panel stays.
+  const openIssue = (i: Issue) => { setSelId(i.id); if (api) router.push(`/w/${api.slug}/issue/${i.identifier ?? i.id}`); else setOpen(true); };
+  const select = (i: Issue, openPanel: boolean) => { if (openPanel) openIssue(i); else setSelId(i.id); };
 
   const row = (i: Issue) => (
     <div key={i.id} role='option' data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`row${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
@@ -1047,7 +1053,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         </div>
       )}
       <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} cycles={CYCLES} fullFields={!!api} teams={teamList} teamId={teamScope ?? api?.teamId ?? ''} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
-      {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
+      {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{toastLink && toast === toastLink.msg && <a className='toast-undo' href={toastLink.href} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setToast(null); router.push(toastLink.href); }}>View issue</a>}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
       {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}
       {filterPick && <Picker title={`Filter by ${FILTER_LABEL[filterPick.kind].toLowerCase()}`} multi anchor={filterPick.rect} options={filterOptions(filterPick.kind)} onPick={(id) => toggleFilter(filterPick.kind, id)} onClose={() => { const k = filterPick.kind; setFilterPick(null); setTimeout(() => document.getElementById(`fb-${k}`)?.focus(), 0); }} />}
