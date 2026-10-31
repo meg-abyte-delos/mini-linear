@@ -1,5 +1,5 @@
 'use client';
-import { Button, Checkbox, EmptyState, Input, Menu, Tooltip, type MenuEntry } from '@/components/ui';
+import { Button, Checkbox, EmptyState, IconButton, Input, Menu, Tooltip, type MenuEntry } from '@/components/ui';
 import { WIDE_MQ } from '@/lib/breakpoints';
 import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
@@ -878,8 +878,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       <aside id='app-sidebar' className='side' aria-label='Sidebar' onClick={(e) => { if ((e.target as HTMLElement).closest('a.side-link')) setNavOpen(false); }} onKeyDown={(e) => { if (e.key === 'Escape' && navOpen) { e.stopPropagation(); setNavOpen(false); } }}>
         <div className='side-head'>
           <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
-          <button className='side-icbtn' onClick={openPalette} aria-label='Search' title='Search (⌘K)' aria-keyshortcuts='Meta+K Control+K'><SideIcon name='search' /></button>
-          {!readOnly && <button className='side-icbtn compose' onClick={() => create()} aria-label='New issue' title='New issue (C)' aria-keyshortcuts='C'><SideIcon name='compose' /></button>}
+          <IconButton className='side-icbtn' onClick={openPalette} label='Search' title='Search (⌘K)' aria-keyshortcuts='Meta+K Control+K'><SideIcon name='search' /></IconButton>
+          {!readOnly && <IconButton className='side-icbtn compose' onClick={() => create()} label='New issue' title='New issue (C)' aria-keyshortcuts='C'><SideIcon name='compose' /></IconButton>}
         </div>
         <nav aria-label='Primary'>
           <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><SideIcon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>

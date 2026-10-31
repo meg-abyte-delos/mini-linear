@@ -25,10 +25,11 @@
 /* Wave B sidebar: header with search + compose, 14px Lucide icons, tree indent, smooth collapse (tokens). */
 .side-head { display:flex; align-items:center; gap:2px; padding-bottom:6px; }
 .side-head .ws { flex:1; min-width:0; padding:0; }
-.side-icbtn { flex:none; display:grid; place-items:center; width:28px; height:28px; border:0; border-radius:6px; background:none; color:var(--muted); cursor:pointer; transition:background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
-.side-icbtn:hover, .side-icbtn:focus-visible { background:var(--hover); color:var(--fg); }
-.side-icbtn.compose { background:var(--raised); color:var(--fg); box-shadow:0 0 0 1px var(--line); }
-.side-icbtn.compose:hover { background:color-mix(in srgb, var(--fg) 8%, var(--raised)); }
+.side-icbtn { flex:none; }
+a.side-icbtn { display:grid; place-items:center; width:28px; height:28px; border-radius:var(--r-btn); color:var(--muted); transition:background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
+a.side-icbtn:hover, a.side-icbtn:focus-visible { background:var(--hover); color:var(--fg); }
+.btn.side-icbtn.compose { background:var(--raised); color:var(--fg); box-shadow:0 0 0 1px var(--line); }
+.btn.side-icbtn.compose:hover:not(:disabled) { background:color-mix(in srgb, var(--fg) 8%, var(--raised)); }
 .side-link { height:var(--side-item-h); font-size:var(--fs-base); font-weight:var(--fw-medium); color:var(--muted-strong); }
 .side-link .side-ic { flex:none; color:var(--muted); }
 .side-link[aria-current=page] .side-ic, .side-link:hover .side-ic { color:var(--fg); }
