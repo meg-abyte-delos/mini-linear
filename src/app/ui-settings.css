@@ -1,5 +1,5 @@
 /* Settings + Members screens (D6). Colors, type and motion come from tokens.css only; the sizes below are component dimensions. */
-:root { --set-nav-w:220px; --set-content-w:720px; --set-ctl-h:32px; --set-search-w:280px; --set-key-w:96px; --set-check:16px; --set-invite-w:300px; }
+:root { --set-nav-w:220px; --set-content-w:720px; --set-ctl-h:32px; --set-search-w:280px; --set-key-w:96px; --set-invite-w:300px; }
 
 .set { display:grid; grid-template-columns:var(--set-nav-w) minmax(0,1fr); min-height:100vh; background:var(--bg); color:var(--fg); }
 .set-nav { box-sizing:border-box; display:flex; flex-direction:column; gap:var(--sp-1); padding:var(--sp-4) var(--sp-3); background:var(--side); border-right:1px solid var(--line-soft); }
@@ -48,8 +48,6 @@
 .set-inline { display:flex; align-items:center; gap:var(--sp-2); margin-top:var(--sp-3); padding-top:var(--sp-3); border-top:1px solid var(--line-soft); }
 .set-inline-label { display:flex; align-items:center; gap:var(--sp-2); color:var(--muted-strong); }
 .set-error { margin:0; color:color-mix(in srgb, var(--danger) 65%, var(--fg)); }
-.set-check { width:var(--set-check); height:var(--set-check); margin:0; accent-color:var(--accent); cursor:pointer; }
-.set-check:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 
 /* Buttons: default, primary, ghost; destructive actions are red (data-tone='danger'). */
 .set-icon-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }

@@ -2,7 +2,7 @@
 // Linear-style "New issue" modal: title, WYSIWYG description, property chips on ui/Combobox, Create more, Cmd+Enter, Esc, focus trap.
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Combobox, type ComboOption } from '@/components/ui';
+import { Button, Combobox, Toggle, type ComboOption } from '@/components/ui';
 import { useExitMount } from '@/components/ui/useExitMount';
 import { RichEditor } from '@/components/RichEditor';
 import { Avatar, Icon, PriorityIcon, StatusIcon, UnassignedIcon } from '@/components/icons';
@@ -182,8 +182,8 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, c
             {links.length > 0 && <ul className='ni-links' aria-label='Attachments'>{links.map((l, n) => <li key={l.url + n}><span className='ni-link-t'>{l.title}</span><button type='button' aria-label={`Remove attachment ${l.title}`} onClick={() => setLinks((x) => x.filter((_, i) => i !== n))}>×</button></li>)}</ul>}
             <div className='ni-foot'>
               <button ref={clipEl} type='button' className='ni-attach' aria-label='Attach link' title='Attach link' onClick={() => { setLinkErr(false); setLinkForm((f) => f ?? { url: '', title: '' }); }}><Icon name='attach' size={16} /></button>
-              <label className='ni-more'><input type='checkbox' role='switch' checked={more} onChange={(e) => setMore(e.target.checked)} />Create more</label>
-              <button type='button' className='dlg-btn dlg-confirm' title='Create issue (⌘↵)' aria-keyshortcuts='Meta+Enter Control+Enter' disabled={busy} onClick={() => void submit()}>Create issue</button>
+              <span className='ni-more'><Toggle checked={more} onChange={(e) => setMore(e.target.checked)} label='Create more' /></span>
+              <Button variant='primary' title='Create issue (⌘↵)' aria-keyshortcuts='Meta+Enter Control+Enter' loading={busy} onClick={() => void submit()}>Create issue</Button>
             </div>
           </div>
         </div>,

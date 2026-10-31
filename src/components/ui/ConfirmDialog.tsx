@@ -2,6 +2,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useExitMount } from './useExitMount';
+import { Button } from './Button';
 
 interface Props { open: boolean; title: string; children?: ReactNode; confirmLabel: string; cancelLabel?: string; destructive?: boolean; busy?: boolean; onConfirm: () => void; onCancel: () => void }
 
@@ -42,8 +43,8 @@ export function ConfirmDialog({ open, title, children, confirmLabel, cancelLabel
         <h2 id={titleId} className='dlg-title'>{title}</h2>
         {children && <div id={descId} className='dlg-body'>{children}</div>}
         <div className='dlg-actions'>
-          <button ref={cancelRef} type='button' className='dlg-btn' onClick={onCancel}>{cancelLabel}</button>
-          <button type='button' className='dlg-btn dlg-confirm' data-destructive={destructive || undefined} disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
+          <Button ref={cancelRef} variant='ghost' onClick={onCancel}>{cancelLabel}</Button>
+          <Button variant={destructive ? 'secondary' : 'primary'} tone={destructive ? 'danger' : undefined} loading={busy} onClick={onConfirm}>{confirmLabel}</Button>
         </div>
       </div>
     </div>,

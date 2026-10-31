@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { httpInboxClient, NOTIF_TYPES, TYPE_LABEL, type PrefMap, type NotifType } from '@/lib/inbox-client';
 import { SettingsShell } from '@/components/SettingsShell';
+import { Checkbox } from '@/components/ui';
 
 function NotificationPrefs({ slug, onMsg }: { slug: string; onMsg: (m: string) => void }) {
   const client = useMemo(() => httpInboxClient(slug), [slug]);
@@ -23,8 +24,8 @@ function NotificationPrefs({ slug, onMsg }: { slug: string; onMsg: (m: string) =
             {NOTIF_TYPES.map((t) => (
               <tr key={t}>
                 <td>{TYPE_LABEL[t]}</td>
-                <td className='set-center'><input type='checkbox' className='set-check' aria-label={`In-app: ${TYPE_LABEL[t]}`} checked={prefs[t].in_app} onChange={(e) => void set(t, 'in_app', e.target.checked)} /></td>
-                <td className='set-center'><input type='checkbox' className='set-check' aria-label={`Email: ${TYPE_LABEL[t]}`} checked={prefs[t].email} onChange={(e) => void set(t, 'email', e.target.checked)} /></td>
+                <td className='set-center'><Checkbox aria-label={`In-app: ${TYPE_LABEL[t]}`} checked={prefs[t].in_app} onChange={(e) => void set(t, 'in_app', e.target.checked)} /></td>
+                <td className='set-center'><Checkbox aria-label={`Email: ${TYPE_LABEL[t]}`} checked={prefs[t].email} onChange={(e) => void set(t, 'email', e.target.checked)} /></td>
               </tr>
             ))}
           </tbody>
