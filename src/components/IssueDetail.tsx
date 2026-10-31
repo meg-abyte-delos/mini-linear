@@ -9,7 +9,7 @@ import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
 import { useIssueRealtime } from '@/lib/detail/use-issue-realtime';
-import { Button, Chip, ConfirmDialog, IconButton, Tooltip, type MenuEntry } from '@/components/ui';
+import { Button, Chip, ConfirmDialog, IconButton, Input, Tooltip, type MenuEntry } from '@/components/ui';
 import { participants, repliesLabel, repliesOf, threadOpen } from '@/lib/detail/threads';
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { listTeams } from '@/lib/settings-client';
@@ -410,7 +410,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           <h2 id='h-sub'>Sub-issues {pr.total > 0 && <><span className='count'>{pr.done}/{pr.total}</span><span className='sub-bar' role='img' aria-label={`${pr.done} of ${pr.total} sub-issues done`}><SubBarFill pct={Math.round((pr.done / pr.total) * 100)} /></span></>}
             {!readOnly && <IconButton size={24} className='sec-add' label='Add sub-issue' onClick={() => setAdding(true)}><Icon name='plus' /></IconButton>}</h2>
           {children.length > 0 && <ul className='idp-rows'>{children.map((c) => <li key={c.id} className={c.status === 'done' ? 'is-done' : undefined}><Link className='row-link' href={`/w/${slug}/issue/${identifierOf(c)}`}><StatusIcon status={c.status} /><span className='id'>{identifierOf(c)}</span><span className='t'>{c.title}</span>{(() => { const u = who(c.assignee_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}</Link></li>)}</ul>}
-          {!readOnly && adding && <form className='inline-add' onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (new FormData(f).get('t') as string ?? '').trim(); if (t && !subBusy) { void addSubIssue(t).then((ok) => { if (ok) f.reset(); }); } }}><label className='sr-only' htmlFor='sub-t'>New sub-issue title</label><input id='sub-t' name='t' autoFocus readOnly={subBusy} aria-busy={subBusy} placeholder='Sub-issue title, Enter to create' maxLength={255} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAdding(false); } }} /><Button type='submit' size={24} disabled={subBusy}>Add</Button></form>}
+          {!readOnly && adding && <form className='inline-add' onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (new FormData(f).get('t') as string ?? '').trim(); if (t && !subBusy) { void addSubIssue(t).then((ok) => { if (ok) f.reset(); }); } }}><label className='sr-only' htmlFor='sub-t'>New sub-issue title</label><Input id='sub-t' name='t' autoFocus readOnly={subBusy} aria-busy={subBusy} placeholder='Sub-issue title, Enter to create' maxLength={255} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAdding(false); } }} /><Button type='submit' size={24} disabled={subBusy}>Add</Button></form>}
           {!readOnly && !adding && children.length > 0 && <button className='add-row' onClick={() => setAdding(true)}>+ Add sub-issue</button>}
         </section>
 
@@ -431,7 +431,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           <h2 id='h-att'>Attachments
             {!readOnly && <IconButton size={24} className='sec-add' label='Add link' onClick={() => setLinkForm((f) => f ?? { url: '', title: '' })}><Icon name='plus' /></IconButton>}</h2>
           <ul className='idp-rows'>{attachments.map((a) => <li key={a.id}><a href={safeHref(a.url) ?? '#'} target='_blank' rel='noopener noreferrer nofollow'>{a.title}</a>{!readOnly && <IconButton size={24} className='x' label={`Remove attachment ${a.title}`} onClick={() => void removeAttachment(a)}>×</IconButton>}</li>)}</ul>
-          {!readOnly && linkForm && (<form className='inline-add' onSubmit={(e) => { e.preventDefault(); void addLink(); }}><label className='sr-only' htmlFor='att-url'>Link URL</label><input id='att-url' type='url' placeholder='https://…' value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} /><label className='sr-only' htmlFor='att-title'>Link title</label><input id='att-title' placeholder='Title (optional)' value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} /><Button type='submit' size={24}>Attach</Button><Button variant='ghost' size={24} onClick={() => setLinkForm(null)}>Cancel</Button></form>)}
+          {!readOnly && linkForm && (<form className='inline-add' onSubmit={(e) => { e.preventDefault(); void addLink(); }}><label className='sr-only' htmlFor='att-url'>Link URL</label><Input id='att-url' type='url' placeholder='https://…' value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} /><label className='sr-only' htmlFor='att-title'>Link title</label><Input id='att-title' placeholder='Title (optional)' value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} /><Button type='submit' size={24}>Attach</Button><Button variant='ghost' size={24} onClick={() => setLinkForm(null)}>Cancel</Button></form>)}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-act'>
