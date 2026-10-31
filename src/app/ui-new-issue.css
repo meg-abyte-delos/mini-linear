@@ -61,3 +61,20 @@
 .ni-more input[role='switch']:checked { background:var(--accent); border-color:var(--accent); }
 .ni-more input[role='switch']:checked::after { transform:translateX(10px); background:var(--accent-fg); }
 @media (prefers-reduced-motion: reduce) { .ni-more input[role='switch'], .ni-more input[role='switch']::after { transition:none; } }
+/* Review 02:00: ghost paperclip in the footer, more-properties chip, link form and attached links. */
+.ni-attach { display:inline-flex; align-items:center; justify-content:center; width:var(--side-item-h); height:var(--side-item-h); padding:0; color:var(--muted-strong); background:transparent; border:0; border-radius:var(--r-sm); cursor:pointer; }
+.ni-attach:hover { background:var(--hover); color:var(--fg); }
+.ni-attach:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.ni-prop-more { padding:0 var(--sp-1); color:var(--muted-strong); }
+.ni-date { cursor:pointer; }
+.ni-date input { font:inherit; font-size:var(--fs-sm); color:inherit; background:transparent; border:0; outline:none; color-scheme:light dark; }
+.ni-date:focus-within { outline:2px solid var(--accent); outline-offset:1px; }
+.ni-link { display:flex; flex-wrap:wrap; gap:var(--sp-2); }
+.ni-link input { flex:1 1 160px; min-width:0; min-height:var(--side-item-h); padding:0 var(--sp-2); font:inherit; font-size:var(--fs-sm); color:var(--fg); background:transparent; border:1px solid var(--line); border-radius:var(--r-sm); }
+.ni-link input[aria-invalid='true'] { border-color:var(--danger); }
+.ni-link input:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.ni-links { display:flex; flex-wrap:wrap; gap:var(--sp-2); margin:0; padding:0; list-style:none; }
+.ni-links li { display:inline-flex; align-items:center; gap:var(--sp-1); max-width:100%; padding:0 var(--sp-2); font-size:var(--fs-sm); color:var(--muted-strong); border:1px solid var(--line); border-radius:var(--r-sm); }
+.ni-link-t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ni-links button { color:inherit; background:transparent; border:0; cursor:pointer; }
+.ni-links button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }

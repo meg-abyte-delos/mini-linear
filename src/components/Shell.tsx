@@ -111,7 +111,7 @@ function paletteGroup(id: string): string {
 // One icon per action (Linear), never a shared fallback.
 const PALETTE_ICON: Record<string, IconName> = {
   list: 'list', 'go-project': 'folder', board: 'board', cycles: 'cycle', projects: 'folder', create: 'plus', 'search-all': 'search', 'clear-filters': 'x',
-  help: 'help', 'toggle-select': 'checkSquare', 'select-all': 'checkSquare', 'clear-select': 'x', status: 'cycle', 'set-status': 'issues', delete: 'trash',
+  help: 'help', 'toggle-select': 'checkSquare', 'select-all': 'listCheck', 'clear-select': 'x', status: 'cycle', 'set-status': 'issues', delete: 'trash',
   'set-priority': 'flag', 'set-assignee': 'user', 'assign-me': 'user', 'set-label': 'tag', 'copy-id': 'copy', open: 'external',
 };
 function paletteIcon(id: string) {
@@ -506,26 +506,39 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (d.assignee_id) extra.assignee_id = d.assignee_id;
     if (d.label_ids.length) extra.label_ids = d.label_ids;
     if (d.project_id) extra.project_id = d.project_id;
+    if (d.cycle_id) extra.cycle_id = d.cycle_id;
+    // The local store has no estimate / due date (its patch schema is strict): those go to the server only.
+    const srv: Record<string, unknown> = {};
+    if (d.estimate !== null) srv.estimate = d.estimate;
+    if (d.due_date) srv.due_date = d.due_date;
     let made: Issue | null | undefined;
     let patchFailed = false;
+    // Links picked in the modal become attachments of the new issue (API mode only; the mock store has no attachments).
+    const attachLinks = async (id: string) => {
+      if (!api || !d.links.length) return true;
+      const c = detailApi(api.slug); let ok = true;
+      for (const l of d.links) { const r = await c.addAttachment(id, { kind: 'link', url: l.url, title: l.title }); if (!r.ok) ok = false; }
+      return ok;
+    };
     if (api) {
       const row = await apiCreate(api.slug, d.team_id || api.teamId, d.title);
       if (!row) { setToast('Could not create the issue.'); return false; }
       if (d.team_id && d.team_id !== (teamScope ?? api.teamId)) {
         // Another team's issue does not belong in this team's store: apply the properties server-side, then just confirm.
-        const other = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
+        const other = { ...extra, ...srv, ...(row.status !== d.status ? { status: d.status } : {}) };
         let failed = false;
         if (Object.keys(other).length) { const r = await apiPatch(api.slug, row, row.version, other); failed = r.kind !== 'ok'; }
+        if (!(await attachLinks(row.id))) failed = true;
         setToast(failed ? `Created ${row.identifier ?? d.title}, but some properties could not be saved.` : `Created ${row.identifier ?? d.title}`);
         return true;
       }
       versions.current.set(row.id, row.version);
       store.current.upsert({ ...row, sort_key: String(Date.now()) });
       const patch = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
-      if (Object.keys(patch).length) {
-        store.current.update(row.id, patch);
+      if (Object.keys(patch).length || Object.keys(srv).length) {
+        if (Object.keys(patch).length) store.current.update(row.id, patch);
         // Await the follow-up PATCH here (not push()) so a failure is reported instead of being overwritten by the "Created" toast.
-        const r = await apiPatch(api.slug, row, row.version, patch);
+        const r = await apiPatch(api.slug, row, row.version, { ...patch, ...srv });
         if (r.issue) {
           versions.current.set(row.id, r.issue.version);
           const local = store.current.list().find((x) => x.id === row.id);
@@ -533,6 +546,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         }
         if (r.kind !== 'ok') patchFailed = true;
       }
+      if (!(await attachLinks(row.id))) patchFailed = true;
       made = store.current.list().find((x) => x.id === row.id);
     } else {
       made = store.current.create({ title: d.title, description: d.description, status: d.status, priority: d.priority, assignee_id: d.assignee_id });
@@ -1007,7 +1021,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           </div>
         </div>
       )}
-      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} teams={teamList} teamId={teamScope ?? api?.teamId ?? ''} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
+      <NewIssueModal open={newIssue !== null} {...(newIssue?.status ? { initialStatus: newIssue.status } : {})} people={people} labels={LABELS} projects={PROJECTS} cycles={CYCLES} fullFields={!!api} teams={teamList} teamId={teamScope ?? api?.teamId ?? ''} onClose={() => setNewIssue(null)} onSubmit={submitNew} />
       {toast && <div className='toast' role='status' onClick={() => setToast(null)}>{toast}{undoDel && toast === undoDel.msg && <button type='button' className='toast-undo' onClick={(e) => { e.stopPropagation(); void undoDelete(); }}>Undo</button>}</div>}
       {pick && <Picker title={({ priority: 'Set priority', assignee: 'Set assignee', label: 'Set labels', status: 'Set status', project: 'Set project', cycle: 'Set cycle' } as const)[pick.kind]} multi={pick.kind === 'label'} anchor={pick.rect} options={pickOptions()} onPick={applyPick} onClose={closePick} />}
       {projPick !== false && <Picker title='Go to project' anchor={projPick} options={PROJECTS.map((p) => ({ id: p.id, label: p.name }))} onPick={goToProject} onClose={() => setProjPick(false)} />}
