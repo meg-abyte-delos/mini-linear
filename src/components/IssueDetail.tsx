@@ -516,17 +516,26 @@ function SubBarFill({ pct }: { pct: number }) {
   return <span ref={ref} />;
 }
 
+function readDraft(key?: string): string | null {
+  if (!key) return null;
+  try { return sessionStorage.getItem(key) || null; } catch { return null; /* storage blocked */ }
+}
+
 function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = '', submitLabel, draftKey }: { draftKey?: string; onAttach?: (() => void); label: string; onSubmit: (b: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean; initial?: string; submitLabel?: string }) {
   const inline = !onCancel && !!onAttach;
   const people = useContext(PeopleCtx);
-  const [text, setText] = useState(initial);
-  const [caret, setCaret] = useState(initial.length);
+  // Lazy init from the draft so the persistence effect never runs with '' before the restored text renders.
+  const [text, setText] = useState(() => readDraft(draftKey) ?? initial);
+  const [caret, setCaret] = useState(() => (readDraft(draftKey) ?? initial).length);
   const [sel, setSel] = useState(0);
+  const restoredKey = useRef(draftKey);
   const ref = useRef<HTMLTextAreaElement>(null);
   // Optional draft in sessionStorage so leaving for the issue page (Attach) keeps what was typed.
   useEffect(() => {
-    if (!draftKey) return;
-    try { const d = sessionStorage.getItem(draftKey); if (d) { setText(d); setCaret(d.length); } } catch { /* storage blocked */ }
+    if (!draftKey || restoredKey.current === draftKey) return; // first mount already restored lazily
+    restoredKey.current = draftKey;
+    const d = readDraft(draftKey);
+    if (d) { setText(d); setCaret(d.length); }
   }, [draftKey]);
   useEffect(() => {
     if (!draftKey) return;
