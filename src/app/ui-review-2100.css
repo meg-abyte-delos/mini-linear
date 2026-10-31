@@ -17,7 +17,7 @@
 .idp-sec:is([aria-labelledby=h-sub],[aria-labelledby=h-rel],[aria-labelledby=h-att]) > h2 { height:32px; margin:0; gap:6px; font-size:var(--fs-sm); font-weight:500; color:var(--muted-strong); }
 .idp-sec:is([aria-labelledby=h-sub],[aria-labelledby=h-rel],[aria-labelledby=h-att]) > :last-child:not(h2) { margin-bottom:var(--sp-2); }
 .idp-sec h2 .sec-add, .idp-sec h2 .rel-add { margin-left:0; }
-.idp-sec h2 .sec-add { width:20px; height:20px; opacity:0; transition:opacity var(--dur-fast) var(--ease-out); }
+.idp-sec h2 .sec-add { opacity:0; transition:opacity var(--dur-fast) var(--ease-out); }
 .idp-sec:hover h2 .sec-add, .idp-sec h2 .sec-add:focus-visible, .idp-sec h2 .sec-add[aria-expanded=true] { opacity:1; }
 @media (hover:none) { .idp-sec h2 .sec-add { opacity:1; } }
 @media (prefers-reduced-motion: reduce) { .idp-sec h2 .sec-add { transition:none; } }

@@ -9,7 +9,7 @@ import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
 import { useIssueRealtime } from '@/lib/detail/use-issue-realtime';
-import { ConfirmDialog, Tooltip, type MenuEntry } from '@/components/ui';
+import { Button, ConfirmDialog, IconButton, Tooltip, type MenuEntry } from '@/components/ui';
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { listTeams } from '@/lib/settings-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
@@ -25,7 +25,7 @@ import { PresenceStack } from '@/components/PresenceStack';
 import { usePresence } from '@/lib/presence/use-presence';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
-type PickKind = 'status' | 'priority' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent' | 'relation';
+type PickKind = 'status' | 'priority' | 'estimate' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent' | 'relation';
 const REL_ORDER: Relation['type'][] = ['blocks', 'blocked_by', 'related', 'duplicate'];
 const REL_LABEL: Record<Relation['type'], string> = { blocks: 'Blocks', blocked_by: 'Blocked by', related: 'Related', duplicate: 'Duplicate of' };
 const ESTIMATES = [0, 1, 2, 3, 5, 8, 13];
@@ -216,6 +216,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     switch (kind) {
       case 'status': return STATUSES.map((s) => ({ id: s, label: STATUS_LABEL[s], checked: issue.status === s, lead: <StatusIcon status={s} /> }));
       case 'priority': return PRIORITY_LABEL.map((l, p) => ({ id: String(p), label: l, checked: issue.priority === p, lead: <PriorityIcon priority={p as Issue['priority']} /> }));
+      case 'estimate': return [{ id: '', label: 'No estimate', checked: issue.estimate == null }, ...ESTIMATES.map((n) => ({ id: String(n), label: `${n} pt${n === 1 ? '' : 's'}`, checked: issue.estimate === n }))];
       case 'assignee': return [{ id: '', label: 'Unassigned', checked: !issue.assignee_id }, ...people.map((u) => ({ id: u.id, label: u.name, checked: issue.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
       case 'labels': return meta.labels.map((l) => ({ id: l.id, label: l.name, checked: issue.label_ids.includes(l.id) }));
       case 'project': return [{ id: '', label: 'No project', checked: !issue.project_id }, ...meta.projects.map((p) => ({ id: p.id, label: p.name, checked: issue.project_id === p.id }))];
@@ -230,6 +231,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     if (k !== 'labels') setPick(null);
     if (k === 'status') void update({ status: id as Status }, `set status to ${STATUS_LABEL[id as Status]}`);
     else if (k === 'priority') void update({ priority: Number(id) as Issue['priority'] }, `set priority to ${PRIORITY_LABEL[Number(id)] ?? id}`);
+    else if (k === 'estimate') void update({ estimate: id === '' ? null : Number(id) }, id === '' ? 'removed the estimate' : `set estimate to ${id}`);
     else if (k === 'assignee') void update({ assignee_id: id || null }, id ? `assigned to ${who(id)?.name ?? id}` : 'removed the assignee');
     else if (k === 'labels') { const has = issue.label_ids.includes(id); void update({ label_ids: has ? issue.label_ids.filter((l) => l !== id) : [...issue.label_ids, id] }, `${has ? 'removed' : 'added'} label ${meta.labels.find((l) => l.id === id)?.name ?? id}`); }
     else if (k === 'project') void update({ project_id: id || null }, id ? `moved to project ${meta.projects.find((p) => p.id === id)?.name}` : 'removed the project');
@@ -345,7 +347,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   // The Combobox stays mounted so it can animate out; it keeps the last kind while closed.
   if (pick) lastPick.current = pick;
   const shown = pick ?? lastPick.current ?? { kind: 'status' as PickKind, el: null };
-  const pickTitle: Record<PickKind, string> = { status: 'Change status', priority: 'Set priority', assignee: 'Assign to', labels: 'Change labels', project: 'Move to project', cycle: 'Move to cycle', parent: 'Set parent issue', relation: `Add relation: ${lastPick.current?.relType ? REL_LABEL[lastPick.current.relType] : ''}` };
+  const pickTitle: Record<PickKind, string> = { status: 'Change status', priority: 'Set priority', estimate: 'Set estimate', assignee: 'Assign to', labels: 'Change labels', project: 'Move to project', cycle: 'Move to cycle', parent: 'Set parent issue', relation: `Add relation: ${lastPick.current?.relType ? REL_LABEL[lastPick.current.relType] : ''}` };
   pickAnchor.current = pick?.el ?? null;
   const open = (kind: PickKind) => (e: React.MouseEvent<HTMLButtonElement>) => setPick({ kind, el: e.currentTarget });
   const assignee = who(issue.assignee_id);
@@ -399,30 +401,30 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
 
         <section className='idp-sec' aria-labelledby='h-sub'>
           <h2 id='h-sub'>Sub-issues {pr.total > 0 && <><span className='count'>{pr.done}/{pr.total}</span><span className='sub-bar' role='img' aria-label={`${pr.done} of ${pr.total} sub-issues done`}><SubBarFill pct={Math.round((pr.done / pr.total) * 100)} /></span></>}
-            {!readOnly && <button className='sec-add' aria-label='Add sub-issue' onClick={() => setAdding(true)}>+</button>}</h2>
+            {!readOnly && <IconButton size={24} className='sec-add' label='Add sub-issue' onClick={() => setAdding(true)}><Icon name='plus' /></IconButton>}</h2>
           {children.length > 0 && <ul className='idp-rows'>{children.map((c) => <li key={c.id} className={c.status === 'done' ? 'is-done' : undefined}><Link className='row-link' href={`/w/${slug}/issue/${identifierOf(c)}`}><StatusIcon status={c.status} /><span className='id'>{identifierOf(c)}</span><span className='t'>{c.title}</span>{(() => { const u = who(c.assignee_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}</Link></li>)}</ul>}
-          {!readOnly && adding && <form className='inline-add' onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (new FormData(f).get('t') as string ?? '').trim(); if (t && !subBusy) { void addSubIssue(t).then((ok) => { if (ok) f.reset(); }); } }}><label className='sr-only' htmlFor='sub-t'>New sub-issue title</label><input id='sub-t' name='t' autoFocus readOnly={subBusy} aria-busy={subBusy} placeholder='Sub-issue title, Enter to create' maxLength={255} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAdding(false); } }} /><button type='submit' className='btn' data-size='24' disabled={subBusy}>Add</button></form>}
+          {!readOnly && adding && <form className='inline-add' onSubmit={(e) => { e.preventDefault(); const f = e.currentTarget; const t = (new FormData(f).get('t') as string ?? '').trim(); if (t && !subBusy) { void addSubIssue(t).then((ok) => { if (ok) f.reset(); }); } }}><label className='sr-only' htmlFor='sub-t'>New sub-issue title</label><input id='sub-t' name='t' autoFocus readOnly={subBusy} aria-busy={subBusy} placeholder='Sub-issue title, Enter to create' maxLength={255} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setAdding(false); } }} /><Button type='submit' size={24} disabled={subBusy}>Add</Button></form>}
           {!readOnly && !adding && children.length > 0 && <button className='add-row' onClick={() => setAdding(true)}>+ Add sub-issue</button>}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-rel'>
           <h2 id='h-rel'>Relations
-            {!readOnly && <span className='rel-add'><button ref={relBtn} className='sec-add' aria-label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}>+</button>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button role='menuitem' key={t} onClick={() => { setRelMenu(false); setPick({ kind: 'relation', relType: t, el: relBtn.current }); }}>{REL_LABEL[t]}…</button>)}</div>}</span>}
+            {!readOnly && <span className='rel-add'><IconButton ref={relBtn} size={24} className='sec-add' label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}><Icon name='plus' /></IconButton>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button role='menuitem' key={t} onClick={() => { setRelMenu(false); setPick({ kind: 'relation', relType: t, el: relBtn.current }); }}>{REL_LABEL[t]}…</button>)}</div>}</span>}
           </h2>
           {REL_ORDER.map((t) => { const rs = relations.filter((r) => r.type === t); if (!rs.length) return null; return (
             <div key={t} className='rel-group'><div className='rel-type' id={`rg-${t}`}>{REL_LABEL[t]}</div>
               <ul className='idp-rows' aria-labelledby={`rg-${t}`}>{rs.map((r) => { const o = byId(r.related_issue_id); const open = t === 'blocked_by' && !!o && o.status !== 'done'; const u = who(o?.assignee_id); return (
                 <li key={r.id} className={o?.status === 'done' ? 'is-done' : undefined}>
                   {o ? <Link className='row-link' href={`/w/${slug}/issue/${identifierOf(o)}`}><StatusIcon status={o.status} /><span className='id'>{identifierOf(o)}</span><span className='t'>{o.title}</span>{open && <span className='blocked-flag' title='Still blocking'>Blocked</span>}{u && <Avatar initials={u.initials} hue={u.hue} />}</Link> : <span className='row-link'>{r.related_issue_id}</span>}
-                  {!readOnly && <button className='x' aria-label={`Remove relation ${REL_LABEL[r.type]} ${o ? identifierOf(o) : ''}`} onClick={() => void removeRelation(r)}>×</button>}
+                  {!readOnly && <IconButton size={24} className='x' label={`Remove relation ${REL_LABEL[r.type]} ${o ? identifierOf(o) : ''}`} onClick={() => void removeRelation(r)}>×</IconButton>}
                 </li>); })}</ul></div>); })}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-att'>
           <h2 id='h-att'>Attachments
-            {!readOnly && <button className='sec-add' aria-label='Add link' onClick={() => setLinkForm((f) => f ?? { url: '', title: '' })}>+</button>}</h2>
-          <ul className='idp-rows'>{attachments.map((a) => <li key={a.id}><a href={safeHref(a.url) ?? '#'} target='_blank' rel='noopener noreferrer nofollow'>{a.title}</a>{!readOnly && <button className='x' aria-label={`Remove attachment ${a.title}`} onClick={() => void removeAttachment(a)}>×</button>}</li>)}</ul>
-          {!readOnly && linkForm && (<form className='inline-add' onSubmit={(e) => { e.preventDefault(); void addLink(); }}><label className='sr-only' htmlFor='att-url'>Link URL</label><input id='att-url' type='url' placeholder='https://…' value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} /><label className='sr-only' htmlFor='att-title'>Link title</label><input id='att-title' placeholder='Title (optional)' value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} /><button type='submit' className='btn' data-size='24'>Attach</button><button type='button' className='btn' data-variant='ghost' data-size='24' onClick={() => setLinkForm(null)}>Cancel</button></form>)}
+            {!readOnly && <IconButton size={24} className='sec-add' label='Add link' onClick={() => setLinkForm((f) => f ?? { url: '', title: '' })}><Icon name='plus' /></IconButton>}</h2>
+          <ul className='idp-rows'>{attachments.map((a) => <li key={a.id}><a href={safeHref(a.url) ?? '#'} target='_blank' rel='noopener noreferrer nofollow'>{a.title}</a>{!readOnly && <IconButton size={24} className='x' label={`Remove attachment ${a.title}`} onClick={() => void removeAttachment(a)}>×</IconButton>}</li>)}</ul>
+          {!readOnly && linkForm && (<form className='inline-add' onSubmit={(e) => { e.preventDefault(); void addLink(); }}><label className='sr-only' htmlFor='att-url'>Link URL</label><input id='att-url' type='url' placeholder='https://…' value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} /><label className='sr-only' htmlFor='att-title'>Link title</label><input id='att-title' placeholder='Title (optional)' value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} /><Button type='submit' size={24}>Attach</Button><Button variant='ghost' size={24} onClick={() => setLinkForm(null)}>Cancel</Button></form>)}
         </section>
 
         <section className='idp-sec' aria-labelledby='h-act'>
@@ -449,7 +451,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         <section className='side-group' aria-labelledby='sg-plan'>
           <h3 id='sg-plan' className='side-h'>Planning</h3>
           <dl>
-          <dt><label htmlFor='prop-est'>Estimate</label></dt><dd className='prop-native'><span className='prop-pill' aria-hidden='true'><PropIcon name='estimate' /><span className={issue.estimate == null ? 'prop-empty' : undefined}>{issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}</span></span><select id='prop-est' disabled={readOnly} value={issue.estimate ?? ''} onChange={(e) => void update({ estimate: e.target.value === '' ? null : Number(e.target.value) }, e.target.value === '' ? 'removed the estimate' : `set estimate to ${e.target.value}`)}><option value=''>No estimate</option>{ESTIMATES.map((n) => <option key={n} value={n}>{n} pt{n === 1 ? '' : 's'}</option>)}</select></dd>
+          <dt>Estimate</dt><dd><button disabled={readOnly} onClick={open('estimate')} aria-haspopup='dialog' aria-label={`Estimate: ${issue.estimate == null ? 'not set' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}`}><PropIcon name='estimate' /><span className={issue.estimate == null ? 'prop-empty' : undefined}>{issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}</span></button></dd>
           <dt><label htmlFor='prop-due'>Due date</label></dt><dd className='prop-native'><span className={`prop-pill due-${due}`} aria-hidden='true'><PropIcon name='due' /><span className={issue.due_date ? undefined : 'prop-empty'}>{dueLabel}</span>{due === 'overdue' && <span className='due-flag'>Overdue</span>}</span><input id='prop-due' type='date' disabled={readOnly} value={issue.due_date ?? ''} onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* not supported */ } }} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} /></dd>
           <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
           </dl>
@@ -494,10 +496,10 @@ function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, 
   const one = (x: Comment) => (
     <article className='cmt' aria-label={`Comment by ${who(x.author_id)?.name ?? 'Someone'}`}>
       <header>{(() => { const u = who(x.author_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}<span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <Age iso={x.created_at} />{x.edited_at && <span className='dim'> (edited)</span>}
-        {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <button aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</button>}{canDelete(x) && <button aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</button>}</span>}</header>
+        {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <Button variant='ghost' size={24} aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</Button>}{canDelete(x) && <Button variant='ghost' size={24} tone='danger' aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</Button>}</span>}</header>
       {editing === x.id ? <Composer label='Edit comment' initial={x.body} autoFocus submitLabel='Save' onSubmit={async (b) => { const ok = await onEdit(x, b); if (ok) setEditing(null); return ok; }} onCancel={() => setEditing(null)} /> : <Markdown source={x.body} empty='' />}
       <div className='reacts' role='group' aria-label='Reactions'>
-        {EMOJIS.map((e) => { const r = x.reactions?.find((y) => y.emoji === e); return (r || !readOnly) && <button key={e} className={reactedBy(r, ME) ? 'on' : ''} aria-pressed={reactedBy(r, ME)} aria-label={`React ${e}${r ? `, ${r.count}` : ''}`} disabled={readOnly} onClick={() => onReact(x, e)}>{e}{r && <span>{r.count}</span>}</button>; })}
+        {EMOJIS.map((e) => { const r = x.reactions?.find((y) => y.emoji === e); return (r || !readOnly) && <Button key={e} variant='ghost' size={24} className={reactedBy(r, ME) ? 'react on' : 'react'} aria-pressed={reactedBy(r, ME)} aria-label={`React ${e}${r ? `, ${r.count}` : ''}`} disabled={readOnly} onClick={() => onReact(x, e)}>{e}{r && <span className='react-n'>{r.count}</span>}</Button>; })}
       </div>
     </article>
   );
@@ -505,7 +507,7 @@ function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, 
     <div className='cmt-thread'>
       {one(c)}
       {replies.length > 0 && <ul className='replies'>{replies.map((r) => <li key={r.id}>{one(r)}</li>)}</ul>}
-      {!readOnly && (replying ? <Composer label='Reply' autoFocus onSubmit={async (b) => { const ok = await onReply(b); if (ok) setReplying(false); return ok; }} onCancel={() => setReplying(false)} /> : <button className='link-btn' onClick={() => setReplying(true)}>Reply</button>)}
+      {!readOnly && (replying ? <Composer label='Reply' autoFocus onSubmit={async (b) => { const ok = await onReply(b); if (ok) setReplying(false); return ok; }} onCancel={() => setReplying(false)} /> : <Button variant='ghost' size={24} className='cmt-reply' onClick={() => setReplying(true)}>Reply</Button>)}
     </div>
   );
 }
@@ -572,7 +574,7 @@ function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = ''
         }} />
       {list.length > 0 && <ul id={listId} role='listbox' aria-label='Mention a teammate' className='mention-list'>{list.map((u, k) => <li key={u.id} id={`${listId}-${u.id}`} role='option' aria-selected={k === idx} onMouseDown={(e) => { e.preventDefault(); choose(u); }}>{u.name} <span className='dim'>@{u.handle}</span></li>)}</ul>}
       {inline ? <div className='composer-tools'><button type='button' className='composer-ic' aria-label='Attach link' title='Attach link' onClick={onAttach}><Icon name='attach' size={16} /></button><button type='button' className='composer-ic composer-send' aria-label='Comment' title='Comment (⌘↵)' disabled={!text.trim()} onClick={() => void submit()}><Icon name='send' size={16} /></button></div>
-        : <div className='composer-actions'>{onCancel && <button className='btn' data-variant='ghost' onClick={onCancel}>Cancel</button>}<button className='btn' data-variant='primary' disabled={!text.trim()} onClick={() => void submit()}>{submitLabel ?? (label === 'Reply' ? 'Reply' : 'Comment')}</button></div>}
+        : <div className='composer-actions'>{onCancel && <Button variant='ghost' onClick={onCancel}>Cancel</Button>}<Button variant='primary' disabled={!text.trim()} onClick={() => void submit()}>{submitLabel ?? (label === 'Reply' ? 'Reply' : 'Comment')}</Button></div>}
     </div>
   );
 }

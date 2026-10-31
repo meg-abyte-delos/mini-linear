@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+// Estimate is a picker (same Combobox as Priority/Cycle), no native select.
+async function setEstimate(page: Page, v: string) { await page.getByRole('button', { name: /^Estimate:/ }).click(); await page.getByRole('option', { name: v === '' ? 'No estimate' : `${v} pt${v === '1' ? '' : 's'}`, exact: true }).click(); }
+
+
 type Page = import('@playwright/test').Page;
 // The detail page runs on the API (demo workspace, demo session). Each test creates its own issue, so the shared DB and the other specs' titles are never touched.
 const TITLE = 'Board drag and drop';
@@ -40,7 +44,7 @@ test('inline title, properties and activity', async ({ page }) => {
   await page.getByRole('combobox', { name: /Change status/ }).fill('done');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set status to Done');
-  await page.getByLabel('Estimate').selectOption('5');
+  await setEstimate(page, '5');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
   // The ?today= override is ignored when the server runs a production build (CI), so the page compares against the real clock.
   // Use a date that is in the past on any clock, not one relative to the pinned 2026-10-28.
@@ -165,7 +169,7 @@ test('comments: edit, delete, and one chronological timeline with change events'
   await expect(c).toContainText('(edited)');
   // change events (estimate) interleave with the comment, in time order
   // The assignee change is not exercised here: the picker needs the members directory (PR 4).
-  await page.getByLabel('Estimate').selectOption('3');
+  await setEstimate(page, '3');
   const items = await feed.locator('> li').allTextContents();
   const ci = items.findIndex((t) => t.includes('final'));
   const ei = items.findIndex((t) => t.includes('set estimate to 3'));
