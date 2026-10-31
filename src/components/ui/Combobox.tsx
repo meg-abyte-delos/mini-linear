@@ -6,11 +6,11 @@ import { fuzzyFilter } from '@/lib/fuzzy';
 import { moveIndex, firstEnabled, lastEnabled } from '@/lib/ui/nav';
 
 export interface ComboOption { id: string; label: string; lead?: ReactNode; hint?: ReactNode; checked?: boolean; disabled?: boolean }
-interface Props { open: boolean; anchorRef: RefObject<HTMLElement | null>; onClose: () => void; label: string; options: ComboOption[]; onPick: (id: string) => void; multi?: boolean; numbered?: boolean; startOnChecked?: boolean; placeholder?: string; emptyText?: string }
+interface Props { open: boolean; anchorRef: RefObject<HTMLElement | null>; onClose: () => void; label: string; options: ComboOption[]; onPick: (id: string) => void; multi?: boolean; numbered?: boolean; startOnChecked?: boolean; matchWidth?: boolean; placeholder?: string; emptyText?: string }
 
 // ARIA 1.2 combobox picker: the input keeps DOM focus, aria-activedescendant tracks the highlighted option.
 // Single-select closes on pick; multi stays open. Esc closes (Popover); Tab is left alone so focus moves on.
-export function Combobox({ open, anchorRef, onClose, label, options, onPick, multi, numbered, startOnChecked, placeholder, emptyText = 'No match' }: Props) {
+export function Combobox({ open, anchorRef, onClose, label, options, onPick, multi, numbered, startOnChecked, matchWidth, placeholder, emptyText = 'No match' }: Props) {
   const uid = useId();
   const [q, setQ] = useState('');
   const [i, setI] = useState(0);
@@ -21,8 +21,8 @@ export function Combobox({ open, anchorRef, onClose, label, options, onPick, mul
   const optId = (id: string) => uid + '-o-' + id;
   const pick = (o: ComboOption) => { if (o.disabled) return; onPick(o.id); if (!multi) onClose(); };
   return (
-    <Popover open={open} anchorRef={anchorRef} onClose={onClose} label={label} role='dialog' initialFocus='first'>
-      <div className='combo'>
+    <Popover open={open} anchorRef={anchorRef} onClose={onClose} label={label} role='dialog' initialFocus='first' matchWidth={matchWidth}>
+      <div className={matchWidth ? 'combo combo-fit' : 'combo'}>
         <input
           className='combo-input' role='combobox' aria-expanded='true' aria-controls={uid + '-list'} aria-autocomplete='list' aria-label={'Filter: ' + label}
           aria-activedescendant={results[active] ? optId(results[active].id) : undefined} placeholder={placeholder ?? label} value={q}

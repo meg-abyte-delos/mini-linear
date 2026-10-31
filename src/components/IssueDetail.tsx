@@ -504,7 +504,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           </dl>
         </section>
       </div>
-      <Combobox open={!!pick} anchorRef={pickAnchor} onClose={() => setPick(null)} label={pickTitle[shown.kind]} multi={shown.kind === 'labels'} numbered={shown.kind === 'status'} startOnChecked={shown.kind === 'status'} options={options(shown.kind)} onPick={(id) => void onPick(id)} />
+      <Combobox open={!!pick} anchorRef={pickAnchor} onClose={() => setPick(null)} matchWidth label={pickTitle[shown.kind]} multi={shown.kind === 'labels'} numbered={shown.kind === 'status'} startOnChecked={shown.kind === 'status'} options={options(shown.kind)} onPick={(id) => void onPick(id)} />
       <ConfirmDialog open={confirmDelete} title={`Delete ${ident}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void lifecycle('delete'); }}>
         <p>{issue.title}</p><p>The issue moves to the trash. You can restore it from there.</p>
       </ConfirmDialog>
