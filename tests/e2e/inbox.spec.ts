@@ -131,7 +131,7 @@ test('shell: the List/Board toggle is hidden on Inbox, Cycles and Projects', asy
   await expect(page.getByRole('group', { name: 'View', exact: true })).toBeVisible();
 });
 
-test('inbox: detail shows a status pill, a short date, a primary Open issue, and titles carry a tooltip', async ({ page }) => {
+test('inbox: detail shows a status pill, a short date, a ghost Open issue, and titles carry a tooltip', async ({ page }) => {
   await page.goto('/?view=inbox');
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('option').first()).toBeVisible();
@@ -145,10 +145,10 @@ test('inbox: detail shows a status pill, a short date, a primary Open issue, and
   // short date, not toLocaleString (30/10/2026, 10:00:00)
   const when = await detail.getByText('When', { exact: true }).locator('xpath=following-sibling::dd[1]').textContent();
   expect(when).toMatch(/^(just now|\d+[mh] ago|[A-Z][a-z]{2} \d{1,2}(, \d{4})?, \d{2}:\d{2})$/);
-  // Open issue is the first, primary action
+  // Open issue is the first action, ghost (Linear has no primary button in this header)
   const first = detail.getByRole('toolbar', { name: 'Notification actions' }).getByRole('button').first();
   await expect(first).toHaveText('Open issue');
-  await expect(first).toHaveAttribute('data-variant', 'primary');
+  await expect(first).toHaveAttribute('data-variant', 'ghost');
   // truncated text keeps a tooltip with the full value
   const row = page.getByRole('option').first();
   await expect(row.locator('.ntitle')).toHaveAttribute('title', /.+/);
@@ -177,4 +177,11 @@ test('inbox: the options menu (Mark all as read marks everything) is only on the
   }
   await page.getByRole('tab', { name: 'All' }).click();
   await expect(page.getByRole('button', { name: 'Inbox options' })).toBeVisible();
+});
+
+test('inbox: opened directly, the sidebar marks Inbox and no Issues link', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  const side = page.getByRole('complementary', { name: 'Sidebar' });
+  await expect(side.locator('a.side-link[aria-current="page"]')).toHaveText([/Inbox/]);
 });

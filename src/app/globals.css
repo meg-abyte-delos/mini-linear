@@ -185,8 +185,8 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .sv-row:hover .sv-tag, .sv-row:focus-within .sv-tag { visibility:hidden; }
 .sv-row:has([aria-current=page]) .sv-acts { background:var(--sel); }
 @media (hover:none) { .sv-acts { opacity:1; } .sv-tag { display:none; } }
-.sv-act { flex:0 0 auto; white-space:nowrap; border:0; background:none; color:var(--muted-strong); cursor:pointer; font:inherit; font-size:var(--fs-sm); padding:0 4px; height:24px; border-radius:4px; }
-.sv-act:hover, .sv-act:focus-visible { color:var(--fg); background:var(--hover); }
+.sv-act { flex:0 0 auto; white-space:nowrap; }
+.btn.sv-act[data-size='24'] { padding:0 var(--sp-1); }
 .save-form { display:inline-flex; align-items:center; gap:var(--sp-1); }
 .save-form .cb-row { font-size:var(--fs-sm); }
 .save-err { color:var(--fg); font-size:var(--fs-sm); }

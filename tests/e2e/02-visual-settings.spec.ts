@@ -11,5 +11,5 @@ test('visual: workspace-settings', async ({ page }) => {
   await page.evaluate(() => document.fonts.ready);
   await settled(page);
   await page.mouse.move(0, 0);
-  await expect(page).toHaveScreenshot('workspace-settings-1280.png', { maxDiffPixelRatio: 0.015, animations: 'disabled', caret: 'hide' });
+  await expect(page).toHaveScreenshot('workspace-settings-1280.png', { maxDiffPixelRatio: 0.002, animations: 'disabled', caret: 'hide' });
 });
