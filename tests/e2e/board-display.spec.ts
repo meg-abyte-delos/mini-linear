@@ -23,21 +23,26 @@ test('board: Display button opens options without Grouping; card properties togg
   await expect(page.locator('.board .card .id')).toHaveCount(0);
   await dlg.getByRole('button', { name: 'Priority', exact: true }).click();
   await expect(page.locator('.board .card .card-prio')).toHaveCount(0);
+  await dlg.getByRole('button', { name: 'Assignee', exact: true }).click(); // ID and Assignee both off: no empty card-top row
+  await expect(page.locator('.board .card .card-top')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dlg).toBeHidden();
   await expect(btn).toBeFocused();
 });
 
-test('board: Ordering Priority sorts a column by priority and disables nothing else', async ({ page }) => {
+test('board: Ordering Priority sorts a column by priority and turns drag off with a note', async ({ page }) => {
   await openBoard(page);
   await page.locator('#fb-display').click();
   const dlg = page.getByRole('dialog', { name: 'Display options' });
   await dlg.getByLabel('Ordering').click();
   await page.getByRole('menu', { name: 'Ordering' }).locator('[role=menuitem]').filter({ hasText: 'Priority' }).click();
   await expect(dlg.getByLabel('Ordering')).toHaveAttribute('data-value', 'priority');
+  await expect(dlg.getByRole('note')).toContainText('Set Ordering to Manual');
+  await expect(page.locator('.board .card[draggable=true]')).toHaveCount(0);
   await page.keyboard.press('Escape');
   const prios = await page.locator('.board section, .board [data-testid^=col-]').first().locator('.card-prio').evaluateAll((els) => els.map((e) => e.getAttribute('title') ?? ''));
   const rank = (t: string) => ['Urgent', 'High', 'Medium', 'Low'].indexOf(t);
+  expect(prios.length).toBeGreaterThan(1);
   const r = prios.map(rank).map((x) => (x < 0 ? 9 : x));
   expect([...r].sort((a, b) => a - b)).toEqual(r);
 });
