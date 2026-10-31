@@ -1,5 +1,5 @@
 'use client';
-import { Button, Checkbox, EmptyState, Input, Menu, Tooltip, type MenuEntry } from '@/components/ui';
+import { Button, Checkbox, EmptyState, IconButton, Input, Menu, Tooltip, type MenuEntry } from '@/components/ui';
 import { WIDE_MQ } from '@/lib/breakpoints';
 import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
