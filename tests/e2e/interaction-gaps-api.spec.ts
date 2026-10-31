@@ -60,3 +60,24 @@ test('Cmd+1 does not pick a status; Space does not peek in the Inbox', async ({ 
   await page.keyboard.press('Space');
   await expect(page.getByRole('button', { name: 'Close detail panel' })).toBeHidden();
 });
+
+test('list > issue > Back keeps the opened issue selected and visible', async ({ page, browser }) => {
+  await withSession(browser, page);
+  for (let n = 0; n < 3; n++) await apiCreateIssue(page, `Return row ${n} ${Date.now()}`);
+  await page.goto('/'); await page.waitForSelector('html[data-ready]');
+  const scroll = page.locator('.scroll');
+  const last = page.locator('.scroll [role=option]').last();
+  await last.scrollIntoViewIfNeeded();
+  const id = (await last.getAttribute('data-id'))!;
+  expect(await scroll.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await last.click();
+  await expect(page).toHaveURL(/issue/);
+  await page.goBack();
+  await page.waitForSelector('html[data-ready]');
+  const back = page.locator(`[data-id="${id}"]`);
+  await expect(back).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => scroll.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  const [rb, sb] = await Promise.all([back.boundingBox(), scroll.boundingBox()]);
+  expect(rb!.y).toBeGreaterThanOrEqual(sb!.y - 1);
+  expect(rb!.y + rb!.height).toBeLessThanOrEqual(sb!.y + sb!.height + 1);
+});
