@@ -19,7 +19,7 @@ export function SettingsTeamPage({ slug, teamId }: { slug: string; teamId: strin
   const [busy, setBusy] = useState(false);
   const reload = useCallback(async () => {
     try {
-      const [w, teams] = await Promise.all([S.getSettings(slug), S.listTeams(slug)]);
+      const [w, teams] = await Promise.all([S.getSettings(slug), S.listTeams(slug, fetch, true)]);
       setWs(w);
       const t = teams.find((x) => x.id === teamId) ?? null;
       setTeam(t); setMissing(!t);
@@ -39,7 +39,7 @@ export function SettingsTeamPage({ slug, teamId }: { slug: string; teamId: strin
     <SettingsShell slug={slug} current={current} header={<><h1 className='set-h1'>{team.name} <span className='set-key'>{team.key}</span></h1><p className='set-desc'>Members, workflow, estimates, cycles and labels for this team.</p></>}>
       {msg && <p role='status' className='toast'>{msg}</p>}
       <TeamPanel slug={slug} team={team} members={members} canAdmin={isAdmin(ws.role)} onChanged={setMsg} onDelete={() => setConfirm(true)} />
-      <TeamSettings slug={slug} teamId={teamId} embedded />
+      <TeamSettings slug={slug} teamId={teamId} embedded readOnly={!isAdmin(ws.role)} />
       <ConfirmDialog open={confirm} destructive busy={busy} title={`Delete ${team.name}?`} confirmLabel='Delete team' onConfirm={() => void remove()} onCancel={() => setConfirm(false)}>
         This permanently deletes the team and all of its issues. This cannot be undone.
       </ConfirmDialog>
