@@ -2,6 +2,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { listTeams, type Team } from '@/lib/settings-client';
+// Every settings page uses .btn and the primitives; General no longer pulls them in through a ui import.
+import '@/app/ui-primitives.css';
 import '@/app/ui-settings.css';
 
 // 'team:<id>' marks one team's page.
