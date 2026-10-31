@@ -33,7 +33,7 @@ import { ProjectDetail } from '@/components/ProjectDetail';
 import { ProjectsList } from '@/components/ProjectsList';
 import { httpViewsClient, mockViewsClient, groupToFilters, viewUrl, type SavedView } from '@/lib/views-client';
 import { FILTER_KEYS, NONE, activeCount, applyFilters, emptyFilters, writeFilters, type FilterKey, type Filters } from '@/lib/filters';
-import { WorkspaceSwitcher, TeamSection, SideIcon } from '@/components/SidebarParts';
+import { Sidebar } from '@/components/Sidebar';
 import { listTeams, type Team } from '@/lib/settings-client';
 import { DisplayPick } from '@/components/DisplayPick';
 import { NewIssueModal, type NewIssueDraft } from '@/components/NewIssueModal';
@@ -878,39 +878,18 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   return (
     <div className='shell' data-nav={navOpen ? 'open' : undefined}>
       <div className='side-scrim' aria-hidden='true' onClick={() => setNavOpen(false)} />
-      <aside id='app-sidebar' className='side' aria-label='Sidebar' onClick={(e) => { if ((e.target as HTMLElement).closest('a.side-link')) setNavOpen(false); }} onKeyDown={(e) => { if (e.key === 'Escape' && navOpen) { e.stopPropagation(); setNavOpen(false); } }}>
-        <div className='side-head'>
-          <WorkspaceSwitcher slug={api?.slug ?? null} people={nlPeople} />
-          <IconButton className='side-icbtn' onClick={openPalette} label='Search' title='Search (⌘K)' aria-keyshortcuts='Meta+K Control+K'><SideIcon name='search' /></IconButton>
-          {!readOnly && <IconButton className='side-icbtn compose' onClick={() => create()} label='New issue' title='New issue (C)' aria-keyshortcuts='C'><SideIcon name='compose' /></IconButton>}
-        </div>
-        <nav aria-label='Primary'>
-          <a className={`side-link${view === 'inbox' ? ' active' : ''}`} aria-current={view === 'inbox' ? 'page' : undefined} href='#inbox' onClick={(e) => { e.preventDefault(); setView('inbox'); }}><SideIcon name='inbox' /><span>Inbox</span>{unreadCount > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${unreadCount} unread notifications`}>{unreadCount > 99 ? '99+' : unreadCount}</span>}</a>
-          <a className='side-link' href='#my-issues' onClick={(e) => e.preventDefault()}><SideIcon name='mine' /><span>My issues</span></a>
-          <a className='side-link' href='#views' onClick={(e) => e.preventDefault()}><SideIcon name='views' /><span>Views</span></a>
-          <div role='group' aria-label='Saved views' data-testid='saved-views'>
-            {views.map((v) => (
-              <div key={v.id} className='sv-row'>
-                <a className={`side-link sub${activeViewId === v.id ? ' active' : ''}`} aria-current={activeViewId === v.id ? 'page' : undefined} href={`?v=${v.id}`} onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setViewState('list'); applyView(v); }} title={v.name}><span className='sv-name'>{v.name}</span>{v.shared && <span className='sv-tag'>Shared</span>}</a>
-                <span className='sv-acts'><button className='sv-act' aria-label={`Copy link to ${v.name}`} onClick={() => copyViewLink(v)}>{copied === v.id ? 'Copied' : 'Link'}</button>
-                {!readOnly && <button className='sv-act' aria-label={`Delete view ${v.name}`} onClick={() => void deleteView(v)}>×</button>}</span>
-              </div>
-            ))}
-          </div>
-        </nav>
-        <div className='side-label'>Your teams</div>
-        <nav aria-label='Teams'>
-          {sideTeams.map((t) => { const here = !api || teamScope === t.id; const home = !api || t.id === api.teamId; const onIssues = here && view !== 'cycles' && view !== 'projects' && view !== 'inbox'; return (
-          <TeamSection key={t.id} id={sideTeams.length > 1 ? `team-nav-${t.id}` : 'team-nav'} name={t.name}>
-          <a className={`side-link sub${onIssues ? ' active' : ''}`} aria-current={onIssues ? 'page' : undefined} href='#issues' data-team={t.id} onClick={(e) => { e.preventDefault(); setTeamScope(t.id); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}><SideIcon name='issues' /><span>Issues</span>{home && hint('go-issues') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-issues')}</kbd>}</a>
-          {home && (<>
-          <a className={`side-link sub${view === 'cycles' ? ' active' : ''}`} aria-current={view === 'cycles' ? 'page' : undefined} href='#cycles' onClick={(e) => { e.preventDefault(); setTeamScope(t.id); setView('cycles'); }}><SideIcon name='cycles' /><span>Cycles</span></a>
-          <a className={`side-link sub${view === 'projects' ? ' active' : ''}`} aria-current={view === 'projects' ? 'page' : undefined} href='#projects' onClick={(e) => { e.preventDefault(); setTeamScope(t.id); setView('projects'); }}><SideIcon name='projects' /><span>Projects</span>{hint('go-projects') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-projects')}</kbd>}</a>
-          </>)}
-          </TeamSection>
-          ); })}
-        </nav>
-      </aside>
+      <Sidebar
+        slug={api?.slug ?? null} people={nlPeople} unread={unreadCount} views={views} teams={sideTeams} homeTeamId={api ? api.teamId : null}
+        active={{ kind: view === 'inbox' ? 'inbox' : view === 'cycles' ? 'cycles' : view === 'projects' ? 'projects' : 'issues', teamId: api ? teamScope : null, viewId: activeViewId }}
+        readOnly={readOnly} copied={copied} navOpen={navOpen} onNavigate={() => setNavOpen(false)}
+        onSearch={openPalette} {...(!readOnly ? { onCompose: () => create() } : {})}
+        onInbox={() => setView('inbox')}
+        onIssues={(id) => { setTeamScope(id); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}
+        onCycles={(id) => { setTeamScope(id); setView('cycles'); }}
+        onProjects={(id) => { setTeamScope(id); setView('projects'); }}
+        onView={(v) => { if (view === 'cycles' || view === 'projects' || view === 'inbox') setViewState('list'); applyView(v); }}
+        onCopyView={copyViewLink} onDeleteView={(v) => void deleteView(v)}
+      />
       <main className='main' ref={mainRef} data-view={view}>
         <header className='head'>
           <button type='button' ref={navToggleRef} className='side-toggle' aria-label='Open sidebar' aria-controls='app-sidebar' aria-expanded={navOpen} onClick={() => setNavOpen((o) => !o)}><svg width='16' height='16' viewBox='0 0 16 16' aria-hidden='true' focusable='false'><rect x='1.75' y='2.75' width='12.5' height='10.5' rx='2' fill='none' stroke='currentColor' strokeWidth='1.5' /><path d='M6 3v10' stroke='currentColor' strokeWidth='1.5' /></svg></button>

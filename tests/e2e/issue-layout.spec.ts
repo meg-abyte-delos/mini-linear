@@ -27,6 +27,35 @@ for (const width of [1280, 1440]) {
       await expect(side.getByRole('link', { name: /inbox/i })).toBeVisible();
     });
 
+    test('issue page and Search show the same sidebar entries as the list', async ({ page }) => {
+      const issue = await apiCreateIssue(page, `layout-entries-${width}-${Date.now()}`);
+      const labels = async (url: string) => {
+        await page.goto(url);
+        const side = page.getByRole('complementary', { name: 'Sidebar' });
+        await expect(side.getByRole('link', { name: 'My issues', exact: true })).toBeVisible();
+        await expect(side.getByRole('link', { name: 'Views', exact: true })).toBeVisible();
+        await expect(side.getByRole('group', { name: 'Saved views' })).toBeAttached();
+        await expect(side.getByRole('link', { name: 'Issues' }).first()).toBeVisible();
+        await expect(side.getByRole('link', { name: 'Cycles' }).first()).toBeVisible();
+        await expect(side.getByRole('link', { name: 'Projects' }).first()).toBeVisible();
+        await expect(side.getByRole('group', { name: 'Saved views' })).toBeAttached();
+        await page.waitForTimeout(500); // people/teams/unread load async
+        return (await side.locator('.side-link').allInnerTexts()).map((t) => t.replace(/\s*\d+\+?$/, ''));
+      };
+      const list = await labels('/');
+      expect(await labels(`/w/${DEMO.slug}/issue/${issue.identifier}`)).toEqual(list);
+      expect(await labels('/search')).toEqual(list);
+    });
+
+    test('sidebar marks the current route: Issues on the issue page, Search icon on /search', async ({ page }) => {
+      const issue = await apiCreateIssue(page, `layout-active-${width}-${Date.now()}`);
+      await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
+      const side = page.getByRole('complementary', { name: 'Sidebar' });
+      await expect(side.locator('a.side-link[aria-current="page"]').first()).toHaveText(/Issues/);
+      await page.goto('/search');
+      await expect(side.getByRole('link', { name: 'Search', exact: true })).toHaveAttribute('aria-current', 'page');
+    });
+
     test('sidebar on the issue page has the same width as on the list', async ({ page }) => {
       const issue = await apiCreateIssue(page, `layout-same-${width}-${Date.now()}`);
       await page.goto('/');
