@@ -3,7 +3,7 @@
 // without a handler an item is a real link back into the Shell (standalone routes get their data from AppSidebar below).
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
-import { IconButton } from '@/components/ui';
+import { Button, IconButton } from '@/components/ui';
 import { SideIcon, TeamSection, WorkspaceSwitcher } from '@/components/SidebarParts';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
@@ -67,8 +67,8 @@ export function Sidebar(p: SidebarProps) {
           {p.views.map((v) => (
             <div key={v.id} className='sv-row'>
               <SideLink className={`side-link sub${active.viewId === v.id ? ' active' : ''}`} current={active.viewId === v.id} href={p.onView ? `?v=${v.id}` : `/?v=${v.id}`} onSelect={p.onView ? () => p.onView?.(v) : undefined} title={v.name}><span className='sv-name'>{v.name}</span>{v.shared && <span className='sv-tag'>Shared</span>}</SideLink>
-              <span className='sv-acts'><button className='sv-act' aria-label={`Copy link to ${v.name}`} onClick={() => p.onCopyView?.(v)}>{p.copied === v.id ? 'Copied' : 'Link'}</button>
-              {!p.readOnly && <button className='sv-act' aria-label={`Delete view ${v.name}`} onClick={() => p.onDeleteView?.(v)}>×</button>}</span>
+              <span className='sv-acts'><Button variant='ghost' size={24} className='sv-act' aria-label={`Copy link to ${v.name}`} onClick={() => p.onCopyView?.(v)}>{p.copied === v.id ? 'Copied' : 'Link'}</Button>
+              {!p.readOnly && <Button variant='ghost' size={24} className='sv-act' aria-label={`Delete view ${v.name}`} onClick={() => p.onDeleteView?.(v)}>×</Button>}</span>
             </div>
           ))}
         </div>
@@ -95,7 +95,7 @@ export function Sidebar(p: SidebarProps) {
 }
 
 /** Data for routes outside the Shell (issue page, Search): people, teams, saved views and the unread badge, same sources as Shell. */
-export function AppSidebar({ slug, current, id, onNavigate, navOpen }: { slug: string | null; current: 'search' | 'issue'; id?: string; onNavigate?: () => void; navOpen?: boolean }) {
+export function AppSidebar({ slug, current, id, onNavigate, navOpen, teamId }: { slug: string | null; current: 'search' | 'issue'; /** Team that owns the open issue: only its Issues link is marked (none when unknown). */ teamId?: string | null; id?: string; onNavigate?: () => void; navOpen?: boolean }) {
   const [people, setPeople] = useState<NlPeople>(EMPTY_PEOPLE);
   const [teams, setTeams] = useState<Team[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
@@ -119,7 +119,7 @@ export function AppSidebar({ slug, current, id, onNavigate, navOpen }: { slug: s
   return (
     <Sidebar
       slug={slug} people={people} unread={unread} views={views} teams={sideTeams} homeTeamId={teams[0]?.id ?? null}
-      active={{ kind: current === 'search' ? 'search' : 'issues' }} id={id ?? 'app-sidebar'} copied={copied}
+      active={current === 'search' ? { kind: 'search' } : { kind: 'issues', teamId: teamId ?? '' }} id={id ?? 'app-sidebar'} copied={copied}
       {...(onNavigate ? { onNavigate, navOpen: navOpen ?? false } : {})}
       onCopyView={(v) => { void navigator.clipboard?.writeText(viewUrl(window.location.origin, '/', v.id)).catch(() => undefined); setCopied(v.id); setTimeout(() => setCopied((c) => (c === v.id ? null : c)), 1500); }}
       onDeleteView={(v) => { void viewsClient.remove(v).then((ok) => { if (ok) setViews((l) => l.filter((x) => x.id !== v.id)); }); }}
