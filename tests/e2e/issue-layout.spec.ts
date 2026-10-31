@@ -27,6 +27,26 @@ for (const width of [1280, 1440]) {
       await expect(side.getByRole('link', { name: /inbox/i })).toBeVisible();
     });
 
+    test('issue page and Search show the same sidebar entries as the list', async ({ page }) => {
+      const issue = await apiCreateIssue(page, `layout-entries-${width}-${Date.now()}`);
+      const labels = async (url: string) => {
+        await page.goto(url);
+        const side = page.getByRole('complementary', { name: 'Sidebar' });
+        await expect(side.getByRole('link', { name: 'My issues', exact: true })).toBeVisible();
+        await expect(side.getByRole('link', { name: 'Views', exact: true })).toBeVisible();
+        await expect(side.getByRole('group', { name: 'Saved views' })).toBeAttached();
+        await expect(side.getByRole('link', { name: 'Issues' }).first()).toBeVisible();
+        await expect(side.getByRole('link', { name: 'Cycles' }).first()).toBeVisible();
+        await expect(side.getByRole('link', { name: 'Projects' }).first()).toBeVisible();
+        await expect(side.getByRole('group', { name: 'Saved views' })).toBeAttached();
+        await page.waitForTimeout(500); // people/teams/unread load async
+        return (await side.locator('.side-link').allInnerTexts()).map((t) => t.replace(/\s*\d+\+?$/, ''));
+      };
+      const list = await labels('/');
+      expect(await labels(`/w/${DEMO.slug}/issue/${issue.identifier}`)).toEqual(list);
+      expect(await labels('/search')).toEqual(list);
+    });
+
     test('sidebar on the issue page has the same width as on the list', async ({ page }) => {
       const issue = await apiCreateIssue(page, `layout-same-${width}-${Date.now()}`);
       await page.goto('/');

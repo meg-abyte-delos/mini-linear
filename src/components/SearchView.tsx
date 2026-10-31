@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { StatusIcon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
-import { AppSidebar } from '@/components/AppSidebar';
+import { AppSidebar } from '@/components/Sidebar';
 import { STATUSES, STATUS_LABEL, type Issue, type Status } from '@/lib/issues';
 import { MIN_QUERY, searchApi, searchLocal, highlightParts, snippetParts, type HitKind, type SearchHit } from '@/lib/search-client';
 

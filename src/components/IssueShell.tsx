@@ -2,7 +2,7 @@
 // Issue page chrome: app sidebar + off-canvas drawer at or below 900px, toggled from the issue header (same behaviour as Shell).
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { WIDE_MQ } from '@/lib/breakpoints';
-import { AppSidebar } from '@/components/AppSidebar';
+import { AppSidebar } from '@/components/Sidebar';
 
 type NavCtx = { open: boolean; toggle: () => void; toggleRef: React.RefObject<HTMLButtonElement | null> };
 const Ctx = createContext<NavCtx | null>(null);
