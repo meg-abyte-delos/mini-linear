@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { IssueActivity } from '@/components/IssueDetail';
@@ -69,7 +69,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
   // Stable window listener reading the latest handler through a ref: re-binding in a passive effect can lag a render under load,
   // so the first key hit the stale (empty-list) closure and was lost (inbox.spec x-toggles-selection flake).
   const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => undefined);
-  onKeyRef.current = function onKey(e: KeyboardEvent) {
+  const onKey = function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
@@ -89,6 +89,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
       else if (sel && e.key === 'u') { e.preventDefault(); const ns = targets(); void actMany(ns, ns.every((n) => n.read_at) ? 'unread' : 'read'); }
       else if (sel && e.key === 'Enter' && !(t && t.tagName === 'BUTTON')) { e.preventDefault(); open(sel); }
   };
+  useLayoutEffect(() => { onKeyRef.current = onKey; }); // committed before paint, never written during render
   useEffect(() => {
     const h = (e: KeyboardEvent) => onKeyRef.current(e);
     window.addEventListener('keydown', h);
