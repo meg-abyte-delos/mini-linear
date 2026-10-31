@@ -502,11 +502,11 @@ function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, 
     </article>
   );
   return (
-    <li>
+    <div className='cmt-thread'>
       {one(c)}
       {replies.length > 0 && <ul className='replies'>{replies.map((r) => <li key={r.id}>{one(r)}</li>)}</ul>}
       {!readOnly && (replying ? <Composer label='Reply' autoFocus onSubmit={async (b) => { const ok = await onReply(b); if (ok) setReplying(false); return ok; }} onCancel={() => setReplying(false)} /> : <button className='link-btn' onClick={() => setReplying(true)}>Reply</button>)}
-    </li>
+    </div>
   );
 }
 

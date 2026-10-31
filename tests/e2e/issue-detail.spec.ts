@@ -90,6 +90,10 @@ test('comments: mention autocomplete, reply thread, reactions', async ({ page })
   const r = page.getByRole('combobox', { name: 'Reply' });
   await r.fill('on it'); await r.press('Control+Enter');
   await expect(page.locator('.replies .cmt')).toContainText('on it');
+  // a11y: every li sits in a real list (no li nested in a comment wrapper), and axe finds no list/listitem violation
+  expect(await page.evaluate(() => Array.from(document.querySelectorAll('li')).filter((li) => !li.parentElement?.matches('ul,ol,menu')).length)).toBe(0);
+  const ax = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(ax.violations.filter((v) => v.id === 'listitem' || v.id === 'list')).toEqual([]);
 });
 
 test('sub-issues, relations, attachments', async ({ page }) => {
