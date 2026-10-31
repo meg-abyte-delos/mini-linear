@@ -1,5 +1,5 @@
-// One stable color per user: hash the id into a fixed palette slot (CSS maps av-c0..av-c7 to tokens).
-export const AVATAR_SLOTS = 8;
+// One stable color per user: hash the id into a fixed palette slot (CSS maps c0..c12 in ui-review-0000.css).
+export const AVATAR_SLOTS = 13;
 export function avatarSlot(userId: string): number {
   let h = 2166136261;
   for (let k = 0; k < userId.length; k++) { h ^= userId.charCodeAt(k); h = Math.imul(h, 16777619); }

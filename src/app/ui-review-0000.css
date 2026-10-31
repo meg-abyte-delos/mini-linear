@@ -1,0 +1,21 @@
+/* Review 00:00 (main d2b02fe). */
+
+/* Issue page right column: sentence-case section headers, 12px/500, tertiary (Linear). */
+/* Doubled class: ui-issue-page.css is imported by the route, after layout. */
+.side-h.side-h { text-transform:none; letter-spacing:0; font-size:var(--fs-sm); font-weight:var(--fw-medium); color:var(--fg-tertiary); }
+
+/* Issue header: favorite / more are ghost icon buttons. `.idp button` (0,1,1) was adding a 1px border and 3px 8px padding. */
+.idp .idh-btn { border:0; padding:0; background:none; }
+.idp .idh-btn:hover:not([aria-disabled=true]) { background:color-mix(in srgb, var(--fg) 6%, transparent); }
+
+/* Members: emails fit at 1280. Role/State narrower (both tables share the grid), Email gets a fixed 176px, Name keeps the rest. */
+/* :has() bumps specificity over ui-settings.css (route import, loaded after layout). */
+.set-table:has(.set-col-role) .set-col-role { width:136px; }
+.set-table:has(.set-col-role) .set-col-state { width:96px; }
+.set-table:has(.set-col-name) .set-col-email { width:176px; }
+
+/* Avatars: 13 slots (prime modulus, src/lib/ui/avatar.ts) so the 8 demo seed users get 8 distinct, well-separated hues
+   (Elena orange, Sam violet: no more twin indigo side by side). No user slot reuses the workspace avatar indigo
+   (#5e6ad2, .av.h1). White initials stay >= 4.8:1 on every .av background. */
+.av.c0 { background:#6b4fbb; } .av.c1 { background:#2a7a9c; } .av.c2 { background:#9c3f8f; } .av.c3 { background:#1b7d77; } .av.c4 { background:#a23b5e; } .av.c5 { background:#9a5424; } .av.c6 { background:#3d7a3a; } .av.c7 { background:#3f6fb5; } .av.c8 { background:#b03a2e; } .av.c9 { background:#8a6a12; } .av.c10 { background:#7a4fa0; } .av.c11 { background:#5a6b1f; } .av.c12 { background:#7d5f2a; }
+.uav.uav-c0 { --av:#6b4fbb; } .uav.uav-c1 { --av:#2a7a9c; } .uav.uav-c2 { --av:#9c3f8f; } .uav.uav-c3 { --av:#1b7d77; } .uav.uav-c4 { --av:#a23b5e; } .uav.uav-c5 { --av:#9a5424; } .uav.uav-c6 { --av:#3d7a3a; } .uav.uav-c7 { --av:#3f6fb5; } .uav.uav-c8 { --av:#b03a2e; } .uav.uav-c9 { --av:#8a6a12; } .uav.uav-c10 { --av:#7a4fa0; } .uav.uav-c11 { --av:#5a6b1f; } .uav.uav-c12 { --av:#7d5f2a; }
