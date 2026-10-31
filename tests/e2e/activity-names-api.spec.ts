@@ -54,7 +54,7 @@ test('rendered feed shows names, never raw ids, for assignee/project/cycle/label
   await expect(feed).toContainText(`set project to Feed project ${stamp}`);
   await expect(feed).toContainText(`set cycle to Feed cycle ${stamp}`);
   await expect(feed).toContainText(`added feed-label-${stamp}`);
-  await expect(feed).toContainText('changed status from Backlog to In Progress');
+  await expect(feed).toContainText('changed status from Backlog to In progress');
   const items = await feed.getByRole('listitem').allInnerTexts();
   expect(items.length).toBeGreaterThanOrEqual(5);
   for (const t of items) expect(t).not.toMatch(UUID);
