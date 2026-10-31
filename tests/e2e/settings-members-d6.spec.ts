@@ -61,14 +61,19 @@ test('members page: search filters, invite sends and lists a pending invite, rev
   await expect(inv).toHaveCount(0);
 });
 
-test('members page: row menu offers role changes and a red Remove that asks to confirm', async ({ page }) => {
+test('members page: inline role dropdown, role tabs, row menu with a red Remove that asks to confirm', async ({ page }) => {
   await page.goto('/w/demo/members');
   const rows = page.getByTestId('member-row');
   await expect(rows.first()).toBeVisible();
+  // Tabs filter by role and show their counts.
+  await page.getByRole('tab', { name: /^Guests/ }).click();
+  for (const r of await rows.all()) await expect(r.getByRole('button', { name: /^Role for/ }).or(r.locator('.set-role-text'))).toContainText(/Guest/i);
+  await page.getByRole('tab', { name: /^All/ }).click();
+  await expect(page.getByRole('tab', { name: /^All/ })).toHaveAttribute('aria-selected', 'true');
   const others = rows.filter({ has: page.getByRole('button', { name: /^Actions for/ }) });
   test.skip((await others.count()) === 0, 'demo workspace has no other member');
   await others.first().getByRole('button', { name: /^Actions for/ }).click();
-  await expect(page.getByRole('menuitem', { name: 'Make guest' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /^Make / })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: 'Remove from workspace' })).toHaveAttribute('data-destructive', 'true');
   await page.getByRole('menuitem', { name: 'Remove from workspace' }).click();
   const dlg = page.getByRole('alertdialog');

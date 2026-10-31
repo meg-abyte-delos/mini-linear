@@ -16,7 +16,6 @@ test('members page lists the workspace members from the API and is axe clean', a
     const row = rows.filter({ hasText: m.email });
     await expect(row).toHaveCount(1);
     await expect(row).toContainText(new RegExp(m.role, 'i'));
-    await expect(row).toContainText('Active');
   }
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(r.violations.map((v) => `${v.id} x${v.nodes.length}`)).toEqual([]);

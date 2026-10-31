@@ -5,9 +5,17 @@ import { personName } from '@/lib/nl-people';
 import { ConfirmDialog, Popover, Select, UserAvatar, type MenuEntry } from '@/components/ui';
 import { RowMenu } from '@/components/RowMenu';
 import { SettingsShell } from '@/components/SettingsShell';
+import { Icon } from '@/components/icons';
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const isAdmin = (r?: string) => r === 'owner' || r === 'admin';
+type Tab = 'all' | 'admins' | 'members' | 'guests';
+const TABS: { id: Tab; label: string; match: (r: string) => boolean }[] = [
+  { id: 'all', label: 'All', match: () => true },
+  { id: 'admins', label: 'Admins', match: (r) => r === 'owner' || r === 'admin' },
+  { id: 'members', label: 'Members', match: (r) => r === 'member' },
+  { id: 'guests', label: 'Guests', match: (r) => r === 'guest' },
+];
 const dateFmt = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
 
 function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: boolean; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void; roles: S.AssignableRole[]; onSend: (email: string, role: 'admin' | 'member' | 'guest') => Promise<string | null> }) {
@@ -64,6 +72,7 @@ export function Members({ slug }: { slug: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [tab, setTab] = useState<Tab>('all');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [removing, setRemoving] = useState<S.MemberRow | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,7 +92,9 @@ export function Members({ slug }: { slug: string }) {
   useEffect(() => { void load(); }, [load]);
 
   const admin = isAdmin(role);
-  const shown = useMemo(() => (rows ?? []).filter((m) => S.matchesMember(m, personName(m), q)), [rows, q]);
+  const tabDef = TABS.find((t) => t.id === tab) ?? TABS[0]!;
+  const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.id, (rows ?? []).filter((m) => t.match(m.role)).length])) as Record<Tab, number>, [rows]);
+  const shown = useMemo(() => (rows ?? []).filter((m) => tabDef.match(m.role) && S.matchesMember(m, personName(m), q)), [rows, q, tabDef]);
   const act = async (p: Promise<unknown>, ok: string) => { try { await p; setMsg(ok); await load(); } catch (e) { setMsg((e as Error).message); } };
   const confirmRemove = async () => {
     if (!removing) return;
@@ -97,13 +108,10 @@ export function Members({ slug }: { slug: string }) {
   };
 
   const header = (
-    <div className='set-head-row'>
-      <div>
-        <h1 className='set-h1'>Members</h1>
-        {rows && <p className='set-desc'>{rows.length} {rows.length === 1 ? 'member' : 'members'} in this workspace</p>}
-      </div>
-      {admin && <button ref={inviteBtn} type='button' className='btn' data-size='32' data-variant='primary' aria-haspopup='dialog' aria-expanded={inviteOpen} onClick={() => setInviteOpen((o) => !o)}>Invite</button>}
-    </div>
+    <>
+      <h1 className='set-h1'>Members</h1>
+      {rows && <p className='set-desc'>{rows.length} {rows.length === 1 ? 'member' : 'members'} in this workspace</p>}
+    </>
   );
   if (err) return <SettingsShell slug={slug} current='members' header={<h1 className='set-h1'>Members</h1>}><p role='alert' className='set-error'>{err}</p></SettingsShell>;
   if (!rows) return <SettingsShell slug={slug} current='members' header={<h1 className='set-h1'>Members</h1>}><p role='status' className='set-muted'>Loading members…</p></SettingsShell>;
@@ -114,34 +122,49 @@ export function Members({ slug }: { slug: string }) {
         {msg && <p role='status' className='toast'>{msg} <button type='button' className='btn' data-size='32' data-variant='ghost' onClick={() => setMsg(null)}>Dismiss</button></p>}
         <div className='set-toolbar'>
           <input type='search' className='set-input set-search' aria-label='Search members' placeholder='Search by name or email' value={q} onChange={(e) => setQ(e.target.value)} />
+          <div role='tablist' aria-label='Filter by role' className='set-tabs'>
+            {TABS.map((t) => (
+              <button key={t.id} type='button' role='tab' id={`mem-tab-${t.id}`} aria-selected={tab === t.id} aria-controls='mem-panel' tabIndex={tab === t.id ? 0 : -1} className='set-tab'
+                onClick={() => setTab(t.id)}
+                onKeyDown={(e) => {
+                  const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+                  if (!d) return;
+                  e.preventDefault();
+                  const n = TABS[(TABS.findIndex((x) => x.id === t.id) + d + TABS.length) % TABS.length]!;
+                  setTab(n.id); document.getElementById(`mem-tab-${n.id}`)?.focus();
+                }}>{t.label} <span className='set-tab-n'>{counts[t.id]}</span></button>
+            ))}
+          </div>
+          {admin && <button ref={inviteBtn} type='button' className='btn set-invite-btn' data-size='32' data-variant='primary' aria-haspopup='dialog' aria-expanded={inviteOpen} onClick={() => setInviteOpen((o) => !o)}><Icon name='plus' size={14} />Invite</button>}
         </div>
-        <section aria-labelledby='mem-h' className='set-card set-flush'>
-          <h2 id='mem-h' className='sr-only'>Members</h2>
-          <table className='set-table'>
-            <thead><tr><th scope='col' className='set-col-name'>Name</th><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th><th scope='col' className='set-col-state'>State</th><th scope='col' className='set-col-end'><span className='sr-only'>Actions</span></th></tr></thead>
+        <section id='mem-panel' role='tabpanel' aria-labelledby={`mem-tab-${tab}`} className='set-card set-flush'>
+                    <table className='set-table'>
+            <thead><tr><th scope='col' className='set-col-name'>Name</th><th scope='col' className='set-col-email'>Email</th><th scope='col' className='set-col-role'>Role</th></tr></thead>
             <tbody>
               {shown.map((m) => {
                 const name = personName(m);
                 const self = m.user_id === meId;
+                const manage = admin && !self && S.canManageMember(role, m.role);
                 const entries: MenuEntry[] = [
-                  ...S.assignableRoles(role).map((r) => ({ id: `role-${r}`, label: `Make ${r}`, disabled: m.role === r, onSelect: () => void act(S.setMemberRole(slug, m.user_id, r), `${name} is now ${r}`) })),
-                  { type: 'separator' as const },
                   { id: 'remove', label: 'Remove from workspace', destructive: true, onSelect: () => setRemoving(m) },
                 ];
                 return (
                   <tr key={m.user_id} data-testid='member-row'>
                     <td><span className='set-person'><UserAvatar userId={m.user_id} name={name} size='md' /><span className='set-person-text'>{name}{self && <span className='set-you'>you</span>}</span></span></td>
                     <td className='set-muted'>{m.email}</td>
-                    <td>{admin && !self && S.canManageMember(role, m.role)
-                      ? <Select className='set-select set-role-select' label={`Role for ${name}`} value={m.role} options={S.assignableRoles(role).map((r: S.AssignableRole) => ({ id: r, label: cap(r) }))}
-                          onChange={(id) => void act(S.setMemberRole(slug, m.user_id, id as S.WorkspaceRole), `${name} is now ${id}`)} />
-                      : <span className='set-role' data-role={m.role}>{m.role}</span>}</td>
-                    <td><span className='set-state'>Active</span></td>
-                    <td className='set-end'>{admin && !self && S.canManageMember(role, m.role) && <RowMenu label={`Actions for ${name}`} entries={entries} />}</td>
+                    <td>
+                      <span className='set-role-cell'>
+                        {manage
+                          ? <Select className='set-select set-role-select' label={`Role for ${name}`} value={m.role} options={S.assignableRoles(role).map((r: S.AssignableRole) => ({ id: r, label: cap(r) }))}
+                              onChange={(id) => void act(S.setMemberRole(slug, m.user_id, id as S.WorkspaceRole), `${name} is now ${id}`)} />
+                          : <span className='set-role-text'>{cap(m.role)}</span>}
+                        {manage && <RowMenu label={`Actions for ${name}`} entries={entries} />}
+                      </span>
+                    </td>
                   </tr>
                 );
               })}
-              {shown.length === 0 && <tr><td colSpan={5} className='set-empty'>No members match “{q}”.</td></tr>}
+              {shown.length === 0 && <tr><td colSpan={3} className='set-empty'>{q ? <>No members match “{q}”.</> : `No ${tabDef.label.toLowerCase()} yet.`}</td></tr>}
             </tbody>
           </table>
         </section>
