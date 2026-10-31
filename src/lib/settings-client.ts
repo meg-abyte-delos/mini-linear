@@ -25,6 +25,22 @@ export function settingsPatch(prev: Pick<WorkspaceSettings, 'name' | 'slug' | 'l
   if (next.logo_url.trim() !== (prev.logo_url ?? '')) p.logo_url = next.logo_url.trim();
   return p;
 }
+export type Me = { id: string; email: string; display_name: string | null; avatar_url: string | null; theme: 'light' | 'dark' | 'system'; home_page: HomePage };
+export type HomePage = 'inbox' | 'my-issues' | 'projects' | 'views';
+export const getMe = (f: Fetch = fetch) => call<Me>(f, 'GET', '/api/v1/me');
+export const patchMe = (patch: Partial<Pick<Me, 'display_name' | 'avatar_url' | 'theme' | 'home_page'>>, f: Fetch = fetch) => call<Me>(f, 'PATCH', '/api/v1/me', patch);
+/** Logo upload: multipart field `file` (png/jpeg/webp, 1 MiB max). Resolves with the new workspace settings. */
+export const LOGO_MAX_BYTES = 1024 * 1024;
+export const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+export async function uploadLogo(slug: string, file: File, f: Fetch = fetch) {
+  const fd = new FormData(); fd.append('file', file);
+  const r = await f(`${base(slug)}/settings/logo`, { method: 'POST', body: fd });
+  const j = await r.json().catch(() => null);
+  if (!r.ok) throw new SettingsError(r.status, r.status === 413 ? 'Logo is larger than 1 MB' : r.status === 415 ? 'Logo must be a PNG, JPEG or WebP image' : (j as { error?: { message?: string } } | null)?.error?.message ?? `HTTP ${r.status}`);
+  return j as WorkspaceSettings;
+}
+/** Owner only. */
+export const deleteWorkspace = (slug: string, f: Fetch = fetch) => call<void>(f, 'DELETE', base(slug));
 export const patchSettings = (slug: string, patch: Record<string, string>, f: Fetch = fetch) => call<WorkspaceSettings>(f, 'PATCH', `${base(slug)}/settings`, patch);
 /** `mine`: only the teams the caller belongs to (admins and owners still get all of them). */
 export const listTeams = async (slug: string, f: Fetch = fetch, mine = false) => (await call<{ items: Team[] }>(f, 'GET', `${base(slug)}/teams?limit=100${mine ? '&mine=1' : ''}`)).items;

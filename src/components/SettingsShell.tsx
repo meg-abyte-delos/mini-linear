@@ -7,7 +7,7 @@ import '@/app/ui-primitives.css';
 import '@/app/ui-settings.css';
 
 // 'team:<id>' marks one team's page.
-export type SettingsPage = 'general' | 'members' | 'teams' | 'notifications' | 'profile' | 'preferences' | `team:${string}`;
+export type SettingsPage = 'general' | 'members' | 'teams' | 'labels' | 'notifications' | 'profile' | 'preferences' | `team:${string}`;
 
 // Two-column settings layout: left nav + one centered content column. Pages put their own <h1> in `header`.
 // One nav for every settings page: Account, Workspace, then the sub-list of the viewer's teams.
@@ -29,6 +29,7 @@ export function SettingsShell({ slug, current, header, children }: { slug: strin
         {link('general', s, 'General')}
         {link('members', `/w/${slug}/members`, 'Members')}
         {link('teams', `${s}/teams`, 'Teams')}
+        {link('labels', `${s}/labels`, 'Labels')}
         {link('notifications', `${s}/notifications`, 'Notifications')}
         {teams.length > 0 && <>
           <p className='set-nav-h' id='set-nav-teams'>Your teams</p>

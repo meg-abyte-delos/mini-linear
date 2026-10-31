@@ -4,10 +4,10 @@ import { createPortal } from 'react-dom';
 import { useExitMount } from './useExitMount';
 import { Button } from './Button';
 
-interface Props { open: boolean; title: string; children?: ReactNode; confirmLabel: string; cancelLabel?: string; destructive?: boolean; busy?: boolean; onConfirm: () => void; onCancel: () => void }
+interface Props { open: boolean; title: string; children?: ReactNode; confirmLabel: string; cancelLabel?: string; destructive?: boolean; busy?: boolean; confirmDisabled?: boolean; onConfirm: () => void; onCancel: () => void }
 
 // Modal alertdialog: focus starts on Cancel (the safe action), Tab cycles inside, Esc and the scrim cancel, focus returns to the opener.
-export function ConfirmDialog({ open, title, children, confirmLabel, cancelLabel = 'Cancel', destructive, busy, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({ open, title, children, confirmLabel, cancelLabel = 'Cancel', destructive, busy, confirmDisabled, onConfirm, onCancel }: Props) {
   const { mounted, state } = useExitMount(open);
   const ref = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -44,7 +44,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel, cancelLabel
         {children && <div id={descId} className='dlg-body'>{children}</div>}
         <div className='dlg-actions'>
           <Button ref={cancelRef} variant='ghost' onClick={onCancel}>{cancelLabel}</Button>
-          <Button variant={destructive ? 'secondary' : 'primary'} tone={destructive ? 'danger' : undefined} loading={busy} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button variant={destructive ? 'secondary' : 'primary'} tone={destructive ? 'danger' : undefined} loading={busy} disabled={confirmDisabled} onClick={onConfirm}>{confirmLabel}</Button>
         </div>
       </div>
     </div>,

@@ -16,9 +16,10 @@ const TABS: { id: Tab; label: string; match: (r: string) => boolean }[] = [
   { id: 'members', label: 'Members', match: (r) => r === 'member' },
   { id: 'guests', label: 'Guests', match: (r) => r === 'guest' },
 ];
+const MAX_INVITES = 20;
 const dateFmt = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
 
-function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: boolean; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void; roles: S.AssignableRole[]; onSend: (email: string, role: 'admin' | 'member' | 'guest') => Promise<string | null> }) {
+function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: boolean; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void; roles: S.AssignableRole[]; onSend: (email: string, role: 'admin' | 'member' | 'guest') => Promise<{ error: string; keep: string } | null> }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'admin' | 'member' | 'guest'>('member');
   const [err, setErr] = useState<string | null>(null);
@@ -28,13 +29,13 @@ function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: bool
     setBusy(true); setErr(null);
     const m = await onSend(email, role);
     setBusy(false);
-    if (m) setErr(m); else { setEmail(''); setRole('member'); onClose(); }
+    if (m) { setErr(m.error); setEmail(m.keep); } else { setEmail(''); setRole('member'); onClose(); }
   };
   return (
     <Popover open={open} anchorRef={anchorRef} onClose={onClose} label='Invite people' align='end'>
       <form className='set-invite' onSubmit={(e) => void submit(e)}>
         <p className='set-invite-h'>Invite to workspace</p>
-        <label className='set-field'><span className='set-label'>Email</span><input className='set-input' type='email' required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com' /></label>
+        <label className='set-field'><span className='set-label'>Email addresses</span><input className='set-input' type='email' multiple required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com, other@company.com' /></label>
         <div className='set-field' role='radiogroup' aria-label='Role'>
           <span className='set-label' aria-hidden='true'>Role</span>
           <div className='set-seg'>
@@ -103,8 +104,13 @@ export function Members({ slug }: { slug: string }) {
     setBusy(false); setRemoving(null);
   };
   const send = async (email: string, r: 'admin' | 'member' | 'guest') => {
-    try { await S.createInvite(slug, email, r); setMsg(`Invitation sent to ${email.trim().toLowerCase()}`); await load(); return null; }
-    catch (e) { return (e as Error).message; }
+    // Several addresses may be pasted, separated by commas or spaces: one invite each; the failures stay in the field.
+    const list = Array.from(new Set(email.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean)));
+    if (list.length > MAX_INVITES) return { error: `Invite at most ${MAX_INVITES} addresses at once`, keep: email };
+    const failed: string[] = []; let sent = 0, firstErr = '';
+    for (const a of list) { try { await S.createInvite(slug, a, r); sent++; } catch (e) { failed.push(a); firstErr ||= (e as Error).message; } }
+    if (sent) { setMsg(sent === 1 ? `Invitation sent to ${list.find((a) => !failed.includes(a))}` : `${sent} invitations sent`); await load(); }
+    return failed.length ? { error: `${sent ? `${sent} sent. ` : ''}${failed.join(', ')}: ${firstErr}`, keep: failed.join(', ') } : null;
   };
 
   const header = (
