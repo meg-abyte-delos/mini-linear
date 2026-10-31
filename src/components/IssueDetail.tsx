@@ -23,6 +23,7 @@ import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people
 import { IssueHeaderBar, type HeaderNav } from '@/components/IssueHeaderBar';
 import { PropIcon } from '@/components/PropIcons';
 import { PresenceStack } from '@/components/PresenceStack';
+import { IssueNavToggle } from '@/components/IssueShell';
 import { usePresence } from '@/lib/presence/use-presence';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
@@ -91,9 +92,31 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [propsOpen, setPropsOpen] = useState(false);
+  const propsToggleRef = useRef<HTMLButtonElement>(null);
+  const propsAsideRef = useRef<HTMLElement>(null);
+  const propsWasOpen = useRef(false);
+  // Properties drawer (<1024px): focus its first control on open, Esc anywhere closes, focus back to the toggle on close.
+  useEffect(() => {
+    const aside = propsAsideRef.current;
+    if (propsOpen) {
+      propsWasOpen.current = true;
+      (aside?.querySelector<HTMLElement>('button:not([disabled]), a[href], input, [tabindex]:not([tabindex="-1"])') ?? aside)?.focus();
+      const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setPropsOpen(false); } };
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    }
+    if (!propsWasOpen.current) return;
+    propsWasOpen.current = false;
+    const a = document.activeElement;
+    if (!a || a === document.body || aside?.contains(a)) propsToggleRef.current?.focus();
+  }, [propsOpen]);
+  // The drawer only exists below 1024px: close it when the viewport grows past that.
+  useEffect(() => { const mq = window.matchMedia('(min-width: 1024px)'); const f = () => { if (mq.matches) setPropsOpen(false); }; f(); mq.addEventListener('change', f); return () => mq.removeEventListener('change', f); }, []);
   const version = useRef(initial.version);
   const client = useMemo(() => (api ? detailApi(slug) : null), [api, slug]);
   const ident = identifierOf(issue);
+  useEffect(() => { setPropsOpen(false); }, [initial.identifier]);
   // Breadcrumb root is the owning team's name ("Demo"), falling back to the identifier key until the team list loads.
   const [teamNames, setTeamNames] = useState<Record<string, string>>({});
   useEffect(() => { if (!api) return; let live = true; void listTeams(slug).then((ts) => { if (live) setTeamNames(Object.fromEntries(ts.map((t) => [t.id, t.name]))); }).catch(() => { /* keep fallback */ }); return () => { live = false; }; }, [api, slug]);
@@ -390,11 +413,14 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const dueLabel = issue.due_date ? new Date(`${issue.due_date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : 'Set due date';
 
   return (
-    <div className='idp'>
-      <main className='idp-main' aria-label={`Issue ${ident}`}>
+    <div className='idp' data-props={propsOpen ? 'open' : undefined}>
+      <div className='idp-scrim' aria-hidden='true' onClick={() => setPropsOpen(false)} />
+      <main className='idp-main' aria-label={`Issue ${ident}`} inert={propsOpen || undefined}>
         <header className='idp-head'>
+          <IssueNavToggle />
           <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>{teamLabel}</Link><span className='sep' aria-hidden='true'>›</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>›</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
           <PresenceStack presence={viewers} size='md' />
+          <button type='button' ref={propsToggleRef} className='idh-btn idp-props-toggle' aria-label='Properties' title='Properties' aria-controls='idp-props' aria-expanded={propsOpen} onClick={() => setPropsOpen((o) => !o)}><PropIcon name='panel' /></button>
           <IssueHeaderBar ident={ident} nav={nav} readOnly={readOnly} entries={menuEntries} moreRef={moreRef} onRestore={() => void lifecycle('restore')} />
         </header>
         {(issue.archived_at || issue.deleted_at) && <p className='idp-banner' role='status'>{issue.deleted_at ? 'This issue is in the trash. Restore it to edit.' : `Archived ${fmtDate(issue.archived_at as string)}.`}</p>}
@@ -445,7 +471,8 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         </section>
       </main>
 
-      <aside className='idp-side' aria-label='Properties'>
+      <div id='idp-props' ref={propsAsideRef as React.RefObject<HTMLDivElement>} tabIndex={-1} className='idp-side' aria-label='Properties' role={propsOpen ? 'dialog' : 'complementary'} aria-modal={propsOpen || undefined}>
+        {propsOpen && <IconButton label='Close properties' size={24} className='idp-props-close' onClick={() => setPropsOpen(false)}><svg width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' aria-hidden='true'><path d='M4 4l8 8M12 4l-8 8' /></svg></IconButton>}
         <section className='side-group' aria-labelledby='sg-props'>
           <h3 id='sg-props' className='side-h'>Properties</h3>
           <dl>
@@ -460,14 +487,14 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           <dl>
           <dt>Estimate</dt><dd><button disabled={readOnly} onClick={open('estimate')} aria-haspopup='dialog' aria-label={`Estimate: ${issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}`}><PropIcon name='estimate' /><span className={issue.estimate == null ? 'prop-empty' : undefined}>{issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}</span></button></dd>
           <dt><label htmlFor='prop-due'>Due date</label></dt><dd className='prop-native'><span className={`prop-pill due-${due}`} aria-hidden='true'><PropIcon name='due' /><span className={issue.due_date ? undefined : 'prop-empty'}>{dueLabel}</span>{due === 'overdue' && <span className='due-flag'>Overdue</span>}</span><input id='prop-due' type='date' disabled={readOnly} value={issue.due_date ?? ''} onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* not supported */ } }} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} /></dd>
-          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
+          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'} title={cycle?.name}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
           </dl>
         </section>
         <section className='side-group' aria-labelledby='sg-org'>
           <h3 id='sg-org' className='side-h'>Organization</h3>
           <dl>
-          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'><PropIcon name='parent' /><span className={parent ? 'prop-trunc' : 'prop-empty'}>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</span></button></dd>
-          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'><PropIcon name='project' /><span className={project ? 'prop-trunc' : 'prop-empty'}>{project?.name ?? 'Add to project'}</span></button></dd>
+          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'><PropIcon name='parent' /><span className={parent ? 'prop-trunc' : 'prop-empty'} title={parent ? `${identifierOf(parent)} ${parent.title}` : undefined}>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</span></button></dd>
+          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'><PropIcon name='project' /><span className={project ? 'prop-trunc' : 'prop-empty'} title={project?.name}>{project?.name ?? 'Add to project'}</span></button></dd>
           </dl>
         </section>
         <section className='side-group' aria-labelledby='sg-git'>
@@ -476,7 +503,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           <dt>Branch</dt><dd><Tooltip label={branch}><button className='branch-btn' onClick={() => void copyBranch()} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code><span className='branch-copy'><PropIcon name='copy' /></span></button></Tooltip></dd>
           </dl>
         </section>
-      </aside>
+      </div>
       <Combobox open={!!pick} anchorRef={pickAnchor} onClose={() => setPick(null)} label={pickTitle[shown.kind]} multi={shown.kind === 'labels'} numbered={shown.kind === 'status'} startOnChecked={shown.kind === 'status'} options={options(shown.kind)} onPick={(id) => void onPick(id)} />
       <ConfirmDialog open={confirmDelete} title={`Delete ${ident}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void lifecycle('delete'); }}>
         <p>{issue.title}</p><p>The issue moves to the trash. You can restore it from there.</p>

@@ -2,9 +2,9 @@ import type { HTMLAttributes, InputHTMLAttributes, ReactNode, Ref } from 'react'
 
 type Common = { ref?: Ref<HTMLInputElement> };
 
-export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & Common & { size?: 28 | 32; invalid?: boolean };
+export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & Common & { size?: 24 | 28 | 32; invalid?: boolean };
 
-/** Text input: 28 in the app, 32 in forms/auth. `invalid` sets aria-invalid and the danger border. */
+/** Text input: 28 in the app, 24 inline in toolbars, 32 in forms/auth. `invalid` sets aria-invalid and the danger border. */
 export function Input({ size = 28, invalid, className, ...rest }: InputProps) {
   return <input {...rest} className={className ? `input ${className}` : 'input'} data-size={size} aria-invalid={invalid || rest['aria-invalid'] || undefined} />;
 }

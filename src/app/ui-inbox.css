@@ -11,14 +11,10 @@
 .badge { background:var(--accent); color:var(--accent-fg); font-weight:500; }
 .inbox-bar { height:36px; padding:0 var(--sp-4); border-bottom:1px solid var(--line-soft); }
 .inbox-tabs { padding:var(--sp-2) var(--sp-4); gap:2px; }
-.inbox-tabs button { height:24px; padding:0 var(--sp-2); font-size:var(--fs-sm); }
-.inbox-tabs button:hover { color:var(--fg); background:color-mix(in srgb, var(--fg) 4%, transparent); }
-.inbox-tabs button.on { background:color-mix(in srgb, var(--fg) 8%, transparent); }
-.inbox-tabs button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
-.snooze-menu { background:var(--panel); box-shadow:0 16px 48px rgba(0,0,0,.5); padding:var(--sp-1); }
-.snooze-menu button { height:28px; padding:0 var(--sp-2); border:0; border-radius:6px; background:none; color:var(--fg); cursor:pointer; }
-.snooze-menu button:hover { background:color-mix(in srgb, var(--fg) 6%, transparent); }
-.snooze-menu button:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.snooze-menu { background:var(--raised); box-shadow:var(--shadow-pop); padding:var(--sp-1); }
+.inbox-tabs .btn[aria-selected='true'] { background:var(--sel); color:var(--fg); }
+.snooze-menu .btn { justify-content:flex-start; }
+.snooze-menu .btn-label { display:flex; flex:1; align-items:center; justify-content:space-between; gap:var(--sp-2); }
 .inbox-wrap .inbox { flex:0 1 44%; min-width:360px; max-width:560px; border-right:1px solid var(--line-soft); }
 .inbox-detail { flex:1; width:auto; min-width:0; background:var(--panel); border-left:0; padding:var(--sp-4); overflow:auto; }
 .inbox-preview { margin-top:var(--sp-4); padding-top:var(--sp-4); border-top:1px solid var(--line-soft); overflow-wrap:anywhere; }
@@ -47,8 +43,6 @@
 .nrow .nwho { flex:0 3 auto; min-width:0; max-width:40%; overflow:hidden; text-overflow:ellipsis; color:var(--muted); font-size:var(--fs-sm); }
 .nrow .ntime { width:32px; flex:none; color:var(--muted); font-size:var(--fs-sm); }
 .nrow.sel { outline:0; background:color-mix(in srgb, var(--fg) 7%, transparent); box-shadow:inset 2px 0 0 var(--accent); }
-.inbox-tabs button { border:0; border-radius:6px; background:none; color:var(--muted); font-weight:500; cursor:pointer; }
-.inbox-tabs button.on { color:var(--fg); }
 /* Detail pane: bounded, 24px padding, label/value grid like the Linear issue sidebar. */
 .inbox-detail { padding:24px; overflow-y:auto; overflow-x:hidden; border-left:1px solid var(--line-soft); }
 .inbox-detail h2 { margin:0 0 16px; line-height:1.35; overflow-wrap:anywhere; }

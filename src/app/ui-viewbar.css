@@ -22,9 +22,6 @@
 .fseg .fcolon { font-size:0; } /* keeps the accessible name 'Status: Todo' without showing the colon */
 .fx { display:inline-flex; align-items:center; justify-content:center; width:24px; padding:0; border:0; border-left:1px solid var(--line); background:none; color:var(--muted); cursor:pointer; transition:color var(--dur-instant) var(--ease-out), background var(--dur-instant) var(--ease-out); }
 .fx:hover { color:var(--fg); background:var(--hover); }
-.fclear { text-decoration:none; color:var(--muted); }
-.fclear:hover { text-decoration:underline; }
-.filterbar .save-view { border-style:solid; border-radius:var(--r-sm); border-color:var(--line); }
 
 /* Responsive: Linear keeps the shell from 768px, with a narrower sidebar and fewer columns */
 @media (max-width:1100px) {
