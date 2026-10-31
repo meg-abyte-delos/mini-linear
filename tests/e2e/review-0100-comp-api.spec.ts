@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { API_MODE, DEMO, apiCreateIssue, login } from './helpers/auth';
 
 // UI review 01:00: Inbox detail shows the issue Activity + composer, system rows get a calendar glyph, Projects show the status once per row.
@@ -30,6 +31,10 @@ test('Inbox detail: Activity feed and comment composer under the description', a
   await reply.fill('seen from the inbox');
   await detail.getByRole('button', { name: 'Comment', exact: true }).click();
   await expect(detail.getByRole('article', { name: /Comment by/ }).filter({ hasText: 'seen from the inbox' })).toHaveCount(1);
+  // a11y (CommentItem is shared with the issue page): every li sits in a real list, and axe finds no list/listitem violation
+  expect(await mate.evaluate(() => Array.from(document.querySelectorAll('li')).filter((li) => !li.parentElement?.matches('ul,ol,menu')).length)).toBe(0);
+  const ax = await new AxeBuilder({ page: mate }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  expect(ax.violations.filter((v) => v.id === 'listitem' || v.id === 'list')).toEqual([]);
   await ctx.close();
 });
 
