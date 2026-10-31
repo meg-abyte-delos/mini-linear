@@ -35,7 +35,7 @@ function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: bool
     <Popover open={open} anchorRef={anchorRef} onClose={onClose} label='Invite people' align='end'>
       <form className='set-invite' onSubmit={(e) => void submit(e)}>
         <p className='set-invite-h'>Invite to workspace</p>
-        <label className='set-field'><span className='set-label'>Email addresses</span><Input size={32} type='email' multiple required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com, other@company.com' /></label>
+        <label className='set-field'><span className='set-label'>Email addresses</span><Input size={32} type='email' multiple required invalid={!!err} value={email} onChange={(e) => { setEmail(e.target.value); if (err) setErr(null); }} placeholder='name@company.com, other@company.com' /></label>
         <div className='set-field' role='radiogroup' aria-label='Role'>
           <span className='set-label' aria-hidden='true'>Role</span>
           <div className='set-seg'>
