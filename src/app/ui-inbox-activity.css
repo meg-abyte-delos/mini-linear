@@ -42,11 +42,8 @@
 .inbox-activity .composer-inline { position:relative }
 .inbox-activity .composer-inline textarea { padding-bottom:calc(var(--sp-2) + 28px) }
 .inbox-activity .composer-tools { position:absolute;right:var(--sp-2);bottom:var(--sp-2);display:flex;align-items:center;gap:var(--sp-1) }
-.inbox-activity .composer-ic { display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:var(--r-md);background:transparent;color:var(--fg);cursor:pointer }
-.inbox-activity .composer-ic:hover:not(:disabled) { background:color-mix(in srgb,var(--fg) 8%,transparent) }
-.inbox-activity .composer-ic:focus-visible { outline:2px solid var(--accent);outline-offset:1px }
-.inbox-activity .composer-send:not(:disabled) { background:var(--accent);color:var(--accent-fg) }
-.inbox-activity .composer-send:disabled { opacity:.4;cursor:default }
+.inbox-activity .btn.composer-send:not(:disabled) { background:var(--accent);color:var(--accent-fg) }
+
 /* Same comment controls as the issue page (issue-detail.css is not loaded on the Inbox route). */
 .inbox-activity .btn.cmt-reply { margin:calc(-1 * var(--sp-1)) 0 var(--sp-2) var(--sp-1) }
 .inbox-activity .cmt-actions { gap:2px }
