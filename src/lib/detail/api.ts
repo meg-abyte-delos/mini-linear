@@ -14,7 +14,7 @@ export async function call<T>(f: Fetch, url: string, init?: RequestInit): Promis
 
 export interface Relation { id: string; type: 'blocks' | 'blocked_by' | 'related' | 'duplicate'; issue_id: string; related_issue_id: string; direction?: 'outgoing' | 'incoming' }
 export interface Attachment { id: string; kind: 'link' | 'file'; url: string; title: string; created_by: string | null }
-export interface Comment { id: string; body: string; author_id: string | null; parent_comment_id: string | null; created_at: string; version?: number; edited_at?: string | null; reactions?: Reaction[] }
+export interface Comment { id: string; body: string; author_id: string | null; parent_comment_id: string | null; created_at: string; version?: number; edited_at?: string | null; resolved_at?: string | null; resolved_by?: string | null; reactions?: Reaction[] }
 /** Server shape (#75): user_ids of reactors; `mine` is derived client-side from the viewer id. */
 export interface Reaction { emoji: string; count: number; user_ids?: string[] }
 export const reactedBy = (r: Reaction | undefined, me: string) => !!r?.user_ids?.includes(me);
@@ -37,6 +37,7 @@ export function detailApi(slug: string, f: Fetch = (...a) => fetch(...a)) {
     addComment: (id: string, body: string, parent_comment_id: string | null) => call<Comment>(f, `${b}/issues/${id}/comments`, j('POST', { body, parent_comment_id })),
     editComment: (cid: string, body: string, version: number) => call<Comment>(f, `${b}/comments/${cid}`, { ...j('PATCH', { body }), headers: { 'if-match': `"${version}"` } }),
     deleteComment: (cid: string, version: number) => call<null>(f, `${b}/comments/${cid}`, { method: 'DELETE', headers: { 'if-match': `"${version}"` } }),
+    resolve: (cid: string, on: boolean) => call<Comment>(f, `${b}/comments/${cid}/${on ? 'resolve' : 'unresolve'}`, j('POST')),
     react: (cid: string, emoji: string, on: boolean) => call<null>(f, `${b}/comments/${cid}/reactions`, j(on ? 'POST' : 'DELETE', { emoji })),
     archive: (id: string, on: boolean) => call<unknown>(f, `${b}/issues/${id}/${on ? 'archive' : 'unarchive'}`, j('POST')),
     remove: (id: string, version: number) => call<null>(f, `${b}/issues/${id}`, { ...j('DELETE'), headers: { 'if-match': `"${version}"` } }),

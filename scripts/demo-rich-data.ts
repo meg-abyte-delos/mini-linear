@@ -201,6 +201,25 @@ export const RICH_COMMENTS: RichComment[] = [
   C(48, 44, 'admin', 1, '{maya} the drag handles should snap to the week, not the day.'),
   C(49, 44, 'maya', 2, 'Snapping to the week makes sense. I will add day precision with Alt.', { re: 48 }),
   C(50, 18, 'maya', 6, 'The mobile sheet variant is in. {admin} ready for your review.'),
+  // Threads for the issue page (Linear-style): 2 to 5 replies each; k 51 and up. One resolved (collapsed by default).
+  C(51, 20, 'mate', 1, 'Step syntax (*/5) works. List syntax (1,15,30) parses but the next-run preview is off by one for lists that wrap around the hour.'),
+  C(52, 20, 'jonas', 1, '{mate} do we normalise the list before computing the next run? Sorting it first should fix the wrap-around.', { re: 51 }),
+  C(53, 20, 'mate', 2, 'Sorting fixes it. I also dedupe, so 5,5,10 behaves like 5,10.', { re: 51 }),
+  C(54, 20, 'priya', 2, 'Please keep a test for the unsorted input, that is the case users paste.', { re: 51 }),
+  C(55, 20, 'mate', 3, 'Added: unsorted, duplicated and wrapping lists, 6 fixtures.', { re: 51 }),
+  C(56, 20, 'admin', 4, 'Thanks all. {jonas} can you re-check the preview on the board card before we close this?', { re: 51 }),
+  C(57, 24, 'leo', 1, 'Relative timestamps: 2h ago under a day, then the date. Hovering shows the exact time.'),
+  C(58, 24, 'maya', 2, 'Should just now cover the first minute? It feels less jumpy than 0m ago.', { re: 57 }),
+  C(59, 24, 'leo', 2, 'Yes, under 45 seconds. It refreshes every minute.', { re: 57 }),
+  C(60, 24, 'admin', 3, 'Good. Make sure it does not re-render the whole feed each tick.', { re: 57 }),
+  C(61, 33, 'priya', 1, '{leo} which auth schemes do we document? API keys only, or the session cookie too?', { resolved: true }),
+  C(62, 33, 'leo', 1, 'API keys only. The cookie is an implementation detail of the web app.', { re: 61 }),
+  C(63, 33, 'priya', 2, 'Agreed. I will add the scope table (read, write, admin).', { re: 61 }),
+  C(64, 33, 'jonas', 2, 'Include the rate limit headers in the example response.', { re: 61 }),
+  C(65, 33, 'leo', 3, 'Done in the latest draft, resolving this thread.', { re: 61 }),
+  C(66, 41, 'maya', 1, 'Tabs and popover are ready for review. Tooltip still needs the delay logic.'),
+  C(67, 41, 'jonas', 2, '{maya} 400ms open delay, no delay when moving between two tooltips, like Linear.', { re: 66 }),
+  C(68, 41, 'maya', 3, 'Done. Skip-delay window is 300ms.', { re: 66 }),
 ];
 export const mentionsOf = (body: string): Who[] => [...body.matchAll(/\{(admin|mate|maya|jonas|priya|leo)\}/g)].map((m) => m[1] as Who);
 export const commentAt = (m: RichComment) => atDay(issueByKey('DEM', m.n).day + m.after, 4 + (m.k % 4));

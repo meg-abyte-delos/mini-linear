@@ -8,6 +8,7 @@ import { type Row, stale, out, audit, listPage, afterId, assertAssignee, teamVis
 import { computeHealth } from "../project-health";
 import { subscribe } from "./subscriptions";
 import { emit } from "../notifications";
+import { emitSync } from "../sync/emit";
 import { parseMentions, normalizeEmoji, MAX_MENTIONS } from "../comments/mentions";
 
 // ------------------------------------------------ projects (span teams)
@@ -184,7 +185,14 @@ export const createComment = (req: Request, slug: string, rawIssue: string) => w
     if (p[0].parent_comment_id) throw new ApiError("validation_failed", "comment threads are one level deep");
   }
   await ctx.tx`insert into comments (id, workspace_id, issue_id, parent_comment_id, author_id, body) values (${id}, ${ctx.workspaceId}, ${issueId}, ${parent}, ${ctx.userId}, ${b.body})`;
-  if (parent) await ctx.tx`update comments set resolved_at = null, resolved_by = null where id = ${parent} and resolved_at is not null`; // a reply reopens the thread
+  if (parent) {
+    // A reply reopens a resolved thread: same bookkeeping as an explicit unresolve (version bump so a stale edit in another tab gets a 412, audit, change-feed event).
+    const reopened = await ctx.tx`update comments set resolved_at = null, resolved_by = null, version = version + 1 where id = ${parent} and resolved_at is not null returning version`;
+    if (reopened.length) {
+      await audit(ctx, "comment", parent, "unresolve", { resolved_at: { before: "resolved", after: null } });
+      await emitSync(ctx, { entity: "comment", id: parent, op: "update", version: Number(reopened[0]!.version), issueId });
+    }
+  }
   await subscribe(ctx, issueId, [ctx.userId], "commenter");
   const { ids: mentioned } = await syncMentions(ctx, id, issueId, b.body);
   const row = await getComment(ctx, id);

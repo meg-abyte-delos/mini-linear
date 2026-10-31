@@ -1,6 +1,6 @@
 // Inbox data access behind one interface: HTTP (API mode) or in-memory (mock mode, used by the e2e suite).
 import { personName } from '@/lib/nl-people';
-export type NotifType = 'assigned' | 'mention' | 'comment' | 'status_change' | 'due_soon';
+export type NotifType = 'assigned' | 'mention' | 'comment' | 'reply' | 'status_change' | 'due_soon';
 export type Notif = {
   id: string; type: NotifType; issue_id: string; comment_id: string | null; actor_id: string | null;
   read_at: string | null; archived_at: string | null; snoozed_until: string | null; created_at: string;
@@ -13,7 +13,7 @@ export type InboxAction = 'read' | 'unread' | 'archive' | 'unarchive' | 'snooze'
 export type InboxTab = 'all' | 'unread' | 'archived' | 'snoozed';
 export const TABS: { id: InboxTab; label: string }[] = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }, { id: 'archived', label: 'Archived' }, { id: 'snoozed', label: 'Snoozed' }];
 export type PrefMap = Record<NotifType, { in_app: boolean; email: boolean }>;
-export const NOTIF_TYPES: NotifType[] = ['assigned', 'mention', 'comment', 'status_change', 'due_soon'];
+export const NOTIF_TYPES: NotifType[] = ['assigned', 'mention', 'comment', 'reply', 'status_change', 'due_soon'];
 
 /** Snooze presets, computed from a given clock so they are testable. */
 export function snoozePresets(now = new Date()): { id: string; label: string; until: string }[] {
@@ -36,7 +36,7 @@ export interface InboxClient {
   readAll(): Promise<boolean>;
 }
 
-export const TYPE_LABEL: Record<NotifType, string> = { assigned: 'assigned you', mention: 'mentioned you', comment: 'commented', status_change: 'changed status', due_soon: 'is due soon' };
+export const TYPE_LABEL: Record<NotifType, string> = { assigned: 'assigned you', mention: 'mentioned you', comment: 'commented', reply: 'replied', status_change: 'changed status', due_soon: 'is due soon' };
 
 export function httpInboxClient(slug: string, f: typeof fetch = fetch): InboxClient {
   const b = `/api/v1/w/${slug}/notifications`;
