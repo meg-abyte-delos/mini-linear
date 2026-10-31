@@ -8,8 +8,8 @@
 
 /* Filter row: one compact line, quiet buttons */
 .filterbar { gap:6px; padding:6px 16px; min-height:36px; }
-.filterbar .tb-btn { border-color:transparent; color:var(--muted); }
-.filterbar .tb-btn:hover, .filterbar .tb-btn[aria-expanded=true] { border-color:var(--line); }
+/* Filter / Display = Button ghost 24; open state reads like hover */
+.filterbar .tb-btn[aria-expanded=true] { background:var(--hover); color:var(--fg); }
 
 /* Segmented chip: key | value | x, one hairline box (Linear's "Status is Todo ×") */
 .fseg { display:inline-flex; align-items:stretch; height:24px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel); overflow:hidden; }
@@ -35,6 +35,6 @@
 @media (max-width:840px) {
   .row .labels, .row .date { display:none; }
   .vtab { padding-inline:var(--sp-2); }
-  .filterbar .tb-btn span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .filterbar .tb-btn .btn-label > span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 }
 @media (prefers-reduced-motion: reduce) { .fx { transition:none; } }

@@ -84,8 +84,8 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd, 
     <section className={`col${overZone ? ' over-zone' : ''}${folded ? ' folded' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
       <div className='col-head'>
         <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
-        <button type='button' ref={moreRef} className='col-act' aria-label={`${STATUS_LABEL[status]} column options`} title='Column options' aria-haspopup='menu' aria-expanded={menu} onClick={() => setMenu((m) => !m)}><Icon name='more' /></button>
-        {onAdd && <button type='button' className='col-act' aria-label={`Add issue to ${STATUS_LABEL[status]}`} title='Add issue' onClick={() => onAdd(status)}><Icon name='plus' /></button>}
+        <IconButton ref={moreRef} size={24} className='col-act' label={`${STATUS_LABEL[status]} column options`} title='Column options' aria-haspopup='menu' aria-expanded={menu} onClick={() => setMenu((m) => !m)}><Icon name='more' /></IconButton>
+        {onAdd && <IconButton size={24} className='col-act' label={`Add issue to ${STATUS_LABEL[status]}`} title='Add issue' onClick={() => onAdd(status)}><Icon name='plus' /></IconButton>}
         <Menu open={menu} anchorRef={moreRef} onClose={() => setMenu(false)} label={`${STATUS_LABEL[status]} column`} entries={entries} align='end' />
       </div>
       <div className='col-scroll' ref={ref} onScroll={(e) => setTop(e.currentTarget.scrollTop)} data-testid={`col-${status}`}>
@@ -947,7 +947,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               </span>
             ))}
             <div className='fwrap'>
-              <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></button>
+              <Button variant='ghost' size={24} id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></Button>
               {tbMenu === 'filter' && <FilterMenu filters={filters} onClose={() => { setTbMenu(null); document.getElementById('fb-add')?.focus(); }} onPick={(k) => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }} />}
             </div>
             {activeCount(filters) > 0 && <Button variant='ghost' size={24} onClick={() => setFilters(emptyFilters())}>Clear filters</Button>}
@@ -963,7 +963,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             )}
             {(view === 'list' || view === 'board') && (
               <div className='tb-right'>
-                <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></button>
+                <Button variant='ghost' size={24} id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></Button>
                 {tbMenu === 'display' && (
                   <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
                     {view === 'list' && <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><DisplayPick label='Grouping' autoFocus value={grouping} labels={GROUPING_LABEL} onChange={setGrouping} /></div>}
@@ -1028,8 +1028,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               <aside className='board-hidden' aria-label='Hidden columns'>
                 <h3>Hidden columns</h3>
                 {STATUSES.filter((s) => hiddenCols.has(s)).map((s) => (
-                  <button key={s} type='button' className='board-hidden-row' aria-label={`Show ${STATUS_LABEL[s]} column`} onClick={() => setHiddenCols((h) => toggleIn(h, s, false))}>
-                    <StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{boardItems(s).length}</span>
+                  <button key={s} type='button' className='board-hidden-row' onClick={() => setHiddenCols((h) => toggleIn(h, s, false))}>
+                    <StatusIcon status={s} /><span><span className='sr-only'>Show </span>{STATUS_LABEL[s]}<span className='sr-only'> column</span></span><span className='count' aria-hidden='true'>{boardItems(s).length}</span>
                   </button>
                 ))}
               </aside>
