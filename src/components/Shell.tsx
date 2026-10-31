@@ -914,14 +914,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           {(view === 'list' || view === 'board') && !loadError && allIssues.length > 0 && (
             <div className='vtabs' role='group' aria-label='Issue views'>
               {VIEW_TABS.map((t) => { const on = sameSet(filters.status, t.status); return (
-                <button key={t.id} type='button' className='vtab' data-testid={`vtab-${t.id}`} aria-pressed={on} onClick={() => { setActiveViewId(null); setFilters({ ...filters, status: [...t.status] }); }}>{t.label}</button>
+                <Button key={t.id} variant='ghost' size={24} className='vtab' data-testid={`vtab-${t.id}`} aria-pressed={on} onClick={() => { setActiveViewId(null); setFilters({ ...filters, status: [...t.status] }); }}>{t.label}</Button>
               ); })}
             </div>
           )}
           {(view === 'list' || view === 'board') && (
           <div className='switch' role='group' aria-label='View'>
-            <button aria-pressed={view === 'list'} onClick={() => setView('list')} title='List'><Icon name='list' /><span>List</span></button>
-            <button aria-pressed={view === 'board'} onClick={() => setView('board')} title='Board'><Icon name='board' /><span>Board</span></button>
+            <Button variant='ghost' size={24} aria-pressed={view === 'list'} onClick={() => setView('list')} title='List'><Icon name='list' /><span>List</span></Button>
+            <Button variant='ghost' size={24} aria-pressed={view === 'board'} onClick={() => setView('board')} title='Board'><Icon name='board' /><span>Board</span></Button>
           </div>
           )}
         </header>
