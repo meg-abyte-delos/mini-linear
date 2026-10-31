@@ -20,6 +20,7 @@ export function splitStatusSummary(text: string): StatusSplit | null {
   if (!m) return null;
   const to = statusByLabel(m[3]);
   if (!to) return null;
-  // fromText / toText are the names as written in the entry (the stored status name, e.g. "In Progress"), never normalised to STATUS_LABEL.
-  return { lead: m[1]!, from: m[2] ? statusByLabel(m[2]) : null, fromText: m[2] ?? '', to, toText: m[3]!, tail: m[4] ?? '' };
+  // The stored entry says 'In Progress'; the rail, board and list say STATUS_LABEL ('In progress'), so the feed uses STATUS_LABEL too.
+  const from = m[2] ? statusByLabel(m[2]) : null;
+  return { lead: m[1]!, from, fromText: from ? STATUS_LABEL[from] : (m[2] ?? ''), to, toText: STATUS_LABEL[to], tail: m[4] ?? '' };
 }
