@@ -44,6 +44,10 @@ test('inline title, properties and activity', async ({ page }) => {
   await page.getByRole('combobox', { name: /Change status/ }).fill('done');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set status to Done');
+  // The icon sits right before the status name (not after the actor), with a space before the verb.
+  const ev = page.locator('li.ev', { hasText: 'set status to Done' });
+  await expect(ev.locator('.ev-status svg')).toHaveCount(1);
+  expect(await ev.locator('.ev-text').evaluate((n) => n.textContent)).toMatch(/ set status to Done/);
   await setEstimate(page, '5');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
   // The ?today= override is ignored when the server runs a production build (CI), so the page compares against the real clock.
