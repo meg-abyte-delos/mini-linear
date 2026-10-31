@@ -122,5 +122,5 @@
 .row .labels .chip-more::before { content:none; }
 .row .labels .chip-more:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 
-/* Issue page: the feed's last row stays clear of the sticky composer. */
+/* Issue page: breathing room between the feed's last row (event or .cmt) and the composer. */
 .idp-sec[aria-labelledby=h-act] > .feed, .idp-sec[aria-labelledby=h-act] > .cmts { padding-bottom: var(--sp-3); }

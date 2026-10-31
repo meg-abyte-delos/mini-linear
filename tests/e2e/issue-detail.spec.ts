@@ -183,7 +183,7 @@ test.fixme('timeline: assignee change interleaves with comments', async ({ page 
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set assignee');
 });
 
-test('D9: composer stays in view at 1280x720, activity rows carry avatars, Sub-issues/Relations/Attachments share one "+" affordance', async ({ page }) => {
+test('D9: composer sits after the feed and never covers the last comment at 1280x720, activity rows carry avatars, Sub-issues/Relations/Attachments share one "+" affordance', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await ready(page);
   for (const n of ['one', 'two', 'three', 'four']) {
@@ -193,7 +193,11 @@ test('D9: composer stays in view at 1280x720, activity rows carry avatars, Sub-i
     await expect(page.getByRole('article', { name: /Comment by/ })).toHaveCount(['one', 'two', 'three', 'four'].indexOf(n) + 1);
   }
   const btn = page.getByRole('button', { name: 'Comment', exact: true });
+  await btn.scrollIntoViewIfNeeded();
   await expect(btn).toBeInViewport({ ratio: 1 });
+  const gap = await page.evaluate(() => { const all = document.querySelectorAll('.feed .cmt'); const c = all[all.length - 1]!; const k = document.querySelector('.idp-sec[aria-labelledby=h-act]>.composer')!; return [getComputedStyle(k).position, k.getBoundingClientRect().top - c.getBoundingClientRect().bottom] as const; });
+  expect(gap[0]).not.toBe('sticky');
+  expect(gap[1]).toBeGreaterThanOrEqual(0);
   await expect(page.locator('.feed .ev .av').first()).toBeVisible();
   await expect(page.locator('.cmt header .av').first()).toBeVisible();
   for (const name of ['Add sub-issue', 'Add relation', 'Add link']) await expect(page.getByRole('button', { name, exact: true }).first()).toHaveClass(/sec-add/);
