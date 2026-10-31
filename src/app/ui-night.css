@@ -52,8 +52,10 @@
   html:not([data-theme]) .panel { z-index:30; }
   html:not([data-theme]) .selbar, html:not([data-theme]) .toast { z-index:40; }
   html:not([data-theme]) .overlay { z-index:50; }
-  html:not([data-theme]) input:not([type=checkbox]):not([type=radio]),
+  html:not([data-theme]) input:not([type=checkbox]):not([type=radio]):not(.input),
   html:not([data-theme]) select, html:not([data-theme]) textarea { border-color:var(--line-input); }
+  :where(html:not([data-theme])) input.input { border-color:var(--line-input); }
+  :where(html:not([data-theme])) input.input:hover:not(:disabled) { background:var(--hover); }
 }
 
 /* Subtle ambient light behind the app (dark only) */
@@ -91,9 +93,12 @@
 }
 [data-theme='dark'] .switch .btn[aria-pressed=true] { box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
 
-/* Inputs: 3:1 border (non-text contrast) */
-[data-theme='dark'] input:not([type=checkbox]):not([type=radio]),
+/* Inputs: 3:1 border at rest (WCAG 1.4.11 non-text contrast, Rex #129). */
+[data-theme='dark'] input:not([type=checkbox]):not([type=radio]):not(.input),
 [data-theme='dark'] select, [data-theme='dark'] textarea { border-color:var(--line-input); }
+/* Input primitive in dark: same 3:1 rest border; :where() keeps specificity at input.input (0,1,1): above the primitive .input, below .input:focus (accent) and [aria-invalid] (danger). Hover is marked by the --hover fill. */
+:where([data-theme='dark']) input.input { border-color:var(--line-input); }
+:where([data-theme='dark']) input.input:hover:not(:disabled) { background:var(--hover); }
 
 /* Elevated surfaces pick up hairlines + soft depth */
 [data-theme='dark'] .card { box-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 4px 12px rgba(0,0,0,.25); }

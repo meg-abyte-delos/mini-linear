@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import * as S from '@/lib/settings-client';
-import { Select, UserAvatar } from '@/components/ui';
+import { Input, Select, UserAvatar } from '@/components/ui';
 import { SettingsShell } from '@/components/SettingsShell';
 import { useToast } from '@/components/SettingsBits';
 
@@ -53,8 +53,8 @@ function ProfileForm({ me, onSaved }: { me: S.Me; onSaved: (m: S.Me) => void }) 
             : <UserAvatar userId={me.id} name={shown} size='lg' />}
           <div><strong>{shown}</strong><div className='set-muted'>{me.email}</div></div>
         </div>
-        <label className='set-field'><span className='set-label'>Full name</span><input className='set-input' value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder='Your name' /></label>
-        <label className='set-field'><span className='set-label'>Avatar URL (https)</span><input className='set-input' type='url' pattern='https://.*' value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder='https://example.com/me.png' /></label>
+        <label className='set-field'><span className='set-label'>Full name</span><Input size={32} value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder='Your name' /></label>
+        <label className='set-field'><span className='set-label'>Avatar URL (https)</span><Input size={32} type='url' pattern='https://.*' value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder='https://example.com/me.png' /></label>
         {err && <p role='alert' className='set-error'>{err}</p>}
         <div className='set-actions'>
           {avatar && <button type='button' className='btn' data-size='32' data-variant='ghost' onClick={() => setAvatar('')}>Remove avatar</button>}

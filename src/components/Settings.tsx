@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as S from '@/lib/settings-client';
+import { Input } from '@/components/ui';
 import { SettingsShell } from '@/components/SettingsShell';
 import { NameConfirmDialog, useToast } from '@/components/SettingsBits';
 
@@ -73,10 +74,10 @@ export function Settings({ slug }: { slug: string }) {
               </>}
             </span>
           </div>
-          <label className='set-field'><span className='set-label'>Name</span><input className='set-input' value={form.name} disabled={!admin} maxLength={100} required onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          <label className='set-field'><span className='set-label'>Name</span><Input size={32} value={form.name} disabled={!admin} maxLength={100} required onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
           <label className='set-field'><span className='set-label'>URL slug</span>
             <span className='set-slug'><span className='set-slug-pre' aria-hidden='true'>/w/</span>
-              <input className='set-input' value={form.slug} disabled={!admin} pattern='[a-z0-9][a-z0-9-]{1,38}[a-z0-9]' required aria-describedby='slug-prev' onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} /></span>
+              <Input size={32} value={form.slug} disabled={!admin} pattern='[a-z0-9][a-z0-9-]{1,38}[a-z0-9]' required aria-describedby='slug-prev' onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} /></span>
             <span className='set-hint' id='slug-prev'>Your workspace lives at /w/{form.slug || '…'}/issues{form.slug !== ws.slug && ' (links to the old URL will stop working)'}.</span>
           </label>
           {err && <p role='alert' className='set-error'>{err}</p>}

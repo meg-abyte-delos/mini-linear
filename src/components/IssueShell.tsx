@@ -2,7 +2,7 @@
 // Issue page chrome: app sidebar + off-canvas drawer at or below 900px, toggled from the issue header (same behaviour as Shell).
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { WIDE_MQ } from '@/lib/breakpoints';
-import { AppSidebar } from '@/components/AppSidebar';
+import { AppSidebar } from '@/components/Sidebar';
 
 type NavCtx = { open: boolean; toggle: () => void; toggleRef: React.RefObject<HTMLButtonElement | null> };
 const Ctx = createContext<NavCtx | null>(null);
@@ -30,7 +30,7 @@ export function IssueShell({ slug, children }: { slug: string; children: ReactNo
   return (
     <Ctx.Provider value={{ open, toggle: () => setOpen((o) => !o), toggleRef }}>
       <div className='shell issue-shell' data-nav={open ? 'open' : undefined}>
-        <AppSidebar slug={slug} current='issue' id='app-sidebar' onNavigate={() => setOpen(false)} />
+        <AppSidebar slug={slug} current='issue' id='app-sidebar' onNavigate={() => setOpen(false)} navOpen={open} />
         <div className='side-scrim' aria-hidden='true' onClick={() => setOpen(false)} />
         <div className='main idp-host' inert={open || undefined}>{children}</div>
       </div>

@@ -60,7 +60,7 @@ Linear ref: buttons are 28px, radius 6, medium weight, quiet borders; only the p
 
 ### Input, Checkbox, Toggle
 `Input` (`.input`; data-size 28 default, 32 forms/auth, 24 inline in toolbars like the Save view form), `Checkbox` (`.cb`, 16px; 14px in row-select columns), `Toggle` (`role=switch`). Checkbox and Toggle require a name: `label`, `aria-label` or `aria-labelledby` (enforced by the type).
-28px (32 in forms/auth), radius 6, `--panel` fill, 1px `--line`, hover `--line-input`, focus `--accent` border + `--accent-ring`. Placeholder `--dim`. Error: `--danger` border + message below at `--fs-sm`.
+28px (32 in forms/auth), radius 6, `--panel` fill. Light: 1px `--line` at rest, hover `--line-input`. Dark: 1px `--line-input` at rest (3:1, WCAG 1.4.11; `--line` is ~1.1:1 there), hover marked by the `--hover` fill. Focus `--accent` border + `--accent-ring` in both. Placeholder `--dim`. Error: `--danger` border + message below at `--fs-sm`.
 
 ### Select / Menu
 Never a native `<select>`: `Select` (`.select-btn` trigger + `Menu`/`Combobox`). Menu: `--raised`, `--shadow-pop`, `--r-md`, 4px padding, items 28px, radius 5, active `--hover`, destructive = `data-tone="danger"` (`--danger`, same tone as Button), shortcuts in `Kbd`.
@@ -82,7 +82,7 @@ Content max 640 centered. Row: label (13/500) + description (12, muted) left, co
 
 ## 9. Layout (public Linear values, à re-mesurer)
 Not yet measured on a real Linear workspace (signup blocked, 2026-10-31). Values below are public observations; replace them with the measured reference when it lands. Source of truth: tokens.css.
-- App sidebar `--sidebar-w` 244px, on every app route including the issue page (`.shell` + `AppSidebar`). Off-canvas below 900px.
+- App sidebar `--sidebar-w` 244px, on every app route including the issue page (`.shell` + `Sidebar`). Off-canvas below 900px.
 - Issue Properties rail `--idp-side-w` = clamp(280px, 24vw, 340px): 307px at 1280, 340px at 1440. Never narrower than `--idp-side-min` 280px.
 - Property label column `--idp-label-w` 96px; values one line, ellipsis, full value in a tooltip (title).
 - Below 1024px the Properties rail is a right drawer (header toggle, scrim, Esc closes).
