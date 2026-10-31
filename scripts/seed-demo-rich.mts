@@ -78,6 +78,8 @@ try {
     await c.query('insert into labels (id, workspace_id, name, color, group_id) values ($1,$2,$3,$4,$5) on conflict (id) do update set name = excluded.name, color = excluded.color, group_id = excluded.group_id', [lab[key], W, name, color, group ? grp[group] : null]);
   }
   const CY = { c1: CYCLES.c1, c2: CYCLES.c2, c3: CYCLES.c3 } as const;
+  // Demo-only upcoming cycle (c3 turns active on 2026-10-28), so Cycles keeps an Upcoming group. Not in the base seed: e2e clock data stays untouched.
+  await c.query('insert into cycles (id, workspace_id, team_id, name, start_date, end_date, number) values ($1,$2,$3,$4,$5,$6,$7) on conflict (id) do update set name = excluded.name, start_date = excluded.start_date, end_date = excluded.end_date, number = excluded.number', [id(52), W, T, 'Cycle 4', '2026-11-11', '2026-11-24', 4]);
   let ev = 0;
   // Reseeds rewrite the trail: audit rows of seeded issues and comments left by older seed versions (other ids or timestamps) would otherwise stay and leave a half history.
   const seeded = [...RICH_ISSUES.map((r) => (r.team === 'DEM' ? id(100 + r.n) : id(3000 + r.key))), ...RICH_COMMENTS.map((m) => id(2000 + m.k))];
