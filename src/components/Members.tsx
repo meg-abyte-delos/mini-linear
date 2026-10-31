@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as S from '@/lib/settings-client';
 import { personName } from '@/lib/nl-people';
-import { ConfirmDialog, Popover, Select, UserAvatar, type MenuEntry } from '@/components/ui';
+import { ConfirmDialog, Input, Popover, Select, UserAvatar, type MenuEntry } from '@/components/ui';
 import { RowMenu } from '@/components/RowMenu';
 import { SettingsShell } from '@/components/SettingsShell';
 import { Icon } from '@/components/icons';
@@ -35,7 +35,7 @@ function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: bool
     <Popover open={open} anchorRef={anchorRef} onClose={onClose} label='Invite people' align='end'>
       <form className='set-invite' onSubmit={(e) => void submit(e)}>
         <p className='set-invite-h'>Invite to workspace</p>
-        <label className='set-field'><span className='set-label'>Email addresses</span><input className='set-input' type='email' multiple required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com, other@company.com' /></label>
+        <label className='set-field'><span className='set-label'>Email addresses</span><Input size={32} type='email' multiple required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com, other@company.com' /></label>
         <div className='set-field' role='radiogroup' aria-label='Role'>
           <span className='set-label' aria-hidden='true'>Role</span>
           <div className='set-seg'>
@@ -127,7 +127,7 @@ export function Members({ slug }: { slug: string }) {
       <div data-testid='members-page'>
         {msg && <p role='status' className='toast'>{msg} <button type='button' className='btn' data-size='32' data-variant='ghost' onClick={() => setMsg(null)}>Dismiss</button></p>}
         <div className='set-toolbar'>
-          <input type='search' className='set-input set-search' aria-label='Search members' placeholder='Search by name or email' value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input size={32} type='search' className='set-search' aria-label='Search members' placeholder='Search by name or email' value={q} onChange={(e) => setQ(e.target.value)} />
           <div role='tablist' aria-label='Filter by role' className='set-tabs'>
             {TABS.map((t) => (
               <button key={t.id} type='button' role='tab' id={`mem-tab-${t.id}`} aria-selected={tab === t.id} aria-controls='mem-panel' tabIndex={tab === t.id ? 0 : -1} className='set-tab'
