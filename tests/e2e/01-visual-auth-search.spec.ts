@@ -28,9 +28,12 @@ test.describe('anonymous', () => {
 });
 
 test('visual: search results', async ({ page }) => {
+  // The sidebar Inbox badge is polled every 30s and would make the shot unstable: serve an empty inbox so the badge is absent.
+  await page.route(/\/api\/v1\/w\/[^/]+\/notifications\?limit=100/, (r) => r.fulfill({ json: { items: [], unread_count: 0 } }));
   await page.goto('/search?q=cron&today=2026-10-27');
   const first = page.getByRole('list', { name: /results/i }).getByRole('listitem').first();
   await expect(first).toBeVisible();
   await expect(first).toContainText(/cron/i); // real result, not an empty state or an unrelated first hit
+  await expect(page.getByTestId('inbox-badge')).toHaveCount(0);
   await shot(page, 'search');
 });
