@@ -88,20 +88,23 @@ export const logoutAll = route(async (req, sql) => {
 export const me = route(async (req, sql) => {
   const uid = await resolveSession(sql, req);
   if (!uid) throw new ApiError("unauthenticated");
-  const u = (await sql<MeRow[]>`select id, email, display_name, avatar_url, theme from users where id = ${uid}`)[0];
+  const u = (await sql<MeRow[]>`select id, email, display_name, avatar_url, theme, home_page from users where id = ${uid}`)[0];
   if (!u) throw new ApiError("unauthenticated");
   return Response.json(meDto(u));
 });
 
-type MeRow = { id: string; email: string; display_name: string | null; avatar_url: string | null; theme: Theme };
+type MeRow = { id: string; email: string; display_name: string | null; avatar_url: string | null; theme: Theme; home_page: HomePage };
 export const THEMES = ["light", "dark", "system"] as const;
 export type Theme = (typeof THEMES)[number];
+export const HOME_PAGES = ["inbox", "my-issues", "projects", "views"] as const;
+export type HomePage = (typeof HOME_PAGES)[number];
 export const THEME_COOKIE = "ml_theme";
-const meDto = (u: MeRow) => ({ id: u.id, email: u.email, name: u.display_name ?? nameOf(u.email), display_name: u.display_name, avatar_url: u.avatar_url, theme: u.theme });
+const meDto = (u: MeRow) => ({ id: u.id, email: u.email, name: u.display_name ?? nameOf(u.email), display_name: u.display_name, avatar_url: u.avatar_url, theme: u.theme, home_page: u.home_page });
 const patchMeBody = z.object({
   display_name: z.string().trim().min(1).max(80).nullable().optional(),
   avatar_url: z.string().max(2048).url().refine((v) => v.startsWith("https://"), "https only").nullable().optional(),
   theme: z.enum(THEMES).optional(),
+  home_page: z.enum(HOME_PAGES).optional(),
 }).strict();
 
 /** PATCH /me: the session owner edits their own profile and preferences only (no id in the path, nothing to enumerate). */
@@ -109,11 +112,11 @@ export const patchMe = route(async (req, sql) => {
   const uid = await resolveSession(sql, req);
   if (!uid) throw new ApiError("unauthenticated");
   const b = await parseJson(req, patchMeBody);
-  const cur = (await sql<MeRow[]>`select id, email, display_name, avatar_url, theme from users where id = ${uid}`)[0];
+  const cur = (await sql<MeRow[]>`select id, email, display_name, avatar_url, theme, home_page from users where id = ${uid}`)[0];
   if (!cur) throw new ApiError("unauthenticated");
-  const next = { display_name: b.display_name !== undefined ? b.display_name : cur.display_name, avatar_url: b.avatar_url !== undefined ? b.avatar_url : cur.avatar_url, theme: b.theme ?? cur.theme };
-  const u = (await sql<MeRow[]>`update users set display_name = ${next.display_name}, avatar_url = ${next.avatar_url}, theme = ${next.theme}
-    where id = ${uid} returning id, email, display_name, avatar_url, theme`)[0]!;
+  const next = { display_name: b.display_name !== undefined ? b.display_name : cur.display_name, avatar_url: b.avatar_url !== undefined ? b.avatar_url : cur.avatar_url, theme: b.theme ?? cur.theme, home_page: b.home_page ?? cur.home_page };
+  const u = (await sql<MeRow[]>`update users set display_name = ${next.display_name}, avatar_url = ${next.avatar_url}, theme = ${next.theme}, home_page = ${next.home_page}
+    where id = ${uid} returning id, email, display_name, avatar_url, theme, home_page`)[0]!;
   const res = Response.json(meDto(u));
   // Mirrors the stored preference so the server layout can render the right theme on first paint (no inline script under CSP).
   res.headers.append("Set-Cookie", `${THEME_COOKIE}=${u.theme}; Path=/; Max-Age=31536000; SameSite=Lax${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
