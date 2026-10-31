@@ -79,8 +79,8 @@
 .inbox-detail .idp-event { margin:0; color:var(--muted-strong); font-size:var(--fs-sm); }
 .inbox-detail .idp-main .inbox-preview { margin-top:20px; padding-top:20px; }
 .inbox-detail .idp-main .inbox-preview .md { font-size:var(--fs-base); color:var(--fg); }
-/* Properties rail: the issue page component (.idp-side); here it is a flex column of the detail body and scrolls on its own. */
-.inbox-detail .inbox-props { flex:0 0 var(--idp-side-min); overflow-y:auto; }
+/* Properties rail: the issue page component (.idp-side), same width token as the issue page (307 @1280, 340 @1440); here it is a flex column of the detail body and scrolls on its own. */
+.inbox-detail .inbox-props { flex:0 0 var(--idp-side-w); overflow-y:auto; }
 @media (max-width:1180px) { .inbox-detail .idp-main { padding:24px 24px 40px; } }
 /* Review 20:00 (#288): Linear inbox list width. */
 .inbox-wrap .inbox { flex:0 0 clamp(360px, 32%, 520px); width:clamp(360px, 32%, 520px); min-width:0; max-width:none; }
