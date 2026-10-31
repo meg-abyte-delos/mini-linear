@@ -131,7 +131,7 @@ function markTerm(text: string, term: string) {
   return <>{text.slice(0, i)}<mark>{text.slice(i, i + t.length)}</mark>{text.slice(i + t.length)}</>;
 }
 
-export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
+export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; /** @deprecated ignored since #400: the view is derived from the URL */ initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
   const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
@@ -306,15 +306,18 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const view: View = INBOX_PATH.test(navPath) ? 'inbox' : navView === 'board' || navView === 'cycles' || navView === 'projects' || navView === 'inbox' ? navView : 'list';
   // Entering and leaving the inbox pushes a history entry, so Back returns to the previous view; every other change replaces the entry.
   function setView(v: View) {
-    const onInboxPath = INBOX_PATH.test(window.location.pathname);
-    const sp = new URLSearchParams(window.location.search);
-    sp.delete('view');
-    let path = window.location.pathname;
-    if (v === 'inbox' && api) path = `/w/${api.slug}/inbox`;
-    else { if (v !== 'list') sp.set('view', v); if (onInboxPath) path = '/'; }
-    const qs = sp.toString().replace(/%2C/gi, ',');
-    const url = `${path}${qs ? `?${qs}` : ''}${window.location.hash}`;
-    const write = () => { if (path !== window.location.pathname) window.history.pushState(null, '', url); else window.history.replaceState(null, '', url); };
+    // The URL is computed inside write(), at execution time: withViewTransition defers the callback to the next frame, so a query read here would be stale and would overwrite synchronous URL writes that follow (applyView's ?v=, setFilters) (Rex, #401).
+    const write = () => {
+      const onInboxPath = INBOX_PATH.test(window.location.pathname);
+      const sp = new URLSearchParams(window.location.search);
+      sp.delete('view');
+      let path = window.location.pathname;
+      if (v === 'inbox' && api) path = `/w/${api.slug}/inbox`;
+      else { if (v !== 'list') sp.set('view', v); if (onInboxPath) path = '/'; }
+      const qs = sp.toString().replace(/%2C/gi, ',');
+      const url = `${path}${qs ? `?${qs}` : ''}${window.location.hash}`;
+      if (path !== window.location.pathname) window.history.pushState(null, '', url); else window.history.replaceState(null, '', url);
+    };
     if (v !== view) withViewTransition(write); else write();
   }
   const [detailId, setDetailId] = useState<string | null>(null); // project detail page (API mode)
