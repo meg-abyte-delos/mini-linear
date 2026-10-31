@@ -60,7 +60,7 @@ test('journey: create, assign, put in a cycle, complete, and it all survives a r
   await pickFromPanel(page, 'Status', 'Change status', /^Done/i);
   expect(await get(page, it.id)).toMatchObject({ status: 'done', assignee_id: other.user_id, cycle_id: cyc.id });
 
-  await feedHas(page, /changed status from In Progress to Done/);
+  await feedHas(page, /changed status from In progress to Done/);
   await page.reload(); await page.waitForSelector('html[data-ready]');
   const props = page.getByRole('complementary', { name: 'Properties' });
   await expect(props).toContainText('Done');

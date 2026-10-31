@@ -19,10 +19,10 @@ describe('statusOf', () => {
 describe('splitStatusSummary', () => {
   it('cuts around both status names', () => {
     expect(splitStatusSummary('changed status from Backlog to Todo')).toEqual({ lead: 'changed status ', from: 'backlog', fromText: 'Backlog', to: 'todo', toText: 'Todo', tail: '' });
-    expect(splitStatusSummary('set status to In Review')).toEqual({ lead: 'set status ', from: null, fromText: '', to: 'in_review', toText: 'In Review', tail: '' });
+    expect(splitStatusSummary('set status to In Review')).toEqual({ lead: 'set status ', from: null, fromText: '', to: 'in_review', toText: 'In review', tail: '' });
   });
   it('keeps a following change in the tail and ignores unknown names', () => {
-    expect(splitStatusSummary('changed status from Todo to In Progress, changed priority from No priority to High')).toEqual({ lead: 'changed status ', from: 'todo', fromText: 'Todo', to: 'in_progress', toText: 'In Progress', tail: ', changed priority from No priority to High' });
+    expect(splitStatusSummary('changed status from Todo to In Progress, changed priority from No priority to High')).toEqual({ lead: 'changed status ', from: 'todo', fromText: 'Todo', to: 'in_progress', toText: 'In progress', tail: ', changed priority from No priority to High' });
     expect(splitStatusSummary('set status to Bogus')).toBeNull();
     expect(splitStatusSummary('set priority to High')).toBeNull();
   });

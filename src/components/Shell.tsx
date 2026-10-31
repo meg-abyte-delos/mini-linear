@@ -130,6 +130,7 @@ function markTerm(text: string, term: string) {
   return <>{text.slice(0, i)}<mark>{text.slice(i, i + t.length)}</mark>{text.slice(i + t.length)}</>;
 }
 
+const RETURN_KEY = 'ml:list-return';
 export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; /** @deprecated ignored since #400: the view is derived from the URL */ initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
@@ -322,6 +323,19 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }
   const [detailId, setDetailId] = useState<string | null>(null); // project detail page (API mode)
   const [selId, setSelId] = useState<string | null>(initialIssueId ?? null);
+  // List > issue > Back: the issue page is another route, so Shell remounts. openIssue remembers the opened row and the list scroll for this exact list URL; the remount puts the selection and the scroll back (Linear keeps the opened issue selected and visible).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (initialIssueId) return;
+    try {
+      const r = JSON.parse(sessionStorage.getItem(RETURN_KEY) ?? 'null') as { url: string; id: string; top: number } | null;
+      sessionStorage.removeItem(RETURN_KEY); // one-shot: a later fresh visit to the same list URL starts from the default selection
+      if (!r || r.url !== window.location.pathname + window.location.search || !store.current.list().some((x) => x.id === r.id)) return;
+      setSelId(r.id);
+      requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = r.top; });
+    } catch { /* storage unavailable: keep the default selection */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Inbox: HTTP in API mode, in-memory seed otherwise. The unread badge polls every 30s (API mode only).
   const inboxClient = useMemo(() => (api ? httpInboxClient(api.slug) : mockInboxClient()), [api]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -885,7 +899,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const inboxProps = { meta, people, today, onUpdate: (id: string, patch: Partial<Issue>) => { if (!readOnly) updateIssue(id, patch); } };
   const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av-wrap' title='Unassigned'><UnassignedIcon /></span>; };
   // Linear: a click opens the full issue page (sidebar included); Space peeks in the side panel. Without an API there is no page, so the panel stays.
-  const openIssue = (i: Issue) => { setSelId(i.id); if (api) router.push(`/w/${api.slug}/issue/${i.identifier ?? i.id}`); else setOpen(true); };
+  const openIssue = (i: Issue) => { setSelId(i.id); if (api) { try { sessionStorage.setItem(RETURN_KEY, JSON.stringify({ url: window.location.pathname + window.location.search, id: i.id, top: scrollRef.current?.scrollTop ?? 0 })); } catch { /* ignore */ } router.push(`/w/${api.slug}/issue/${i.identifier ?? i.id}`); } else setOpen(true); };
   const select = (i: Issue, openPanel: boolean) => { if (openPanel) openIssue(i); else setSelId(i.id); };
 
   const row = (i: Issue) => (
@@ -1015,7 +1029,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <EmptyState icon='filter' title='No issues match these filters.' hint='Try removing a filter or broadening your search.'
             action={<button className='btn' onClick={() => setFilters(emptyFilters())}>Clear filters</button>} />
         ) : view === 'list' ? (
-          <div className='scroll'>
+          <div className='scroll' ref={scrollRef}>
             {groups.map(({ key, status, items }) => {
               const s = status as Status | null;
               const shut = collapsed.has(key);
