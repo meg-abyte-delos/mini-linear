@@ -78,7 +78,7 @@ export function Sidebar(p: SidebarProps) {
         {p.teams.map((t) => {
           const here = active.teamId == null || active.teamId === t.id;
           const home = p.homeTeamId == null || t.id === p.homeTeamId;
-          const onIssues = on('issues') && here;
+          const onIssues = on('issues') && here && !active.viewId; // a saved view is the active link, not Issues
           return (
             <TeamSection key={t.id} id={p.teams.length > 1 ? `team-nav-${t.id}` : 'team-nav'} name={t.name}>
               <SideLink className={`side-link sub${onIssues ? ' active' : ''}`} current={onIssues} href={p.onIssues ? '#issues' : '/'} data-team={t.id} onSelect={p.onIssues ? () => p.onIssues?.(t.id) : undefined}><SideIcon name='issues' /><span>Issues</span>{home && hint('go-issues') && <kbd className='side-kbd' aria-hidden='true'>{hint('go-issues')}</kbd>}</SideLink>

@@ -30,6 +30,11 @@ test('saved view is persisted by the API: POST /views, survives reload, DELETE r
   await expect(side.getByRole('link', { name: new RegExp(name) })).toBeVisible();
   await side.getByRole('link', { name: new RegExp(name) }).click();
   await expect(page).toHaveURL(/priority=1/);
+  // Linear: header carries the view name, no team tabs, only the view link is current.
+  await expect(page.locator('h1.crumb-title')).toHaveText(name);
+  await expect(page.getByRole('group', { name: 'Issue views' })).toHaveCount(0);
+  await expect(page.locator('aside a[aria-current=page]')).toHaveCount(1);
+  await expect(page.locator('aside a[aria-current=page]')).toContainText(name);
 
   const del = page.waitForResponse((r) => r.url().includes(`/views/${row.id}`) && r.request().method() === 'DELETE');
   await page.getByRole('button', { name: `Delete view ${name}` }).click();
