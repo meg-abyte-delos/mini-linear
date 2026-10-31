@@ -7,7 +7,7 @@ test.use({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark', reducedM
 
 test('visual: workspace-settings', async ({ page }) => {
   await page.goto('/w/demo/settings');
-  await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await settled(page);
   await page.mouse.move(0, 0);

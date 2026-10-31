@@ -874,9 +874,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <div role='group' aria-label='Saved views' data-testid='saved-views'>
             {views.map((v) => (
               <div key={v.id} className='sv-row'>
-                <a className={`side-link sub${activeViewId === v.id ? ' active' : ''}`} aria-current={activeViewId === v.id ? 'page' : undefined} href={`?v=${v.id}`} onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setViewState('list'); applyView(v); }}><span>{v.name}</span>{v.shared && <span className='sv-tag'>Shared</span>}</a>
-                <button className='sv-act' aria-label={`Copy link to ${v.name}`} onClick={() => copyViewLink(v)}>{copied === v.id ? 'Copied' : 'Link'}</button>
-                {!readOnly && <button className='sv-act' aria-label={`Delete view ${v.name}`} onClick={() => void deleteView(v)}>×</button>}
+                <a className={`side-link sub${activeViewId === v.id ? ' active' : ''}`} aria-current={activeViewId === v.id ? 'page' : undefined} href={`?v=${v.id}`} onClick={(e) => { e.preventDefault(); if (view === 'cycles' || view === 'projects' || view === 'inbox') setViewState('list'); applyView(v); }} title={v.name}><span className='sv-name'>{v.name}</span>{v.shared && <span className='sv-tag'>Shared</span>}</a>
+                <span className='sv-acts'><button className='sv-act' aria-label={`Copy link to ${v.name}`} onClick={() => copyViewLink(v)}>{copied === v.id ? 'Copied' : 'Link'}</button>
+                {!readOnly && <button className='sv-act' aria-label={`Delete view ${v.name}`} onClick={() => void deleteView(v)}>×</button>}</span>
               </div>
             ))}
           </div>

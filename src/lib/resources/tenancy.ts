@@ -199,7 +199,15 @@ export const listTeams = (req: Request, slug: string) => withWorkspaceCtx(req, s
   const scope = ctx.role === "guest"
     ? ctx.tx`id in (select i.team_id from issues i join issue_shares s on s.issue_id = i.id where s.guest_user_id = ${ctx.userId} and s.revoked_at is null and i.deleted_at is null)`
     : ctx.tx`true`;
-  const rows = await ctx.tx<Row[]>`${TEAM(ctx)} where ${scope} and ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} order by id limit ${q.limit + 1}`;
+  // ?mine=1: only the teams the caller belongs to (team_memberships row). Owners and admins see every team either way.
+  // A guest is never a member of a team in the settings sense, even when the seed gives it a team_memberships row.
+  const wantMine = new URL(req.url).searchParams.get("mine") === "1";
+  const mine = wantMine && ctx.role === "guest"
+    ? ctx.tx`false`
+    : wantMine && ctx.role !== "owner" && ctx.role !== "admin"
+      ? ctx.tx`id in (select team_id from team_memberships where user_id = ${ctx.userId})`
+      : ctx.tx`true`;
+  const rows = await ctx.tx<Row[]>`${TEAM(ctx)} where ${scope} and ${mine} and ${c ? ctx.tx`id > ${c}::uuid` : ctx.tx`true`} order by id limit ${q.limit + 1}`;
   return listPage(ctx, "teams", q, rows);
 });
 export const createTeam = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
