@@ -28,7 +28,7 @@ test('dnd list: dropping a row on another group changes its status', async ({ pa
   await src.dragTo(target.locator('h2'));
   const to = await statusOf(page, id);
   expect(to).not.toBe(from);
-  expect(await target.locator('h2 span').nth(0).textContent()).toBe(to);
+  expect(await target.locator('h2 .gh-name').textContent()).toBe(to);
 });
 
 test('dnd board: dropping a card on another column changes its status', async ({ page }) => {
