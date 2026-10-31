@@ -152,6 +152,24 @@ try {
   // One pending invitation so the Members page has an Invited row. The token hash is a fixed dummy (nobody holds the token, so it cannot be redeemed); expiry is refreshed on every run.
   await c.query(`insert into invites (id, workspace_id, email, role, token_hash, invited_by, expires_at, created_at) values ($1,$2,'nora.lindqvist@example.test','member',$3,$4, now() + interval '7 days', now() - interval '1 day')
     on conflict (id) do update set expires_at = excluded.expires_at, used_at = null, revoked_at = null`, [id(6000), W, 'seed-demo-rich-invite-0000000000000000000000000000000000000000000000', uid.admin]);
+  // Saved views (sidebar Views section): 3 fixed rows, upserted. Same shape the views API stores: a group of 'in' rules (AND across fields).
+  const rule = (field: string, value: string[]) => ({ field, op: 'in', value });
+  const VIEWS: [number, string, boolean, string, ReturnType<typeof rule>[]][] = [
+    [7000, 'My open bugs', false, 'list', [rule('assignee', [uid.admin]), rule('label', [LABELS.bug]), rule('status', ['backlog', 'todo', 'in_progress', 'in_review'])]],
+    [7001, 'Mini Linear, in progress', true, 'board', [rule('project', [PROJECTS.p1]), rule('status', ['in_progress', 'in_review'])]],
+    [7002, 'High priority this cycle', true, 'list', [rule('priority', ['1', '2']), rule('cycle', [CY.c3])]],
+  ];
+  for (const [k, name, shared, layout, rules] of VIEWS)
+    await c.query('insert into saved_views (id, workspace_id, owner_id, team_id, name, shared, layout, filters) values ($1,$2,$3,null,$4,$5,$6,$7) on conflict (id) do update set owner_id = excluded.owner_id, name = excluded.name, shared = excluded.shared, layout = excluded.layout, filters = excluded.filters, updated_at = now() where (saved_views.owner_id, saved_views.name, saved_views.shared, saved_views.layout, saved_views.filters) is distinct from (excluded.owner_id, excluded.name, excluded.shared, excluded.layout, excluded.filters)',
+      [id(k), W, uid.admin, name, shared, layout, JSON.stringify({ op: 'and', rules })]);
+  // Purge: the seed owns the demo workspace. Every issue, comment and notification it did not create (fixed 00000000-0000-4000-8000-* ids; the app uses uuidv7) is removed, so reruns end on the same list.
+  // Rows left by review scripts or manual tests go; children (comments, labels, shares, mentions) cascade with their issue.
+  const SEEDED_ID = '00000000-0000-4000-8000-%';
+  const purged = await c.query('delete from issues where workspace_id = $1 and id::text not like $2', [W, SEEDED_ID]);
+  await c.query('delete from comments where workspace_id = $1 and id::text not like $2', [W, SEEDED_ID]);
+  await c.query('delete from notifications where workspace_id = $1 and id::text not like $2', [W, SEEDED_ID]);
+  await c.query("delete from audit_events where workspace_id = $1 and entity in ('issue','comment') and entity_id::text not like $2", [W, SEEDED_ID]);
+  if (purged.rowCount) console.log('seed-demo-rich purged ' + purged.rowCount + ' foreign issue(s)');
   await c.query('commit');
   console.log(`seed-demo-rich ok: ${RICH_ISSUES.length} issues, ${RICH_COMMENTS.length} comments, ${RICH_NOTIFS.length} notifications, ${ALL_LABELS.length} labels, ${RICH_USERS.length} extra users`);
 } catch (e) { await c.query('rollback'); throw e; } finally { c.release(); await pool.end(); }
