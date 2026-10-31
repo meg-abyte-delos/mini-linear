@@ -57,7 +57,7 @@ test.describe('Search on the server route', () => {
     await box.fill('qqzzxxnomatch');
     await expect(page.getByTestId('palette-searching')).toBeVisible();
     // Measure only once the entry animation (pal-in: translate + scale) has finished, else x is mid-transform.
-    await page.locator('.palette').evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+    await page.locator('.palette').evaluate((el) => Promise.allSettled(el.getAnimations({ subtree: true }).map((a) => a.finished)));
     const loadingX = (await page.getByTestId('palette-searching').locator('.pal-label').boundingBox())!.x;
     release();
     await expect(page.getByTestId('palette-no-results')).toHaveText(/No results for/);
