@@ -44,6 +44,8 @@ axe 0 violations in dark and light on every touched screen. Text >= 4.5:1, large
 ## 7. Components (use the primitive, never restyle)
 ### Button / IconButton
 React `Button` (`variant` primary|secondary|ghost, `size` 24|28|32, `tone="danger"`, `loading`) and `IconButton` (`label` required: accessible name + tooltip) from `@/components/ui`. They render `.btn` + data attributes (CSS in ui-primitives.css). Never a bare `<button>` styled by a parent selector; comment actions (Reply, Edit, Delete, reactions) are ghost 24.
+
+Exception, hand-styled: `.add-row` (inline "+ Add sub-issue / relation" row on the issue page) is a full-width list row, not a button; it is styled on tokens in issue-detail.css (32px, `--muted`, hover `--hover`, `--r-btn`) and must not be copied for actions.
 | Variant | Look | When |
 |---|---|---|
 | `primary` | `--accent` fill, `--accent-fg` text | the one main action of a group (Create issue, Save). Max one per group |
