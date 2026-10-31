@@ -108,7 +108,7 @@ test('inbox: two panes, no List/Board toggle, j/k drives the issue preview', asy
   await page.keyboard.press('k');
   await expect(detail.getByRole('heading', { level: 2 })).toHaveText(first!);
   // mark read / archive from the preview actions
-  await detail.getByRole('button', { name: /^Mark .* (read|unread)$/ }).click();
+  await detail.getByRole('button', { name: /^Mark (read|unread)\b/ }).click();
   await detail.getByRole('button', { name: /^Archive/ }).click();
   await expect(page.getByRole('option')).toHaveCount(2);
 });
