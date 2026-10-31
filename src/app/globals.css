@@ -200,11 +200,8 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .inbox-wrap { display:flex; flex:1; min-height:0; }
 .inbox-wrap .inbox { flex:1; min-width:0; }
 .inbox-tabs { display:flex; gap:4px; padding:8px 16px 0; }
-.inbox-tabs button { background:none; border:0; color:var(--muted); padding:4px 10px; border-radius:6px; cursor:pointer; }
-.inbox-tabs button.on { background:var(--hover); color:var(--fg); }
 .bulk { display:flex; gap:6px; align-items:center; }
 .snooze-menu { display:flex; flex-direction:column; gap:2px; margin:0 16px 8px; padding:6px; border:1px solid var(--line); border-radius:8px; width:220px; }
-.snooze-menu button { text-align:left; }
 .inbox-detail { width:320px; flex:none; border-left:1px solid var(--line); padding:16px; overflow:auto; }
 .inbox-detail h2 { font-size:15px; margin:0 0 12px; }
 .inbox-detail dt { color:var(--muted); font-size:12px; margin-top:8px; }
