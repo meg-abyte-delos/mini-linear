@@ -35,6 +35,11 @@ try {
     await c.query('update users set display_name = $2 where lower(email) = $1 and display_name is distinct from $2', [email, PERSONA_NAMES[email]]);
   for (const [i, u] of RICH_USERS.entries())
     await c.query(`insert into memberships (id, workspace_id, user_id, role) values ($1,$2,$3,'member') on conflict (workspace_id, user_id) do nothing`, [id(400 + i), W, uid[u.key]]);
+  // Spread join dates over weeks/months, relative to today (re-running re-anchors them to the current day). Unknown emails are skipped.
+  const JOINED_DAYS_AGO: Record<string, number> = { [USERS.admin.email]: 210, [USERS.mate.email]: 150, 'guest@example.test': 12, 'inbox@example.test': 5 };
+  RICH_USERS.forEach((u, i) => { JOINED_DAYS_AGO[u.email] = [96, 61, 34, 19][i] ?? 20 + i * 7; });
+  for (const [email, d] of Object.entries(JOINED_DAYS_AGO))
+    await c.query(`update memberships m set created_at = now() - ($3 || ' days')::interval from users u where m.user_id = u.id and m.workspace_id = $1 and lower(u.email) = $2`, [W, email, String(d)]);
   // Extra teams (the teams_seed_states trigger creates their 6 workflow states). Every non-guest persona joins every team.
   for (const [key, t] of Object.entries(TEAMS))
     if (key !== 'DEM') await c.query('insert into teams (id, workspace_id, name, key) values ($1,$2,$3,$4) on conflict (id) do update set name = excluded.name', [t.id, W, t.name, key]);
