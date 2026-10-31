@@ -329,6 +329,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (initialIssueId) return;
     try {
       const r = JSON.parse(sessionStorage.getItem(RETURN_KEY) ?? 'null') as { url: string; id: string; top: number } | null;
+      sessionStorage.removeItem(RETURN_KEY); // one-shot: a later fresh visit to the same list URL starts from the default selection
       if (!r || r.url !== window.location.pathname + window.location.search || !store.current.list().some((x) => x.id === r.id)) return;
       setSelId(r.id);
       requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollTop = r.top; });
