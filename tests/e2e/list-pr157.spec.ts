@@ -214,3 +214,19 @@ test.fixme('filter picker: Escape closes it after an option was chosen', async (
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
+
+test('Display: Due date, Estimate, Cycle and Updated are offered (off by default); Show sub-issues switch hides child rows', async ({ page }) => {
+  await home(page);
+  await page.locator('#fb-display').click();
+  const dlg = page.getByRole('dialog', { name: 'Display options' });
+  for (const n of ['Due date', 'Estimate', 'Cycle', 'Updated']) await expect(dlg.getByRole('button', { name: n, exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await dlg.getByRole('button', { name: 'Updated', exact: true }).click();
+  await expect(dlg.getByRole('button', { name: 'Updated', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const sw = dlg.getByRole('switch', { name: 'Show sub-issues' });
+  await expect(sw).toBeChecked();
+  const before = await page.locator('.row').count();
+  await sw.uncheck();
+  expect(await page.locator('.row').count()).toBeLessThanOrEqual(before);
+  await sw.check();
+  await expect(page.locator('.row')).toHaveCount(before);
+});

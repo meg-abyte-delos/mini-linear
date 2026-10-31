@@ -28,8 +28,18 @@ export type Ordering = 'manual' | 'priority' | 'created';
 export const GROUPING_LABEL: Record<Grouping, string> = { status: 'Status', none: 'No grouping' };
 export const ORDERING_LABEL: Record<Ordering, string> = { manual: 'Manual', priority: 'Priority', created: 'Created' };
 
-export type DisplayProp = 'priority' | 'id' | 'status' | 'labels' | 'project' | 'created' | 'assignee';
-export const DISPLAY_PROP_LABEL: Record<DisplayProp, string> = { priority: 'Priority', id: 'ID', status: 'Status', labels: 'Labels', project: 'Project', created: 'Created', assignee: 'Assignee' };
+export type DisplayProp = 'priority' | 'id' | 'status' | 'labels' | 'project' | 'cycle' | 'estimate' | 'due' | 'created' | 'updated' | 'assignee';
+export const DISPLAY_PROP_LABEL: Record<DisplayProp, string> = { priority: 'Priority', id: 'ID', status: 'Status', labels: 'Labels', project: 'Project', cycle: 'Cycle', estimate: 'Estimate', due: 'Due date', created: 'Created', updated: 'Updated', assignee: 'Assignee' };
+/** Properties off until the user turns them on (they add columns; the default list stays as before). */
+export const DISPLAY_PROP_DEFAULT_OFF: readonly DisplayProp[] = ['cycle', 'estimate', 'due', 'updated'];
+
+/** "Show sub-issues" off: top-level issues only. */
+export function withoutSubIssues<T extends { parent_id: string | null }>(items: readonly T[], show: boolean): T[] {
+  return show ? [...items] : items.filter((i) => !i.parent_id);
+}
+
+/** Estimate as a short chip ("3"); empty when unset. */
+export const estimateText = (e: number | null | undefined): string => (e === null || e === undefined ? '' : String(e));
 
 /** Priority 1 (urgent) first, 0 (none) last; created newest first; manual keeps the input order. Stable. */
 export function orderIssues<T extends { priority: number; created_at: string }>(items: readonly T[], o: Ordering): T[] {
