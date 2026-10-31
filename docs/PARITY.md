@@ -37,7 +37,7 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 | Comment, edit, delete | present | `/comments/[id]`, `IssueDetail.tsx` | /docs/comment-on-issues |
 | Reactions | present | `/comments/[id]/reactions` | /docs/comment-on-issues |
 | Mentions (@user) notify | present | `lib/comments/mentions.ts`, `mention-inbox-api.spec.ts` | /docs/comment-on-issues |
-| Threaded replies | partial | `parent_comment_id`, Reply button, flat `replies` list. Resolve/unresolve routes exist. Partial: UI in #347 (open); to be switched to present once #347 merges | /docs/comment-on-issues |
+| Threaded replies | present | `parent_comment_id`, collapse/expand with count, resolve/reopen, `lib/detail/threads.ts`, spec `threaded-comments.spec.ts` (#347) | /docs/comment-on-issues |
 | Rich editor (markdown, slash menu) | present | `RichEditor.tsx` | /docs/comment-on-issues |
 | Emoji picker in comments | partial | reactions only, no `:emoji:` autocomplete | /docs/comment-on-issues |
 | Activity feed | present | `/issues/[id]/activity`, `IssueDetail.tsx` | /docs/creating-issues |
@@ -57,7 +57,7 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 | Inbox list, read/unread, archive | present | `Inbox.tsx`, `/notifications/*` | /docs/inbox |
 | Snooze | present | `/notifications/[id]/snooze`, `Inbox.tsx` | /docs/inbox |
 | Bulk actions, archive read, mark all read | present | `/notifications/bulk`, `/archive-read`, `/read-all` | /docs/inbox |
-| Reply notification type | partial | server emits `reply` (`0803`), `inbox-client.ts` NotifType lacks it, row renders `undefined` | /docs/notifications |
+| Reply notification type | present | server emits `reply` (`0803`), `NOTIF_TYPES`/`TYPE_LABEL` in `inbox-client.ts` include it (#347) | /docs/notifications |
 | Notification preferences | present | `SettingsNotifications.tsx`, `/notification-preferences` | /docs/notifications |
 | Inbox filters | partial | filter present, no per-type / per-team filter set | /docs/inbox |
 | Email / push / Slack delivery | partial | `digest.ts`, `/internal/notifications/due-soon`; no Slack, no push | /docs/notifications |
@@ -131,6 +131,7 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 | Cmd+K palette | present | `ui-palette.css`, `Shell.tsx` | https://linear.app/docs/conceptual-model |
 | Natural-language commands | present | `lib/nl-command.ts`, `palette-nl.spec.ts` | n/a (extra) |
 | Shortcuts: g then m (my issues), g then c (cycles), g then b (inbox), `i` assign to me, `Cmd+Shift+C` copy link | missing | not in `SHORTCUTS` | same |
+| Status digits (1 to 6) in the list Picker (`s`) | missing | `Picker.tsx` handles arrows/Enter only, no digit selection | same |
 
 ## Integrations, API
 
@@ -151,14 +152,13 @@ Ranked by how soon a user would notice on a first session. Rank 1 is the most vi
 1. **Grouping beyond status** (assignee, priority, project, cycle, label) and **sub-grouping**: first thing used on the list.
 2. **Filters**: creator, due date, estimate, parent, AND/OR.
 3. **Triage**: queue, accept/decline/duplicate.
-4. **Inbox `reply` rendering** (row shows `undefined`): a visible bug, small fix.
-5. **Issue templates picker** (backend exists).
-6. **Peek / split preview** and **My issues** page.
-7. **Roadmap**: initiatives, drag to reschedule.
-8. **Integrations settings UI**: GitHub, API keys, webhooks (all backend only), then Slack.
-9. **SLAs, saved issue drafts.**
-10. **Project documents, project graph, Insights.**
-11. **Import, SSO/SAML, SCIM, customer requests, sub-teams, audit log UI.**
+4. **Issue templates picker** (backend exists).
+5. **Peek / split preview** and **My issues** page.
+6. **Roadmap**: initiatives, drag to reschedule.
+7. **Integrations settings UI**: GitHub, API keys, webhooks (all backend only), then Slack.
+8. **SLAs, saved issue drafts.**
+9. **Project documents, project graph, Insights.**
+10. **Import, SSO/SAML, SCIM, customer requests, sub-teams, audit log UI.**
 
 ## Maintenance
 
