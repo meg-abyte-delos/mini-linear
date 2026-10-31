@@ -74,7 +74,9 @@ test('inbox: x toggles selection of the focused notification', async ({ page }) 
   // The key handler is re-bound in a passive effect that can lag the commit that renders the rows (seen under CPU load):
   // a first 'x' can hit the previous, empty-list handler and be dropped. Press only while nothing is selected, until it registers.
   await expect(async () => {
-    if (!(await page.getByText('1 selected').isVisible())) await page.keyboard.press('x');
+    // isVisible() does not wait: give a press that already registered a short moment to render before pressing again (a re-press would unselect).
+    const selected = await page.getByText('1 selected').waitFor({ timeout: 300 }).then(() => true, () => false);
+    if (!selected) await page.keyboard.press('x');
     await expect(page.getByText('1 selected')).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 10_000 });
   await page.keyboard.press('j');
