@@ -44,6 +44,9 @@ export interface Issue {
   cycle_id: string | null;
   label_ids: string[];
   parent_id: string | null;
+  estimate?: number | null; // API mode only
+  due_date?: string | null; // API mode only (YYYY-MM-DD)
+  updated_at?: string; // API mode only
   sort_key: string;
   version: number;
   created_at: string;

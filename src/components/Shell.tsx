@@ -19,7 +19,7 @@ import { MIN_QUERY, searchApi, searchLocal, snippetParts, type SearchHit } from 
 import { CyclesList } from '@/components/CyclesList';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
-import { DISPLAY_PROP_LABEL, GROUPING_LABEL, ORDERING_LABEL, type DisplayProp, fitLabels, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
+import { DISPLAY_PROP_DEFAULT_OFF, DISPLAY_PROP_LABEL, GROUPING_LABEL, estimateText, withoutSubIssues, ORDERING_LABEL, type DisplayProp, fitLabels, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
@@ -209,7 +209,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [grouping, setGrouping] = useState<Grouping>('status');
   const [ordering, setOrdering] = useState<Ordering>('manual');
   const [showEmpty, setShowEmpty] = useState(false);
-  const [hidden, setHidden] = useState<ReadonlySet<DisplayProp>>(new Set());
+  const [hidden, setHidden] = useState<ReadonlySet<DisplayProp>>(() => new Set(DISPLAY_PROP_DEFAULT_OFF));
+  const [showSub, setShowSub] = useState(true);
   const shown = (k: DisplayProp) => !hidden.has(k);
   const toggleProp = (k: DisplayProp) => setHidden((h) => { const n = new Set(h); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -354,7 +355,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   useEffect(() => { document.documentElement.dataset.ready = '1'; return () => { delete document.documentElement.dataset.ready; }; }, []);
 
   // Same grouping, ordering and collapsed state as the list render, so j/k never lands on a hidden row.
-  const groups = useMemo(() => listGroups(issues, STATUSES, grouping, ordering, showEmpty), [issues, grouping, ordering, showEmpty]);
+  const groups = useMemo(() => listGroups(withoutSubIssues(issues, showSub), STATUSES, grouping, ordering, showEmpty), [issues, showSub, grouping, ordering, showEmpty]);
   const ordered = useMemo(
     () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.filter((s) => !hiddenCols.has(s)).flatMap((s) => issues.filter((i) => i.status === s))),
     [view, groups, collapsed, issues, hiddenCols],
@@ -846,7 +847,11 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       {subBadge(i)}
       {shown('labels') && <span className='labels'>{(() => { const { shown: vis, hidden } = fitLabels(i.label_ids.flatMap((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? [lb] : []; })); return <>{vis.map((lb) => <span key={lb.id} className={`chip ${lb.hue}`}>{lb.name}</span>)}{hidden.length > 0 && <Tooltip label={hidden.map((h) => h.name).join(', ')}><span className='chip chip-more' tabIndex={0} aria-label={`${hidden.length} more labels: ${hidden.map((h) => h.name).join(', ')}`}>+{hidden.length}</span></Tooltip>}</>; })()}</span>}
       {shown('project') && <span className='proj-col'>{(() => { const pj = i.project_id ? PROJECTS.find((x) => x.id === i.project_id) : null; return pj ? <span className='chip proj' title={pj.name}><PropIcon name='project' /><span className='proj-name'>{pj.name}</span></span> : null; })()}</span>}
+      {shown('cycle') && <span className='cyc-col'>{(() => { const cy = i.cycle_id ? CYCLES.find((x) => x.id === i.cycle_id) : null; return cy ? <span className='chip' title={cy.name}>{cy.name}</span> : null; })()}</span>}
+      {shown('estimate') && <span className='est-col' title={i.estimate != null ? `Estimate ${i.estimate}` : undefined}>{estimateText(i.estimate)}</span>}
+      {shown('due') && <span className='date' title={i.due_date ? `Due ${i.due_date}` : undefined}>{i.due_date ? relDate(i.due_date) : ''}</span>}
       {shown('created') && <span className='date' title={fmtDate(i.created_at)}>{relDate(i.created_at)}</span>}
+      {shown('updated') && <span className='date' title={i.updated_at ? fmtDate(i.updated_at) : undefined}>{i.updated_at ? relDate(i.updated_at) : ''}</span>}
       {shown('assignee') && assignee(i)}
     </div>
   );
@@ -946,6 +951,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                     <div className='dp-row'><span className='dp-k'><Icon name='views' />Ordering</span><DisplayPick label='Ordering' value={ordering} labels={ORDERING_LABEL} onChange={setOrdering} /></div>
                     <div className='dp-sep' role='separator' />
                     <label className='dp-row dp-switch'><span className='dp-k'>Show empty groups</span><input type='checkbox' role='switch' checked={showEmpty} disabled={grouping === 'none'} onChange={(e) => setShowEmpty(e.target.checked)} /><i aria-hidden='true' /></label>
+                    <label className='dp-row dp-switch'><span className='dp-k'>Show sub-issues</span><input type='checkbox' role='switch' checked={showSub} onChange={(e) => setShowSub(e.target.checked)} /><i aria-hidden='true' /></label>
                     <div className='dp-sep' role='separator' />
                     <div className='dp-h' id='dp-props'>Display properties</div>
                     <div className='dp-props' role='group' aria-labelledby='dp-props'>{(Object.keys(DISPLAY_PROP_LABEL) as DisplayProp[]).map((k) => <button key={k} type='button' className={`dp-chip${shown(k) ? ' on' : ''}`} aria-pressed={shown(k)} onClick={() => toggleProp(k)}>{DISPLAY_PROP_LABEL[k]}</button>)}</div>
