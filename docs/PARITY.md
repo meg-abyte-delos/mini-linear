@@ -26,7 +26,7 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 | Copy link / branch name / git-branch | present | `IssueDetail.tsx` (branch), `0110_a9_github_integration` | /docs/github-integration |
 | Bulk actions (multi-select, `x`, Shift+J/K) | present | `SelectionBar.tsx`, `/issues/bulk`, `lib/shortcuts.ts` | /docs/creating-issues |
 | Subscribe / unsubscribe | present | `/issues/[id]/subscription`, `IssueDetail.tsx` | /docs/notifications |
-| Move issue between teams | present | `IssueDetail.tsx` (team move) | /docs/teams |
+| Move issue between teams | missing | `IssueDetail.tsx` only offers "Move to project" (l.376), no team move | /docs/teams |
 | Issue drafts (saved, resumable) | missing | `NewIssueDraft` is only the form state, reset on every open; nothing persisted | /docs/creating-issues |
 | Duplicate issue merge flow | partial | relation type `duplicate` + `cancel_source`; no "mark as duplicate" shortcut | /docs/issue-relations |
 
@@ -37,7 +37,7 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 | Comment, edit, delete | present | `/comments/[id]`, `IssueDetail.tsx` | /docs/comment-on-issues |
 | Reactions | present | `/comments/[id]/reactions` | /docs/comment-on-issues |
 | Mentions (@user) notify | present | `lib/comments/mentions.ts`, `mention-inbox-api.spec.ts` | /docs/comment-on-issues |
-| Threaded replies | partial | `parent_comment_id`, Reply button, flat `replies` list. Missing: thread container, N replies collapse, count, resolve/reopen UI. Resolve/unresolve routes exist. Red spec: `tests/e2e/threaded-comments.spec.ts` | /docs/comment-on-issues |
+| Threaded replies | partial | `parent_comment_id`, Reply button, flat `replies` list. Resolve/unresolve routes exist. Partial: UI in #347 (open); to be switched to present once #347 merges | /docs/comment-on-issues |
 | Rich editor (markdown, slash menu) | present | `RichEditor.tsx` | /docs/comment-on-issues |
 | Emoji picker in comments | partial | reactions only, no `:emoji:` autocomplete | /docs/comment-on-issues |
 | Activity feed | present | `/issues/[id]/activity`, `IssueDetail.tsx` | /docs/creating-issues |
@@ -74,8 +74,8 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 | Ordering | present | `list-ui.ts` | /docs/display-options |
 | Display properties | present | `DisplayPick.tsx` (Due date, Estimate, Cycle, Updated, sub-issues) | /docs/display-options |
 | Saved / custom views | present | `0401_area4_saved_views`, `/views`, `Shell.tsx` | /docs/custom-views |
-| Favorites | present | `/views/favorites`, `IssueHeaderBar.tsx` | /docs/favorites |
-| Shared / team views | partial | `/views` CRUD; no visibility (workspace vs private) UI found | /docs/custom-views |
+| Favorites | partial | `/views/favorites` API exists, but `IssueHeaderBar.tsx` stores favorites in localStorage (`ml.fav.<ident>`), not through the API | /docs/favorites |
+| Shared / team views | partial | `/views` CRUD; `Shell.tsx` (l.237, 266) sets a shared flag at creation. Gap: editing visibility afterwards | /docs/custom-views |
 | My issues | partial | home page pref (`0811`), no dedicated My issues page with tabs | /docs/my-issues |
 | Full search + recents | present | `SearchView.tsx`, `/search`, `/search/recents` | /docs/search |
 | Peek / split-pane preview | missing | none | /docs/display-options |
@@ -99,7 +99,7 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 | Milestones | present | `/projects/[id]/milestones` | /docs/project-milestones |
 | Project updates | present | `/projects/[id]/updates`, `ProjectDetail.tsx` | /docs/project-updates |
 | Project progress graph | partial | `ProgressRing.tsx`, rollup; no scope/burn graph | /docs/project-graph |
-| Project resources / links | present | `lib/resources/`, `ProjectDetail.tsx` | /docs/projects |
+| Project resources / links | missing | `lib/resources/` holds only server handlers: no route, no `ProjectDetail` UI | /docs/projects |
 | Project documents | missing | no documents model | /docs/projects |
 | Roadmap (timeline) | partial | list/roadmap toggle in `ProjectsList.tsx` (`lib/roadmap.ts`); no initiative grouping, no drag to reschedule | /docs/projects |
 | Initiatives | missing | no `initiative` | /docs/initiatives |
@@ -111,7 +111,7 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 | Teams, members, roles | present | `SettingsTeams.tsx`, `Members.tsx`, `/teams`, `/members` | /docs/teams |
 | Sub-teams (hierarchy) | missing | no parent team | /docs/teams |
 | Invites (send, revoke, resend, accept) | present | `/invites`, `0107` | /docs/members-roles |
-| Guests / limited access | API only | issue shares to guests (`/issues/[id]/shares`); no UI, no guest workspace role | /docs/members-roles |
+| Guests / limited access | partial | guest workspace role exists (`Members.tsx` invites, Guests tab, `readOnly` in `page.tsx`). Issue shares to guests (`/issues/[id]/shares`) stay API only | /docs/members-roles |
 | Labels + label groups | present | `SettingsLabels.tsx`, `/label-groups` | /docs/labels |
 | Workspace General (logo, slug, delete) | present | `Settings.tsx`, `0812`, `0813` | /docs/workspaces |
 | Profile and preferences | present | `SettingsAccount.tsx`, `0108` | /docs/workspaces |
@@ -136,7 +136,7 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 
 | Feature | Status | Evidence / gap | Linear doc |
 |---|---|---|---|
-| GitHub (link PRs, branch) | partial | `lib/integrations/github*.ts`, `/integrations/github/*`; no UI in `src/components` or settings page | /docs/github-integration |
+| GitHub (link PRs, branch) | partial | `lib/integrations/github-admin.ts`, `/integrations/github/*`; no UI in `src/components` or settings page | /docs/github-integration |
 | Slack | missing | none | /docs/slack |
 | Other integrations (Figma, Sentry, Zendesk...) | missing | none | /docs/integration-directory |
 | API keys | API only | `/api-keys`; no settings page | /docs/api-and-webhooks |
@@ -148,19 +148,18 @@ Doc base: https://linear.app/docs/ . Re-check a line when you touch the feature;
 
 Ranked by how soon a user would notice on a first session. Rank 1 is the most visible.
 
-1. **Threaded comments UI**: thread container, collapse, N replies, resolve. Visible on any issue with discussion. (Spec red on main.)
-2. **Grouping beyond status** (assignee, priority, project, cycle, label) and **sub-grouping**: first thing used on the list.
-3. **Filters**: creator, due date, estimate, parent, AND/OR.
-4. **Triage**: queue, accept/decline/duplicate.
-5. **Inbox `reply` rendering** (row shows `undefined`): a visible bug, small fix.
-6. **Issue templates picker** (backend exists).
-7. **Peek / split preview** and **My issues** page.
-8. **Roadmap**: initiatives, drag to reschedule.
-9. **Integrations settings UI**: GitHub, API keys, webhooks (all backend only), then Slack.
-10. **SLAs, saved issue drafts.**
-11. **Project documents, project graph, Insights.**
-12. **Import, SSO/SAML, SCIM, customer requests, sub-teams, audit log UI.**
+1. **Grouping beyond status** (assignee, priority, project, cycle, label) and **sub-grouping**: first thing used on the list.
+2. **Filters**: creator, due date, estimate, parent, AND/OR.
+3. **Triage**: queue, accept/decline/duplicate.
+4. **Inbox `reply` rendering** (row shows `undefined`): a visible bug, small fix.
+5. **Issue templates picker** (backend exists).
+6. **Peek / split preview** and **My issues** page.
+7. **Roadmap**: initiatives, drag to reschedule.
+8. **Integrations settings UI**: GitHub, API keys, webhooks (all backend only), then Slack.
+9. **SLAs, saved issue drafts.**
+10. **Project documents, project graph, Insights.**
+11. **Import, SSO/SAML, SCIM, customer requests, sub-teams, audit log UI.**
 
 ## Maintenance
 
-Evidence was gathered from file and route presence plus targeted reads. A `present` line means the feature is wired end to end in code, not that its behaviour matches Linear pixel for pixel. Measured Linear UI values are not recorded here (no Linear account access yet).
+Evidence was gathered from file and route presence plus targeted reads. A `present` line means the feature is wired end to end in code, not that its behaviour matches Linear pixel for pixel. Measured Linear UI values are not recorded here (no Linear account access yet). The `linear.app/docs` URLs in the table were not fetched one by one; they were checked in bulk at creation time, so a path may have moved.
