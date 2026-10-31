@@ -166,3 +166,15 @@ test('inbox: the unread counter equals the number of unread dots', async ({ page
   await expect(page.getByText('0 unread', { exact: true })).toBeVisible();
   await expect(page.locator('li.nrow[data-unread=true]')).toHaveCount(0);
 });
+
+test('inbox: the options menu (Mark all as read marks everything) is only on the All tab', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('button', { name: 'Inbox options' })).toBeVisible();
+  for (const name of ['Unread', 'Archived', 'Snoozed']) {
+    await page.getByRole('tab', { name }).click();
+    await expect(page.getByRole('button', { name: 'Inbox options' })).toHaveCount(0);
+  }
+  await page.getByRole('tab', { name: 'All' }).click();
+  await expect(page.getByRole('button', { name: 'Inbox options' })).toBeVisible();
+});

@@ -43,6 +43,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
   // One row per issue (latest event); the unread count is the number of unread rows, i.e. the dots.
   const { rows: list, members } = useMemo(() => groupByIssue(items ?? []), [items]);
   const unread = list.filter((n) => !n.read_at).length;
+  // readAll() marks every notification read (archived and snoozed too), so the item is gated on the total unread, fetched when the menu opens, not on the rows of the tab.
+  const [totalUnread, setTotalUnread] = useState<number | null>(null);
   const presets = useMemo(() => snoozePresets(), [snoozeOpen]);
   const sel = list[cur] as Notif | undefined;
   const selIssue = sel?.issue ? getIssue?.(sel.issue_id) : undefined;
@@ -126,13 +128,13 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
               <Button size={24} onClick={() => setChecked(new Set())}>Clear</Button>
             </span>
           ) : <span>{unread} unread</span>}
-          {checked.size === 0 && (
+          {checked.size === 0 && tab === 'all' && (
             <>
-              <IconButton ref={moreRef} label='Inbox options' size={24} aria-haspopup='menu' aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
+              <IconButton ref={moreRef} label='Inbox options' size={24} aria-haspopup='menu' aria-expanded={moreOpen} onClick={() => { if (!moreOpen) void client.unreadCount().then(setTotalUnread); setMoreOpen((o) => !o); }}>
                 <svg width='16' height='16' viewBox='0 0 16 16' aria-hidden='true' focusable='false'><path d='M3.5 8h.01M8 8h.01M12.5 8h.01' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' /></svg>
               </IconButton>
               <Menu open={moreOpen} anchorRef={moreRef} onClose={() => setMoreOpen(false)} label='Inbox options' align='end'
-                entries={[{ id: 'read-all', label: 'Mark all as read', disabled: unread === 0, onSelect: () => { void (async () => { if (await client.readAll()) await load(); })(); } }]} />
+                entries={[{ id: 'read-all', label: 'Mark all as read', disabled: (totalUnread ?? unread) === 0, onSelect: () => { void (async () => { if (await client.readAll()) await load(); })(); } }]} />
             </>
           )}
         </div>
