@@ -1,7 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const statusOf = (page: Page, id: string) =>
-  page.locator(`[data-id="${id}"]`).evaluate((el) => el.closest('section')?.querySelector('h2 span:nth-child(2)')?.textContent);
+  page.locator(`[data-id="${id}"]`).evaluate((el) => {
+    // List group header: name lives in .gh-name inside the Button label; board column: 2nd span.
+    const h = el.closest('section')?.querySelector('h2');
+    return (h?.querySelector('.gh-name') ?? h?.querySelector('span:nth-child(2)'))?.textContent;
+  });
 
 // The view switch runs in a View Transition: the DOM swaps asynchronously and the
 // ::view-transition overlay swallows pointer events until it ends. Wait for both.
@@ -24,7 +28,7 @@ test('dnd list: dropping a row on another group changes its status', async ({ pa
   await src.dragTo(target.locator('h2'));
   const to = await statusOf(page, id);
   expect(to).not.toBe(from);
-  expect(await target.locator('h2 span').nth(0).textContent()).toBe(to);
+  expect(await target.locator('h2 .gh-name').textContent()).toBe(to);
 });
 
 test('dnd board: dropping a card on another column changes its status', async ({ page }) => {
