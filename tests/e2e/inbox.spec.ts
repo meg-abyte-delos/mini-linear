@@ -271,3 +271,68 @@ test('inbox: editing the rail keeps an unsent comment draft', async ({ page }) =
   await expect(after).toHaveValue('draft that must survive');
   await expect(after).toHaveAttribute('data-same-node', '1');
 });
+
+// Properties drawer at 1280 (Rex #408 should-fix 2): aria-expanded, Esc + focus return, scrim, and closing on selection change.
+test.describe('inbox: Properties drawer at 1280', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  async function openInbox(page: import('@playwright/test').Page) {
+    await page.goto('/?view=inbox');
+    await page.waitForSelector('html[data-ready]');
+    await expect(page.getByRole('option').first()).toBeVisible();
+    const detail = page.getByRole('complementary', { name: 'Notification detail' });
+    await page.locator('#inbox-props').waitFor({ state: 'attached' });
+    return { detail, toggle: detail.getByRole('button', { name: 'Properties', exact: true }), rail: page.locator('#inbox-props') };
+  }
+
+  test('closed by default, the toggle opens it, Esc closes it and returns focus to the toggle', async ({ page }) => {
+    const { toggle, rail } = await openInbox(page);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(rail).toBeHidden();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(rail).toBeVisible();
+    await rail.getByRole('button').first().focus(); // focus inside the drawer: closing must not strand it on a hidden element
+    await page.keyboard.press('Escape');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(rail).toBeHidden();
+    await expect(toggle).toBeFocused();
+  });
+
+  test('clicking the scrim closes the drawer and returns focus to the toggle', async ({ page }) => {
+    const { toggle, rail } = await openInbox(page);
+    await toggle.click();
+    await expect(rail).toBeVisible();
+    await page.locator('.inbox-scrim').click({ position: { x: 5, y: 200 } });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(rail).toBeHidden();
+    await expect(toggle).toBeFocused();
+  });
+
+  test('reopening, then j/k to another notification closes it', async ({ page }) => {
+    const { toggle, rail } = await openInbox(page);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(rail).toBeVisible();
+    await page.keyboard.press('j');
+    await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-current', 'true');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(rail).toBeHidden();
+  });
+});
+
+test.describe('inbox: Properties rail at 1440', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('the rail is inline and there is no Properties toggle', async ({ page }) => {
+    await page.goto('/?view=inbox');
+    await page.waitForSelector('html[data-ready]');
+    await expect(page.getByRole('option').first()).toBeVisible();
+    await expect(page.locator('#inbox-props')).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'Notification detail' }).getByRole('button', { name: 'Properties', exact: true })).toBeHidden();
+  });
+});
