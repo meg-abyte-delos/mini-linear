@@ -56,12 +56,15 @@ test.describe('Search on the server route', () => {
     await page.keyboard.press('Control+k');
     await box.fill('qqzzxxnomatch');
     await expect(page.getByTestId('palette-searching')).toBeVisible();
+    const loadingX = (await page.getByTestId('palette-searching').locator('.pal-label').boundingBox())!.x;
     release();
     await expect(page.getByTestId('palette-no-results')).toHaveText(/No results for/);
     // One message plus exactly one Search all row under it, no separate entries.
     const opts = page.getByRole('listbox', { name: 'Commands' }).getByRole('option');
     await expect(opts).toHaveCount(1);
     await expect(opts.first()).toHaveText(/Search all for/);
+    // The loading row's text starts where a result row's text starts (no horizontal jump).
+    expect((await opts.first().locator('.pal-label').boundingBox())!.x).toBeCloseTo(loadingX, 0);
     await expect(page.getByTestId('palette-searching')).toHaveCount(0);
     // error
     await page.unroute('**/search?*');

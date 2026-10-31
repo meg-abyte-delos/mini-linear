@@ -48,3 +48,5 @@ body { font-family:var(--font-sans); font-size:var(--fs-base); line-height:var(-
 
 /* 10. Display chips (inactive): border on --line-input so the chip edge meets 3:1 (WCAG 1.4.11) in both themes. */
 .tb-menu.display .dp-chip:not(.on) { border-color:var(--line-input); }
+
+.palette li.pal-status .pal-label { color: var(--muted); }
