@@ -933,7 +933,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <EmptyState icon='issues' title='No issues yet' hint='Issues track the work your team is doing. Create one to get started.'
             action={!readOnly && <button className='btn' data-variant='primary' onClick={() => create()}>Create issue <kbd>C</kbd></button>} />
         ) : view === 'inbox' ? (
-          <Inbox client={inboxClient} refreshKey={rtTick} getIssue={getIssue} lookup={inboxLookup} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
+          <Inbox client={inboxClient} slug={api?.slug} readOnly={readOnly} refreshKey={rtTick} getIssue={getIssue} lookup={inboxLookup} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
           <ProjectDetail refreshKey={rtTick} slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
             issues={allIssues.filter((i) => i.project_id === detailId).map((i) => ({ id: i.id, identifier: i.identifier ?? i.id, title: i.title, done: i.status === 'done' || i.status === 'canceled' }))}

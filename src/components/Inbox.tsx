@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
+import { IssueActivity } from '@/components/IssueDetail';
+import '@/app/ui-inbox-activity.css';
 import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
 import { hueFor, initialsOf } from '@/lib/member-hue';
 import { personName } from '@/lib/nl-people';
@@ -16,7 +18,7 @@ import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type I
 /** Optional name lookups so the detail pane can show properties like Linear's issue sidebar. */
 export interface InboxLookup { person: (id: string | null) => string | undefined; label: (id: string) => { name: string; hue: string } | undefined; project: (id: string | null) => string | undefined }
 
-export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, refreshKey = 0 }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; lookup?: InboxLookup; refreshKey?: number }) {
+export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, refreshKey = 0, readOnly = false }: { client: InboxClient; readOnly?: boolean; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; lookup?: InboxLookup; slug?: string; refreshKey?: number }) {
   const [tab, setTab] = useState<InboxTab>('all');
   const [items, setItems] = useState<Notif[] | null>(null);
   const [err, setErr] = useState(false);
@@ -131,7 +133,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, refresh
               <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
                 <span className={`rowsel${checked.has(n.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }}>{checked.has(n.id) ? '☑' : '☐'}</span>
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
-                {n.actor ? <Avatar initials={initialsOf(personName(n.actor))} hue={hueFor(n.actor.id)} /> : <span className='nav-av' aria-hidden='true' data-kind='system'><svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.5'><circle cx='8' cy='8' r='5.5' /><path d='M8 5v3l2 1.5' /></svg></span>}
+                {n.actor ? <Avatar initials={initialsOf(personName(n.actor))} hue={hueFor(n.actor.id)} /> : <span className='nav-av' aria-hidden='true' data-kind='system' title='Due date reminder'><svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round'><rect x='2.5' y='3.5' width='11' height='10' rx='2' /><path d='M2.5 6.5h11M5.5 2v3M10.5 2v3M8 8.5v2l1.3.8' /></svg></span>}
                 <span className='nmain'>
                   <span className='ntitle' title={n.issue?.title ?? ''}>{n.issue?.title ?? ''}</span>
                   <span className='nsub'>
@@ -167,6 +169,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, refresh
                   {selIssue.description.trim() ? <Markdown source={selIssue.description} /> : <p className='md-empty'>No description.</p>}
                 </section>
               )}
+              {slug && sel.issue && <IssueActivity key={sel.issue_id} slug={slug} issueId={sel.issue_id} identifier={sel.issue.identifier} readOnly={readOnly} />}
             </article>
             <dl className='idp-props' aria-label='Properties'>
               {sel.issue && <><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></>}

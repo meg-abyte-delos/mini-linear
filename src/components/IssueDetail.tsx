@@ -558,3 +558,82 @@ function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = ''
     </div>
   );
 }
+
+/**
+ * Activity feed + comment composer for one issue, reusable outside the issue page (Inbox detail pane).
+ * Same ActivityEvent / CommentItem / Composer as the issue page; owns its comments + activity state.
+ */
+export function IssueActivity({ slug, issueId, identifier, readOnly = false }: { slug: string; issueId: string; identifier: string; readOnly?: boolean }) {
+  const router = useRouter();
+  const [nlPeople, setNlPeople] = useState<NlPeople>(EMPTY_PEOPLE);
+  useEffect(() => {
+    let live = true;
+    void fetchNlPeople(slug).then((p) => { if (live) setNlPeople(p); });
+    return () => { live = false; };
+  }, [slug]);
+  const people = useMemo<readonly Person[]>(() => peopleFromNl(nlPeople), [nlPeople]);
+  const ME = nlPeople.me ?? '';
+  const client = useMemo(() => detailApi(slug), [slug]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+  const reload = () => {
+    void client.comments(issueId).then((r) => r.ok && setComments(r.data.items));
+    void client.activity(issueId).then((r) => r.ok && setActivity(r.data.items));
+  };
+  useEffect(() => { setComments([]); setActivity([]); setToast(null); reload(); }, [client, issueId]);
+  async function postComment(body: string, parentId: string | null) {
+    const r = await client.addComment(issueId, body, parentId);
+    if (!r.ok) { setToast('Could not post the comment'); return false; }
+    setComments((c) => [...c, r.data]);
+    void client.activity(issueId).then((a) => a.ok && setActivity(a.data.items));
+    return true;
+  }
+  async function editComment(c: Comment, body: string) {
+    const r = await client.editComment(c.id, body, c.version ?? 1);
+    if (!r.ok) { setToast(r.status === 412 ? 'Comment changed elsewhere. Reload to edit.' : r.status === 403 ? 'Only the author can edit this comment' : 'Could not edit the comment'); return false; }
+    setComments((cs) => cs.map((x) => (x.id === c.id ? { ...x, ...r.data, reactions: x.reactions } : x)));
+    return true;
+  }
+  async function removeComment(c: Comment) {
+    if (!window.confirm('Delete this comment? Replies are deleted with it.')) return;
+    const r = await client.deleteComment(c.id, c.version ?? 1);
+    if (!r.ok) { setToast(r.status === 403 ? 'Only the author or an admin can delete this comment' : 'Could not delete the comment'); return; }
+    setComments((cs) => cs.filter((x) => x.id !== c.id && x.parent_comment_id !== c.id));
+    void client.activity(issueId).then((a) => a.ok && setActivity(a.data.items));
+  }
+  async function toggleReaction(c: Comment, emoji: string) {
+    const cur = c.reactions?.find((x) => x.emoji === emoji);
+    const on = !reactedBy(cur, ME);
+    const r = await client.react(c.id, emoji, on);
+    if (!r.ok) { setToast('Could not react'); return; }
+    setComments((cs) => cs.map((x) => {
+      if (x.id !== c.id) return x;
+      const list = (x.reactions ?? []).filter((y) => y.emoji !== emoji);
+      const count = (cur?.count ?? 0) + (on ? 1 : -1);
+      const ids = on ? [...(cur?.user_ids ?? []), ME] : (cur?.user_ids ?? []).filter((u) => u !== ME);
+      return { ...x, reactions: count > 0 ? [...list, { emoji, count, user_ids: ids }] : list };
+    }));
+  }
+  const who = (id: string | null | undefined) => findPerson(people, id);
+  const replies = (id: string) => comments.filter((c) => c.parent_comment_id === id);
+  const timeline = [
+    ...activity.filter((a) => !/^(commented|edited a comment)$/.test(a.summary ?? a.action)).map((at) => ({ kind: 'event' as const, at, ts: Date.parse(at.created_at) || 0 })),
+    ...comments.filter((c) => !c.parent_comment_id).map((c) => ({ kind: 'comment' as const, c, ts: Date.parse(c.created_at) || 0 })),
+  ].sort((a, b) => a.ts - b.ts);
+  const mine = (x: Comment) => !!ME && x.author_id === ME;
+  return (
+    <PeopleCtx.Provider value={people}><MeCtx.Provider value={ME}>
+      <section className='idp-sec inbox-activity' aria-labelledby='h-inbox-act'>
+        <h3 id='h-inbox-act'>Activity</h3>
+        {toast && <p role='alert' className='toast'>{toast}</p>}
+        <ol className='feed' aria-label='Activity'>
+          {timeline.map((t) => t.kind === 'event'
+            ? <ActivityEvent key={t.at.id} at={t.at} actor={who(t.at.actor_id)} />
+            : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={mine} canDelete={mine} readOnly={readOnly} /></li>)}
+        </ol>
+        {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} onAttach={() => router.push(`/w/${slug}/issue/${identifier}`)} />}
+      </section>
+    </MeCtx.Provider></PeopleCtx.Provider>
+  );
+}

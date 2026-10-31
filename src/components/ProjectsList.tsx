@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, PriorityIcon, ProjectStatusIcon, UnassignedIcon } from '@/components/icons';
+import { Avatar, Icon, PriorityIcon, ProjectStatusIcon, UnassignedIcon } from '@/components/icons';
 import { EmptyState } from '@/components/ui';
 import { ProgressRing } from '@/components/ProgressRing';
 import { MOCK_PEOPLE, findPerson, type Person } from '@/lib/people';
@@ -56,7 +56,7 @@ export function ProjectsList({ people = MOCK_PEOPLE, projects, issues, today, ca
               return (
                 <div key={p.id} className='cycle project pj-row' role='row' data-project={p.id}>
                   <span className='cy-name' role='cell'>
-                    <ProjectStatusIcon status={p.status} />
+                    <span className='pj-ic' aria-hidden='true'><Icon name='folder' size={14} /></span>
                     {canOpen ? <button className='pj-name' onClick={() => onOpen(p.id)}>{p.name}</button> : <span className='pj-name'>{p.name}</span>}
                     <span className='pj-actions'><button onClick={() => onViewIssues(p.id)}>View issues</button></span>
                   </span>
