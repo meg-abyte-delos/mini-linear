@@ -86,3 +86,4 @@ Not yet measured on a real Linear workspace (signup blocked, 2026-10-31). Values
 - Issue Properties rail `--idp-side-w` = clamp(280px, 24vw, 340px): 307px at 1280, 340px at 1440. Never narrower than `--idp-side-min` 280px.
 - Property label column `--idp-label-w` 96px; values one line, ellipsis, full value in a tooltip (title).
 - Below 1024px the Properties rail is a right drawer (header toggle, scrim, Esc closes).
+- Composer: the mention textarea is a plain textbox (role=combobox is not allowed on textarea), so screen readers no longer announce the mention popup as expanded/collapsed. Follow-up: announce it through a live region or move to a contenteditable combobox.

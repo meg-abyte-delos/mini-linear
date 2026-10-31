@@ -12,7 +12,7 @@ test('a comment mention creates an inbox notification for the mentioned member',
   const issue = await apiCreateIssue(page, title);
   await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
   await page.waitForSelector('html[data-ready]');
-  const box = page.getByRole('combobox', { name: 'Leave a comment' });
+  const box = page.getByRole('textbox', { name: 'Leave a comment' });
   await box.click();
   await box.pressSequentially('please look @mate now');
   const posted = page.waitForResponse((r) => /\/issues\/[^/]+\/comments$/.test(r.url()) && r.request().method() === 'POST');
