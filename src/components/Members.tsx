@@ -34,7 +34,7 @@ function InvitePopover({ open, anchorRef, onClose, roles, onSend }: { open: bool
     <Popover open={open} anchorRef={anchorRef} onClose={onClose} label='Invite people' align='end'>
       <form className='set-invite' onSubmit={(e) => void submit(e)}>
         <p className='set-invite-h'>Invite to workspace</p>
-        <label className='set-field'><span className='set-label'>Email</span><input className='set-input' type='email' required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com' /></label>
+        <label className='set-field'><span className='set-label'>Email addresses</span><input className='set-input' type='email' multiple required value={email} onChange={(e) => setEmail(e.target.value)} placeholder='name@company.com, other@company.com' /></label>
         <div className='set-field' role='radiogroup' aria-label='Role'>
           <span className='set-label' aria-hidden='true'>Role</span>
           <div className='set-seg'>
@@ -103,8 +103,12 @@ export function Members({ slug }: { slug: string }) {
     setBusy(false); setRemoving(null);
   };
   const send = async (email: string, r: 'admin' | 'member' | 'guest') => {
-    try { await S.createInvite(slug, email, r); setMsg(`Invitation sent to ${email.trim().toLowerCase()}`); await load(); return null; }
-    catch (e) { return (e as Error).message; }
+    // Several addresses may be pasted, separated by commas or spaces: one invite each; the failures stay in the field.
+    const list = Array.from(new Set(email.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean)));
+    const failed: string[] = []; let sent = 0, firstErr = '';
+    for (const a of list) { try { await S.createInvite(slug, a, r); sent++; } catch (e) { failed.push(a); firstErr ||= (e as Error).message; } }
+    if (sent) { setMsg(sent === 1 ? `Invitation sent to ${list.find((a) => !failed.includes(a))}` : `${sent} invitations sent`); await load(); }
+    return failed.length ? `${failed.join(', ')}: ${firstErr}` : null;
   };
 
   const header = (

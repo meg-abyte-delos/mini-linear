@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import * as S from '@/lib/settings-client';
-import { ConfirmDialog } from '@/components/ui';
+import { NameConfirmDialog } from '@/components/SettingsBits';
 import { SettingsShell } from '@/components/SettingsShell';
 import { TeamPanel } from '@/components/SettingsTeamPanel';
 const isAdmin = (r?: string) => r === 'owner' || r === 'admin';
@@ -43,9 +43,9 @@ export function SettingsTeams({ slug }: { slug: string }) {
         )}
         {teams.map((t) => <TeamPanel key={t.id} slug={slug} team={t} members={members} canAdmin={admin} onChanged={setMsg} onDelete={() => setDelTeam(t)} />)}
       </section>
-      <ConfirmDialog open={!!delTeam} destructive busy={busy} title={`Delete ${delTeam?.name ?? 'team'}?`} confirmLabel='Delete team' onConfirm={() => void confirmDelete()} onCancel={() => setDelTeam(null)}>
+      <NameConfirmDialog open={!!delTeam} name={delTeam?.name ?? ''} busy={busy} title={`Delete ${delTeam?.name ?? 'team'}?`} confirmLabel='Delete team' onConfirm={() => void confirmDelete()} onCancel={() => setDelTeam(null)}>
         This permanently deletes the team and all of its issues. This cannot be undone.
-      </ConfirmDialog>
+      </NameConfirmDialog>
     </SettingsShell>
   );
 }

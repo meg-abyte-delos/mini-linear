@@ -131,3 +131,26 @@
 .set-toolbar .set-search { flex:1 1 160px; max-width:200px; }
 .set-role-cell .set-role-select, .set-role-cell .set-role-text { width:96px; min-width:96px; justify-content:space-between; box-sizing:border-box; }
 .set-role-cell .set-role-select svg { opacity:.6; }
+/* Point 3: account forms, logo upload, slug preview, danger zone, labels */
+.set-hint { font-size:var(--fs-xs); color:var(--muted); }
+.set-profile-row { display:flex; align-items:center; gap:var(--sp-3); }
+.set-avatar-img { width:56px; height:56px; border-radius:50%; object-fit:cover; border:1px solid var(--line); }
+.set-logo-none { display:inline-flex; align-items:center; justify-content:center; width:48px; height:48px; background:var(--hover); color:var(--muted); font-weight:var(--fw-semibold); }
+.set-logo-row { flex-wrap:wrap; }
+.set-file { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.set-slug { display:flex; align-items:center; }
+.set-slug-pre { height:var(--set-ctl-h); display:inline-flex; align-items:center; padding:0 var(--sp-2); color:var(--muted); background:var(--hover); border:1px solid var(--line); border-right:0; border-radius:var(--r-sm) 0 0 var(--r-sm); box-sizing:border-box; }
+.set-slug .set-input { border-radius:0 var(--r-sm) var(--r-sm) 0; }
+.set-danger-card { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); border-color:color-mix(in srgb, var(--danger) 40%, var(--line)); }
+.set-confirm-field { margin-top:var(--sp-3); }
+.set-label-list { list-style:none; margin:var(--sp-3) 0 0; padding:0; }
+.set-label-row { display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-4); }
+.set-label-row + .set-label-row { border-top:1px solid var(--line); }
+.set-label-name { flex:1; max-width:320px; }
+.set-label-row > span:not(.set-swatch) { flex:1; }
+.set-label-row .btn { margin-left:auto; }
+.set-swatch { width:12px; height:12px; border-radius:50%; flex:none; }
+.set-color { width:32px; height:var(--set-ctl-h); padding:2px; background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); }
+.dlg-confirm:disabled { opacity:.4; cursor:not-allowed; filter:saturate(.5); }
+.set-label-row .set-color { margin-left:auto; }
+.set-label-row .set-color + .btn { margin-left:0; }
