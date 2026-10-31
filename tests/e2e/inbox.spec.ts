@@ -14,9 +14,9 @@ test('inbox: badge, keyboard triage', async ({ page }) => {
   await page.getByRole('link', { name: /^Inbox/ }).click();
   await expect(page).toHaveURL(/view=inbox/);
   await expect(page.getByRole('option')).toHaveCount(3);
-  await expect(page.getByRole('option').first()).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('option').first()).toHaveAttribute('aria-current', 'true');
   await page.keyboard.press('j');
-  await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-current', 'true');
   await page.keyboard.press('u');
   await expect(page.getByTestId('inbox-badge')).toHaveText('1');
   await page.keyboard.press('e');
@@ -80,7 +80,7 @@ test('inbox: x toggles selection of the focused notification', async ({ page }) 
     await expect(page.getByText('1 selected')).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 10_000 });
   await page.keyboard.press('j');
-  await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true'); // x acts on the focused row: wait for the move
+  await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-current', 'true'); // x acts on the focused row: wait for the move
   await page.keyboard.press('x');
   await expect(page.getByText('2 selected')).toBeVisible();
   await page.keyboard.press('x');

@@ -43,3 +43,6 @@
 
 /* 9. Typography: Inter Variable (@fontsource-variable/inter, bundled), tokens only, 450/500/600. */
 body { font-family:var(--font-sans); font-size:var(--fs-base); line-height:var(--lh-base); font-weight:var(--fw-regular); letter-spacing:-0.01em; text-rendering:optimizeLegibility; }
+
+/* 10. Display chips (inactive): border on --line-input so the chip edge meets 3:1 (WCAG 1.4.11) in both themes. */
+.tb-menu.display .dp-chip:not(.on) { border-color:var(--line-input); }
