@@ -13,7 +13,7 @@ export const users = pgTable("users", {
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   failedLogins: integer("failed_logins").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
-  displayName: text("display_name"), avatarUrl: text("avatar_url"), theme: text("theme").notNull().default("system"),
+  displayName: text("display_name"), avatarUrl: text("avatar_url"), theme: text("theme").notNull().default("system"), homePage: text("home_page").notNull().default("inbox"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [uniqueIndex("users_email_lower_uq").on(sql`lower(${t.email})`)]);
 
