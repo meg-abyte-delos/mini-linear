@@ -1,5 +1,5 @@
 /* New issue modal (D7). Tokens and ui primitives only; enter/exit reuse the primitives' keyframes and duration tokens. */
-:root { --ni-w:640px; --ni-desc-min-h:120px; --ni-desc-max-h:40vh; }
+:root { --ni-w:640px; --ni-w-expanded:880px; --ni-desc-min-h:120px; --ni-desc-max-h:40vh; }
 .ni-scrim { position:fixed; inset:0; z-index:80; display:grid; place-items:start center; padding:var(--sp-4); background:color-mix(in srgb, var(--bg) 60%, transparent); overflow:auto; }
 .ni-scrim[data-state='open'] { animation:prim-fade-in var(--dur-base) var(--ease-out); }
 .ni-scrim[data-state='closed'] { animation:prim-fade-out var(--dur-fast) var(--ease-in) forwards; pointer-events:none; }
@@ -72,3 +72,9 @@
 .ni-links button { color:inherit; background:transparent; border:0; cursor:pointer; }
 .ni-links button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .ni-more .cb-row { font-size:inherit; color:inherit; }
+
+/* Expand (Linear): wider dialog and a taller description; the team chip carries the team icon. */
+.ni[data-expanded] { --ni-w:var(--ni-w-expanded); --ni-desc-min-h:280px; --ni-desc-max-h:60vh; }
+.ni-top .ni-head { margin-right:auto; }
+.ni-top .ni-x + .ni-x { margin-left:0; }
+.ni-team .ic { color:var(--muted-strong); }

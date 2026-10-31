@@ -32,6 +32,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, c
   const [project, setProject] = useState<string | null>(null);
   const [team, setTeam] = useState(teamId);
   const [more, setMore] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [estimate, setEstimate] = useState<number | null>(null);
   const [due, setDue] = useState<string | null>(null);
   const [cycle, setCycle] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, c
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) { setTitle(''); setStatus(initialStatus ?? 'todo'); setPriority(0); setAssignee(null); setLabelIds([]); setProject(null); setTeam(teamId); setEstimate(null); setDue(null); setCycle(null); setShown2({ estimate: false, due: false, cycle: false }); setLinks([]); setLinkForm(null); setLinkErr(false); busyRef.current = false; setBusy(false); setInvalid(false); setPick(null); setEditorKey((k) => k + 1); desc.current = ''; }
+    if (open) { setTitle(''); setStatus(initialStatus ?? 'todo'); setPriority(0); setAssignee(null); setLabelIds([]); setProject(null); setTeam(teamId); setExpanded(false); setEstimate(null); setDue(null); setCycle(null); setShown2({ estimate: false, due: false, cycle: false }); setLinks([]); setLinkForm(null); setLinkErr(false); busyRef.current = false; setBusy(false); setInvalid(false); setPick(null); setEditorKey((k) => k + 1); desc.current = ''; }
   }
 
   useEffect(() => {
@@ -151,12 +152,15 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, c
       {mounted && createPortal(
         <div className='ni-scrim' data-state={state} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
           <div
-            ref={dlg} className='ni' role='dialog' aria-modal='true' aria-labelledby={titleId} data-state={state}
+            ref={dlg} className='ni' role='dialog' aria-modal='true' aria-labelledby={titleId} data-state={state} data-expanded={expanded || undefined}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }}
           >
             <div className='ni-top'>
-              {curTeam && <button type='button' className='ni-team' aria-haspopup='dialog' aria-label={curTeam.name + ' team'} onClick={openPick('team')}>{curTeam.key}<span className='ni-caret' aria-hidden='true'>›</span></button>}
+              {curTeam && <button type='button' className='ni-team' aria-haspopup='dialog' aria-label={curTeam.name + ' team'} onClick={openPick('team')}><Icon name='team' size={14} />{curTeam.key}<span className='ni-caret' aria-hidden='true'>›</span></button>}
               <h2 id={titleId} className='ni-head'>New issue</h2>
+              <button type='button' className='ni-x' aria-label={expanded ? 'Collapse' : 'Expand'} title={expanded ? 'Collapse' : 'Expand'} aria-pressed={expanded} onClick={() => setExpanded((x) => !x)}>
+                <svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>{expanded ? <path d='M13 3l-3.5 3.5M9.5 4v2.5H12M3 13l3.5-3.5M6.5 12V9.5H4' /> : <path d='M10 3h3v3M13 3L9.5 6.5M6 13H3v-3M3 13l3.5-3.5' />}</svg>
+              </button>
               <button type='button' className='ni-x' aria-label='Close' onClick={onClose}><svg width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' aria-hidden='true'><path d='M4 4l8 8M12 4l-8 8' /></svg></button>
             </div>
             <input
