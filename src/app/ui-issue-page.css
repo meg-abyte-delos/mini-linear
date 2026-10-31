@@ -56,3 +56,6 @@
 /* With the app sidebar the writing column is narrower: the description toolbar sits under the editor so it never covers the title. Description only: the comment composer keeps its toolbar above. */
 .idp .idp-desc .re-bar { bottom:auto; top:calc(100% + var(--sp-1)); }
 .idp-side:focus { outline:none; }
+/* Description hugs its content like Linear: one line (placeholder) at rest, the editing floor only while focused. */
+.idp .idp-desc .re-surface { min-height:calc(1lh + var(--sp-1) + var(--sp-3)); }
+.idp .idp-desc .re:focus-within .re-surface { min-height:var(--re-min-h); }
