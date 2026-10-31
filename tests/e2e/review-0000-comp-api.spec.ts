@@ -58,9 +58,9 @@ for (const width of [1280, 768]) {
     };
     await inside();
     await box.scrollIntoViewIfNeeded();
-    await page.locator('.composer-inline').first().screenshot({ path: `/workspace/shots/nits-composer-${width}-empty.png` });
+    await page.locator('.composer-inline').first().screenshot({ path: info.outputPath(`nits-composer-${width}-empty.png`) });
     await box.fill(Array.from({ length: 12 }, (_, k) => `line ${k} of a long comment`).join('\n'));
     await inside();
-    await page.locator('.composer-inline').first().screenshot({ path: `/workspace/shots/nits-composer-${width}-full.png` });
+    await page.locator('.composer-inline').first().screenshot({ path: info.outputPath(`nits-composer-${width}-full.png`) });
   });
 }
