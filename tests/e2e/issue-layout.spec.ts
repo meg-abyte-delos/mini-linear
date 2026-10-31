@@ -52,6 +52,8 @@ for (const width of [1280, 1440]) {
       await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
       const side = page.getByRole('complementary', { name: 'Sidebar' });
       await expect(side.locator('a.side-link[aria-current="page"]').first()).toHaveText(/Issues/);
+      // At most one Issues link is marked (the issue's own team), never one per team.
+      await expect(side.locator('a.side-link[aria-current="page"]')).toHaveCount(1);
       await page.goto('/search');
       await expect(side.getByRole('link', { name: 'Search', exact: true })).toHaveAttribute('aria-current', 'page');
     });
