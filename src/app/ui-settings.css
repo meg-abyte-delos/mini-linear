@@ -171,7 +171,7 @@
 .set-wrap .set-select.select-btn:hover:not(:disabled), .set-wrap .set-select.select-btn[aria-expanded='true'] { background:var(--hover); color:var(--fg); }
 .set-wrap .set-select.select-btn:disabled { color:var(--muted); }
 /* "···": visible at rest, clipped to its box (the stray dots came from the svg overflowing a fixed td). */
-.set-wrap .set-icon-btn { width:28px; height:28px; color:var(--muted-strong); overflow:hidden; }
+.set-wrap .set-icon-btn { width:var(--set-ctl-h); height:var(--set-ctl-h); color:var(--muted-strong); }
 .set-wrap .set-icon-btn svg { display:block; flex:none; }
 .set-table:has(.set-col-role) td.set-end, .set-wrap .set-table td.set-end { overflow:hidden; text-overflow:clip; }
 .set-wrap .set-card-head { margin-bottom:var(--sp-2); }
