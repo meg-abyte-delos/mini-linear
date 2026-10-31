@@ -24,7 +24,7 @@ test('settings page: left nav, primitives, delete team confirms in a dialog, axe
   await page.getByRole('button', { name: 'Delete team Zeta Scratch' }).click();
   const dlg = page.getByRole('alertdialog');
   await expect(dlg).toContainText('cannot be undone');
-  await expect(dlg.getByRole('button', { name: 'Delete team' })).toHaveAttribute('data-destructive', 'true');
+  await expect(dlg.getByRole('button', { name: 'Delete team' })).toHaveAttribute('data-tone', 'danger');
   await dlg.getByRole('button', { name: 'Delete team' }).click();
   await expect(page.getByRole('button', { name: 'Delete team Zeta Scratch' })).toHaveCount(0);
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();

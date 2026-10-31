@@ -20,7 +20,6 @@
 .ni-empty { color:var(--muted-strong); }
 .ni-foot { display:flex; align-items:center; gap:var(--sp-2); padding-top:var(--sp-2); border-top:1px solid var(--line-soft); }
 .ni-more { display:inline-flex; align-items:center; gap:var(--sp-2); margin-right:auto; font-size:var(--fs-sm); color:var(--muted-strong); cursor:pointer; }
-.ni-more input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 .ni-hint { display:inline-flex; }
 @media (max-width:640px) { .ni { margin-top:0; } .ni-foot { flex-wrap:wrap; } }
 /* Pickers and tooltips are portalled after the scrim: lift them above it (scrim is z-index 80). */
@@ -31,7 +30,6 @@
 .ni .re-bar .re-btn:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 .ni .re-bar { opacity:1; }
 .ni .re-link .re-apply { color:var(--fg); background:transparent; border:1px solid var(--line); border-radius:var(--r-sm); }
-.ni-more input { accent-color:var(--accent); }
 /* Label dots (legacy .chip lbN classes) inside the modal chips and its picker. */
 .ni-prop .chip, .ni-scrim ~ .pop .combo-opt .chip { display:inline-flex; align-items:center; gap:var(--sp-1); padding:0; border:0; background:none; color:inherit; font-size:var(--fs-sm); }
 .ni-scrim ~ .pop .combo-opt .chip { width:var(--sp-2); height:var(--sp-2); font-size:0; }
@@ -56,11 +54,6 @@
 /* Review 20:00: Linear title (borderless, no fill, 18px/500, no ring) and a token switch for Create more. */
 .ni input.ni-title, .ni input.ni-title:focus, .ni input.ni-title:focus-visible { height:auto; padding:var(--sp-1) 0; font-size:var(--fs-xl); font-weight:var(--fw-medium); line-height:1.35; background:transparent; border:0; border-radius:0; box-shadow:none; outline:none; }
 .ni input.ni-title[aria-invalid='true'] { box-shadow:inset 0 -1px 0 var(--danger); }
-.ni-more input[role='switch'] { appearance:none; -webkit-appearance:none; flex:none; position:relative; width:26px; height:16px; margin:0; border-radius:8px; background:color-mix(in srgb, var(--fg) 16%, transparent); border:1px solid var(--line); cursor:pointer; transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
-.ni-more input[role='switch']::after { content:''; position:absolute; top:2px; left:2px; width:10px; height:10px; border-radius:50%; background:var(--fg); transition:transform var(--dur-fast) var(--ease-out); }
-.ni-more input[role='switch']:checked { background:var(--accent); border-color:var(--accent); }
-.ni-more input[role='switch']:checked::after { transform:translateX(10px); background:var(--accent-fg); }
-@media (prefers-reduced-motion: reduce) { .ni-more input[role='switch'], .ni-more input[role='switch']::after { transition:none; } }
 /* Review 02:00: ghost paperclip in the footer, more-properties chip, link form and attached links. */
 .ni-attach { display:inline-flex; align-items:center; justify-content:center; width:var(--side-item-h); height:var(--side-item-h); padding:0; color:var(--muted-strong); background:transparent; border:0; border-radius:var(--r-sm); cursor:pointer; }
 .ni-attach:hover { background:var(--hover); color:var(--fg); }
@@ -78,3 +71,4 @@
 .ni-link-t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ni-links button { color:inherit; background:transparent; border:0; cursor:pointer; }
 .ni-links button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+.ni-more .cb-row { font-size:inherit; color:inherit; }

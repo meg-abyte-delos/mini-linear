@@ -5,6 +5,7 @@
 
 /* ---- Motion + type: theme independent ---- */
 :root {
+  --r-btn:6px;         /* buttons and inputs */
   --dur-instant:80ms;  /* hover, row background */
   --dur-fast:120ms;    /* color/border changes, chevrons, checkboxes */
   --dur-base:120ms;    /* popovers, menus, tooltips, palette, dialogs, view switches */
