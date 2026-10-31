@@ -520,7 +520,7 @@ function ActivityEvent({ at, actor }: { at: ActivityItem; actor: Person | undefi
     <li className='ev'>
       <span className='ev-lead' aria-hidden='true'>{actor ? <Avatar initials={actor.initials} hue={actor.hue} /> : <span className='dot' />}</span>
       <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span>{' '}{sp
-        ? <>{sp.lead}{sp.from ? <>from{' '}<span className='ev-status'><StatusIcon status={sp.from} /></span>{STATUS_LABEL[sp.from]} to{' '}</> : <>to{' '}</>}<span className='ev-status'><StatusIcon status={sp.to} /></span>{STATUS_LABEL[sp.to]}{sp.tail}</>
+        ? <>{sp.lead}{sp.from ? <>from{' '}<span className='ev-status'><StatusIcon status={sp.from} /></span>{sp.fromText} to{' '}</> : <>to{' '}</>}<span className='ev-status'><StatusIcon status={sp.to} /></span>{sp.toText}{sp.tail}</>
         : text}<span className='ev-sep' aria-hidden='true'> · </span><Age iso={at.created_at} /></span>
     </li>
   );
