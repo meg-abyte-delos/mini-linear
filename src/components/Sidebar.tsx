@@ -95,7 +95,7 @@ export function Sidebar(p: SidebarProps) {
 }
 
 /** Data for routes outside the Shell (issue page, Search): people, teams, saved views and the unread badge, same sources as Shell. */
-export function AppSidebar({ slug, current, id, onNavigate, navOpen }: { slug: string | null; current: 'search' | 'issue'; id?: string; onNavigate?: () => void; navOpen?: boolean }) {
+export function AppSidebar({ slug, current, id, onNavigate, navOpen, teamId }: { slug: string | null; current: 'search' | 'issue'; /** Team that owns the open issue: only its Issues link is marked (none when unknown). */ teamId?: string | null; id?: string; onNavigate?: () => void; navOpen?: boolean }) {
   const [people, setPeople] = useState<NlPeople>(EMPTY_PEOPLE);
   const [teams, setTeams] = useState<Team[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
@@ -119,7 +119,7 @@ export function AppSidebar({ slug, current, id, onNavigate, navOpen }: { slug: s
   return (
     <Sidebar
       slug={slug} people={people} unread={unread} views={views} teams={sideTeams} homeTeamId={teams[0]?.id ?? null}
-      active={{ kind: current === 'search' ? 'search' : 'issues' }} id={id ?? 'app-sidebar'} copied={copied}
+      active={current === 'search' ? { kind: 'search' } : { kind: 'issues', teamId: teamId ?? '' }} id={id ?? 'app-sidebar'} copied={copied}
       {...(onNavigate ? { onNavigate, navOpen: navOpen ?? false } : {})}
       onCopyView={(v) => { void navigator.clipboard?.writeText(viewUrl(window.location.origin, '/', v.id)).catch(() => undefined); setCopied(v.id); setTimeout(() => setCopied((c) => (c === v.id ? null : c)), 1500); }}
       onDeleteView={(v) => { void viewsClient.remove(v).then((ok) => { if (ok) setViews((l) => l.filter((x) => x.id !== v.id)); }); }}
