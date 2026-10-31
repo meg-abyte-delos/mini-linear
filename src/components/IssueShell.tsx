@@ -1,5 +1,5 @@
 'use client';
-// Issue page chrome: app sidebar + off-canvas drawer below 900px, toggled from the issue header (same behaviour as Shell).
+// Issue page chrome: app sidebar + off-canvas drawer at or below 900px, toggled from the issue header (same behaviour as Shell).
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { WIDE_MQ } from '@/lib/breakpoints';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -38,7 +38,7 @@ export function IssueShell({ slug, children }: { slug: string; children: ReactNo
   );
 }
 
-/** Header button that opens the app sidebar drawer (visible below 900px only, via .side-toggle CSS). */
+/** Header button that opens the app sidebar drawer (visible at or below 900px only, via .side-toggle CSS). */
 export function IssueNavToggle() {
   const nav = useIssueNav();
   if (!nav) return null;
