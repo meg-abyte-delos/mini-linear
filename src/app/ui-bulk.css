@@ -34,18 +34,8 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
   content:''; width:8px; height:8px; border-radius:50%;
   background:var(--accent); box-shadow:var(--accent-bar-glow);
 }
-[data-theme='dark'] .selbar > button {
-  height:28px; padding:0 10px; border-radius:7px;
-  background:transparent; border:1px solid transparent;
-  color:var(--fg); font:inherit; cursor:pointer;
-  transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-}
-[data-theme='dark'] .selbar > button:hover { background:var(--hover); border-color:var(--line); }
-[data-theme='dark'] .selbar > button[aria-expanded=true] { background:var(--sel); box-shadow:var(--accent-halo); }
-[data-theme='dark'] .selbar > button:focus-visible { outline:1px solid var(--accent); box-shadow:var(--accent-ring); }
-[data-theme='dark'] .selbar .selbar-undo { color:var(--accent); margin-left:4px; border-left:1px solid var(--line); border-radius:0 7px 7px 0; }
-[data-theme='dark'] .selbar .selbar-clear { color:var(--muted); }
-[data-theme='dark'] .selbar .selbar-clear:hover { color:var(--fg); }
+[data-theme='dark'] .selbar > .btn[aria-expanded=true] { background:var(--sel); box-shadow:var(--accent-halo); }
+[data-theme='dark'] .selbar .selbar-undo { color:var(--accent-text, var(--accent)); }
 
 /* ---------- system dark (no data-theme): same rules ---------- */
 @media (prefers-color-scheme: dark) {
@@ -70,18 +60,8 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
     content:''; width:8px; height:8px; border-radius:50%;
     background:var(--accent); box-shadow:var(--accent-bar-glow);
   }
-  html:not([data-theme]) .selbar > button {
-    height:28px; padding:0 10px; border-radius:7px;
-    background:transparent; border:1px solid transparent;
-    color:var(--fg); font:inherit; cursor:pointer;
-    transition:background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-  }
-  html:not([data-theme]) .selbar > button:hover { background:var(--hover); border-color:var(--line); }
-  html:not([data-theme]) .selbar > button[aria-expanded=true] { background:var(--sel); box-shadow:var(--accent-halo); }
-  html:not([data-theme]) .selbar > button:focus-visible { outline:1px solid var(--accent); box-shadow:var(--accent-ring); }
-  html:not([data-theme]) .selbar .selbar-undo { color:var(--accent); margin-left:4px; border-left:1px solid var(--line); border-radius:0 7px 7px 0; }
-  html:not([data-theme]) .selbar .selbar-clear { color:var(--muted); }
-  html:not([data-theme]) .selbar .selbar-clear:hover { color:var(--fg); }
+  html:not([data-theme]) .selbar > .btn[aria-expanded=true] { background:var(--sel); box-shadow:var(--accent-halo); }
+  html:not([data-theme]) .selbar .selbar-undo { color:var(--accent-text, var(--accent)); }
   /* card depth + selected glow, mirrored from ui-night.css */
   html:not([data-theme]) .card { box-shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 4px 12px rgba(0,0,0,.25); }
   html:not([data-theme]) .card:hover { border-color:rgba(255,255,255,.12); }
@@ -90,7 +70,6 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
 @keyframes bulk-in { from { opacity:0; transform:translate(-50%, 8px); } to { opacity:1; transform:translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) {
   [data-theme='dark'] .selbar, html:not([data-theme]) .selbar { animation:none; }
-  [data-theme='dark'] .selbar > button, html:not([data-theme]) .selbar > button { transition:none; }
 }
 @media (max-width: 640px) {
   [data-theme='dark'] .selbar, html:not([data-theme]) .selbar { left:8px; right:8px; transform:none; overflow-x:auto; animation:none; }
@@ -110,25 +89,21 @@ body:has(.selbar) .toast { bottom:calc(20px + 40px + 8px); }
 }
 
 /* ---------- Linear-style content: icons, shortcut hints, inline clear (x) ---------- */
-[data-theme='dark'] .selbar > button { display:inline-flex; align-items:center; gap:6px; }
 [data-theme='dark'] .selbar-ic { color:var(--muted); flex:none; }
-[data-theme='dark'] .selbar > button:hover .selbar-ic, [data-theme='dark'] .selbar > button[aria-expanded=true] .selbar-ic { color:var(--fg); }
+[data-theme='dark'] .selbar > .btn:hover .selbar-ic, [data-theme='dark'] .selbar > .btn[aria-expanded=true] .selbar-ic { color:var(--fg); }
 [data-theme='dark'] .selbar kbd { font:500 11px/16px var(--font-mono, ui-monospace, monospace); min-width:16px; padding:0 4px; border-radius:4px; text-align:center; color:var(--muted); background:rgba(255,255,255,.06); border:1px solid var(--line); }
-[data-theme='dark'] .selbar > .selbar-x { width:24px; height:24px; padding:0; justify-content:center; color:var(--muted); margin-left:-6px; }
+[data-theme='dark'] .selbar > .selbar-x { color:var(--muted); margin-left:-6px; }
 [data-theme='dark'] .selbar > .selbar-x:hover { color:var(--fg); }
 [data-theme='dark'] .selbar-count { border-right:0; margin-right:0; padding-right:4px; }
 [data-theme='dark'] .selbar-sep { width:1px; height:16px; background:var(--line); margin:0 4px; flex:none; }
-[data-theme='dark'] .selbar .selbar-undo { margin-left:0; border-left:0; border-radius:7px; }
 @media (prefers-color-scheme: dark) {
-html:not([data-theme]) .selbar > button { display:inline-flex; align-items:center; gap:6px; }
 html:not([data-theme]) .selbar-ic { color:var(--muted); flex:none; }
-html:not([data-theme]) .selbar > button:hover .selbar-ic, html:not([data-theme]) .selbar > button[aria-expanded=true] .selbar-ic { color:var(--fg); }
+html:not([data-theme]) .selbar > .btn:hover .selbar-ic, html:not([data-theme]) .selbar > .btn[aria-expanded=true] .selbar-ic { color:var(--fg); }
 html:not([data-theme]) .selbar kbd { font:500 11px/16px var(--font-mono, ui-monospace, monospace); min-width:16px; padding:0 4px; border-radius:4px; text-align:center; color:var(--muted); background:rgba(255,255,255,.06); border:1px solid var(--line); }
-html:not([data-theme]) .selbar > .selbar-x { width:24px; height:24px; padding:0; justify-content:center; color:var(--muted); margin-left:-6px; }
+html:not([data-theme]) .selbar > .selbar-x { color:var(--muted); margin-left:-6px; }
 html:not([data-theme]) .selbar > .selbar-x:hover { color:var(--fg); }
 html:not([data-theme]) .selbar-count { border-right:0; margin-right:0; padding-right:4px; }
 html:not([data-theme]) .selbar-sep { width:1px; height:16px; background:var(--line); margin:0 4px; flex:none; }
-html:not([data-theme]) .selbar .selbar-undo { margin-left:0; border-left:0; border-radius:7px; }
 }
 
 /* Undo action inside the delete toast (L7). */
