@@ -179,10 +179,16 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .selbar button:hover{background:var(--hover)}
 .selbar-count{font-weight:600;margin-right:4px}
 .row .rowsel{margin-right:6px}
-.sv-row { display:flex; align-items:center; }
+.sv-row { display:flex; align-items:center; position:relative; }
 .sv-row .side-link { flex:1; min-width:0; }
-.sv-tag { margin-left:auto; font-size:var(--fs-sm); color:var(--muted-strong); }
-.sv-act { border:0; background:none; color:var(--muted-strong); cursor:pointer; font:inherit; font-size:var(--fs-sm); padding:0 4px; height:24px; border-radius:4px; }
+.sv-name { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sv-tag { flex:0 0 auto; margin-left:auto; font-size:var(--fs-sm); color:var(--muted-strong); white-space:nowrap; }
+/* Linear-style: row actions overlay the right edge on hover/focus only, so the name keeps the full width. */
+.sv-acts { position:absolute; right:2px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:2px; padding-left:6px; background:var(--hover); border-radius:4px; opacity:0; transition:opacity 120ms ease; }
+.sv-row:hover .sv-acts, .sv-row:focus-within .sv-acts { opacity:1; }
+.sv-row:hover .sv-tag, .sv-row:focus-within .sv-tag { visibility:hidden; }
+@media (hover:none) { .sv-acts { opacity:1; } }
+.sv-act { flex:0 0 auto; white-space:nowrap; border:0; background:none; color:var(--muted-strong); cursor:pointer; font:inherit; font-size:var(--fs-sm); padding:0 4px; height:24px; border-radius:4px; }
 .sv-act:hover, .sv-act:focus-visible { color:var(--fg); background:var(--hover); }
 .save-form { display:inline-flex; align-items:center; gap:6px; }
 .save-form input[type=text], .save-form input:not([type]) { height:24px; border-radius:6px; border:1px solid var(--line); background:none; color:var(--fg); font:inherit; font-size:var(--fs-sm); padding:0 8px; }
