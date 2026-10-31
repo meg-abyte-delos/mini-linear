@@ -149,6 +149,8 @@ const ROUTES: [string, string, Pol][] = [
   ['GET', 'w/[slug]/search', 'mem'],
   ['GET', 'w/[slug]/settings', 'mem'],
   ['PATCH', 'w/[slug]/settings', 'adm?'],
+  ['GET', 'w/[slug]/settings/logo', 'mem'],
+  ['POST', 'w/[slug]/settings/logo', 'adm'],
   ['GET', 'w/[slug]/sync', 'mem'],
   ['POST', 'w/[slug]/teams/[id]/cycles/ensure', 'mem'],
   ['GET', 'w/[slug]/teams/[id]/cycle-settings', 'mem'],
