@@ -11,7 +11,7 @@ export type SettingsPage = 'general' | 'members' | 'teams' | 'notifications' | '
 // One nav for every settings page: Account, Workspace, then the sub-list of the viewer's teams.
 export function SettingsShell({ slug, current, header, children }: { slug: string; current: SettingsPage; header: ReactNode; children: ReactNode }) {
   const [teams, setTeams] = useState<Team[]>([]);
-  useEffect(() => { let on = true; listTeams(slug).then((t) => { if (on) setTeams(t); }).catch(() => undefined); return () => { on = false; }; }, [slug]);
+  useEffect(() => { let on = true; listTeams(slug, fetch, true).then((t) => { if (on) setTeams(t); }).catch(() => undefined); return () => { on = false; }; }, [slug]);
   const link = (page: SettingsPage, href: string, label: string) => (
     <a className='set-link' href={href} aria-current={current === page ? 'page' : undefined}>{label}</a>
   );

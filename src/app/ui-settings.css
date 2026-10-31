@@ -117,3 +117,4 @@
 .set-nav-item { display:contents; }
 .set-team-link { color:inherit; text-decoration:none; }
 .set-team-link:hover { text-decoration:underline; }
+.ts-ro { border:0; margin:0; padding:0; min-width:0; }
