@@ -33,7 +33,7 @@ async function open(page: Page, identifier: string) {
 const thread = (page: Page, rootText: string) => page.getByRole('group', { name: 'Thread' }).filter({ hasText: rootText });
 async function replyVia(t: ReturnType<typeof thread>, text: string) {
   await t.getByRole('button', { name: 'Reply', exact: true }).click();
-  const box = t.getByRole('combobox', { name: 'Reply' }).or(t.getByLabel('Reply', { exact: true }));
+  const box = t.getByRole('textbox', { name: 'Reply' }).or(t.getByLabel('Reply', { exact: true }));
   await box.click();
   await box.pressSequentially(text);
   await t.getByRole('button', { name: /^(Reply|Comment)$/ }).last().click();

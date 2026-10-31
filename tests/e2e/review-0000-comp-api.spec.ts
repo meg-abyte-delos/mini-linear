@@ -8,7 +8,7 @@ test('issue composer: Leave a comment placeholder, attach and send icons inside 
   const issue = await apiCreateIssue(page, `composer-${Date.now()}`);
   await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
   await page.waitForSelector('html[data-ready]');
-  const box = page.getByRole('combobox', { name: 'Leave a comment' });
+  const box = page.getByRole('textbox', { name: 'Leave a comment' });
   await expect(box).toHaveAttribute('placeholder', 'Leave a comment…');
   const send = page.getByRole('button', { name: 'Comment', exact: true });
   const attach = page.getByRole('button', { name: 'Attach link' });
@@ -47,7 +47,7 @@ for (const width of [1280, 768]) {
     const issue = await apiCreateIssue(page, `composer-w${width}-${Date.now()}`);
     await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
     await page.waitForSelector('html[data-ready]');
-    const box = page.getByRole('combobox', { name: 'Leave a comment' });
+    const box = page.getByRole('textbox', { name: 'Leave a comment' });
     await expect(box).toHaveAttribute('title', '@ to mention, ⌘↵ to send');
     const send = page.getByRole('button', { name: 'Comment', exact: true });
     await expect(send).toHaveAttribute('title', 'Comment (⌘↵)');
