@@ -28,7 +28,7 @@ Font `--font-sans` (Inter Variable). Scale: `--fs-xs` 11 (labels, kbd) · `--fs-
 
 ## 3. Spacing, radius, elevation
 - 4px grid: `--sp-1` 4 · `--sp-2` 8 · `--sp-3` 12 · `--sp-4` 16. Paddings and gaps are multiples of 4 (2px allowed only inside 24px controls).
-- Radius: `--r-sm` 5 (menu items, small controls), `--r-btn` 6 (buttons, inputs, side items; token added in fix/ui-btn-primitives, `.btn` still has a raw `6px` until then), `--r-md` 8 (cards, popovers), `--r-lg` 12 (dialogs). Columns 10.
+- Radius: `--r-sm` 5 (menu items, small controls), `--r-btn` 6 (buttons, inputs, side items), `--r-md` 8 (cards, popovers), `--r-lg` 12 (dialogs). Columns 10.
 - Elevation: flat surfaces + 1px line. Shadows only for floating layers: `--shadow-pop` (menus, tooltips, dialogs), `--shadow-lg` (palette). No shadow on cards or rows.
 - Density: list row `--row-h` 44, group header `--group-h` 36, sidebar item 28, chip `--chip-h` 22, header bar 44.
 
@@ -42,31 +42,31 @@ Font `--font-sans` (Inter Variable). Scale: `--fs-xs` 11 (labels, kbd) · `--fs-
 axe 0 violations in dark and light on every touched screen. Text >= 4.5:1, large/UI >= 3:1. Focus: `:focus-visible` 2px `--accent` outline, never removed without replacement. Hit target >= 24px.
 
 ## 7. Components (use the primitive, never restyle)
-### Button (`.btn` + data attributes)
-Today: `<button class="btn" data-variant data-size data-tone>` (CSS in ui-primitives.css). React `Button` / `IconButton`: in progress (fix/ui-btn-primitives), not on main yet.
+### Button / IconButton
+React `Button` (`variant` primary|secondary|ghost, `size` 24|28|32, `tone="danger"`, `loading`) and `IconButton` (`label` required: accessible name + tooltip) from `@/components/ui`. They render `.btn` + data attributes (CSS in ui-primitives.css). Never a bare `<button>` styled by a parent selector; comment actions (Reply, Edit, Delete, reactions) are ghost 24.
 | Variant | Look | When |
 |---|---|---|
-| `primary` | `--accent` fill, `--accent-fg` text (`.btn` has a raw `#fff` fallback, removed in fix/ui-btn-primitives) | the one main action of a group (Create issue, Save). Max one per group |
+| `primary` | `--accent` fill, `--accent-fg` text | the one main action of a group (Create issue, Save). Max one per group |
 | `secondary` (default) | fg 4% fill, 1px `--line` | other actions (Cancel, Invite) |
 | `ghost` | transparent, `--muted-strong` | toolbar / inline actions (Filter, Display) |
 | `icon` | ghost, square `width = height` | icon-only, always with `aria-label` + Tooltip |
 | `data-tone="danger"` | danger text + 45% border, 14% fill on hover | destructive (Delete workspace), combine with secondary |
 Sizes `data-size` 24 (dense toolbars, 12px text, 8px padding) · 28 (default, 12px padding) · 32 (forms, dialogs, auth).
-States: hover `--hover` + stronger border (primary: accent 88% + black); active = hover; focus-visible 2px accent, offset 1px; disabled `--dim` + .6 opacity, no hover. Target, to implement in fix/ui-btn-primitives (not in `.btn` yet): loading = `aria-busy="true"`, disabled, spinner replaces leading icon, width unchanged.
+States: hover `--hover` + stronger border (primary: accent 88% + black); active = hover; focus-visible 2px accent, offset 1px; disabled `--dim` + .6 opacity, no hover. Loading = `aria-busy="true"`, disabled, spinner over the hidden label, width unchanged.
 Linear ref: buttons are 28px, radius 6, medium weight, quiet borders; only the primary is colored.
 
-### Input (target)
-In progress (fix/ui-btn-primitives): no `Input` component or shared input style on main yet, only `.combo-input` inside Combobox. Target spec:
+### Input, Checkbox, Toggle
+`Input` (`.input`), `Checkbox` (`.cb`, 16px; 14px in row-select columns), `Toggle` (`role=switch`). Checkbox and Toggle require a name: `label`, `aria-label` or `aria-labelledby` (enforced by the type).
 28px (32 in forms/auth), radius 6, `--panel` fill, 1px `--line`, hover `--line-input`, focus `--accent` border + `--accent-ring`. Placeholder `--dim`. Error: `--danger` border + message below at `--fs-sm`.
 
 ### Select / Menu
-Never a native `<select>`: `Select` (`.select-btn` trigger + `Menu`/`Combobox`). Menu: `--raised`, `--shadow-pop`, `--r-md`, 4px padding, items 28px, radius 5, active `--hover`, destructive `--danger`, shortcuts in `Kbd`.
+Never a native `<select>`: `Select` (`.select-btn` trigger + `Menu`/`Combobox`). Menu: `--raised`, `--shadow-pop`, `--r-md`, 4px padding, items 28px, radius 5, active `--hover`, destructive = `data-tone="danger"` (`--danger`, same tone as Button), shortcuts in `Kbd`.
 
 ### Chip
 `Chip`: 22px, radius 5, `--fs-sm`, `--panel` fill + 1px line, color dot 7px before label. Tones accent / danger.
 
 ### List row
-44px, 16px side padding, gap 10, hairline `--line-soft`. Order: select, priority, id (52px, muted), status, title (ellipsis), labels/project pushed right, avatar 18px, date 72px right. Hover `--hover`; selected `--sel` + 2px inset accent bar. Actions show on hover/focus only.
+44px, 16px side padding, gap 10, hairline `--line-soft`. Order: select (Checkbox 14px, visible on hover/focus/selection, own column; Inbox: before the unread dot), priority, id (52px, muted), status, title (ellipsis), labels/project pushed right, avatar 18px, date 72px right. Hover `--hover`; selected `--sel` + 2px inset accent bar. Actions show on hover/focus only.
 
 ### Settings card / row
 Content max 640 centered. Row: label (13/500) + description (12, muted) left, control right, hairline between rows, card transparent with `--line-soft`. Danger zone last, danger-toned buttons.

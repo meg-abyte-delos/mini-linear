@@ -34,7 +34,7 @@
 .side { min-width:0; }
 .inbox-wrap { display:flex; min-height:0; min-width:0; flex:1; overflow:hidden; }
 /* Rows: no checkbox at rest, actor avatar at the left. */
-.nrow .rowsel { flex:none; width:14px; height:14px; display:grid; place-items:center; font-size:12px; line-height:1; color:var(--muted); opacity:0; transition:opacity var(--dur-instant) var(--ease-out); }
+.nrow .rowsel { flex:none; width:14px; height:14px; opacity:0; transition:opacity var(--dur-instant) var(--ease-out); }
 .nrow:hover .rowsel, .nrow:focus-within .rowsel, .nrow .rowsel.on, .inbox ul:has(.rowsel.on) .rowsel { opacity:1; }
 .nrow .ndot { flex:none; }
 .nrow .nav-av { flex:none; width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:600; background:var(--accent); color:var(--accent-fg); text-transform:uppercase; }
@@ -102,3 +102,8 @@
 .nrow .nsub .nsep { flex:none; }
 .nrow .nsub .nwho { flex:0 1 auto; max-width:none; min-width:0; font-size:var(--fs-xs); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .nrow .ntime { width:auto; min-width:32px; flex:none; align-self:flex-start; padding-top:2px; text-align:right; }
+
+/* Row select = the Checkbox primitive at 14px, own column before the unread dot. */
+.nrow .cb.rowsel { width:14px; height:14px; }
+.nrow .cb.rowsel[data-checked]::after { left:3.5px; top:1px; width:3.5px; height:7px; }
+.cb.rowsel { display:block; box-sizing:border-box; cursor:pointer; }

@@ -9,10 +9,6 @@
 .inbox-activity .cmt { background:var(--panel);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-2) }
 .inbox-activity .cmt header { font-size:var(--fs-sm);margin-bottom:4px }
 .inbox-activity .reacts { display:flex;gap:4px }
-.inbox-activity .reacts button { padding:0 6px;border-radius:999px;font-size:12px }
-.inbox-activity .reacts button.on { border-color:var(--accent);background:var(--sel) }
-.inbox-activity .reacts span { margin-left:3px }
-.inbox-activity .link-btn { border:0;color:var(--muted);padding:0 0 var(--sp-2) }
 .inbox-activity .composer { position:relative;margin-top:var(--sp-2) }
 .inbox-activity .composer textarea { width:100%;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-2) var(--sp-3);font:inherit;resize:vertical }
 .inbox-activity .composer-actions { display:flex;justify-content:flex-end;gap:var(--sp-2);margin-top:4px }
@@ -24,8 +20,6 @@
 .inbox-activity .feed .tl-cmt { margin:var(--sp-2) 0;color:var(--fg) }
 .inbox-activity .cmt-actions { float:right;display:inline-flex;gap:4px;opacity:0 }
 .inbox-activity .cmt:hover .cmt-actions, .inbox-activity .cmt:focus-within .cmt-actions { opacity:1 }
-.inbox-activity .cmt-actions button { border:0;background:none;color:var(--muted);padding:0 6px;font-size:12px }
-.inbox-activity .cmt-actions button:hover { color:var(--fg) }
 .inbox-activity .feed .ev { display:flex;align-items:center;gap:8px;padding-left:0;min-height:24px }
 .inbox-activity .feed .ev .av { width:16px;height:16px;font-size:9px }
 .inbox-activity .feed .ev .dot { position:static;flex:none;margin:0 5px }
@@ -53,3 +47,8 @@
 .inbox-activity .composer-ic:focus-visible { outline:2px solid var(--accent);outline-offset:1px }
 .inbox-activity .composer-send:not(:disabled) { background:var(--accent);color:var(--accent-fg) }
 .inbox-activity .composer-send:disabled { opacity:.4;cursor:default }
+/* Same comment controls as the issue page (issue-detail.css is not loaded on the Inbox route). */
+.inbox-activity .btn.cmt-reply { margin:calc(-1 * var(--sp-1)) 0 var(--sp-2) var(--sp-1) }
+.inbox-activity .cmt-actions { gap:2px }
+.inbox-activity .reacts .react { gap:3px;min-width:24px;justify-content:center;padding:0 6px;border-radius:var(--r-btn);color:var(--muted-strong) }
+.inbox-activity .reacts .react.on { background:var(--sel);border-color:color-mix(in srgb,var(--accent) 45%,transparent);color:var(--fg) }

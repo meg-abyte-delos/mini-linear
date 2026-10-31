@@ -46,7 +46,7 @@ export function Menu({ open, anchorRef, onClose, label, entries, align, matchWid
           return (
             <div
               key={e.id} ref={(el) => { refs.current[k] = el; }} role='menuitem' tabIndex={k === active ? 0 : -1}
-              aria-disabled={e.disabled || undefined} data-destructive={e.destructive || undefined} data-active={k === active}
+              aria-disabled={e.disabled || undefined} data-tone={e.destructive ? 'danger' : undefined} data-active={k === active}
               className='menu-item' onClick={() => choose(e)} onMouseEnter={() => !e.disabled && setActive(k)}
             >
               <span className='menu-ic' aria-hidden='true'>{e.icon}</span>

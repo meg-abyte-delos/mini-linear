@@ -1,5 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
+// Estimate is a picker (same Combobox as Priority/Cycle), no native select.
+async function setEstimate(page: Page, v: string) { await page.getByRole('button', { name: /^Estimate:/ }).click(); await page.getByRole('option', { name: v === '' ? 'No estimate' : `${v} pt${v === '1' ? '' : 's'}`, exact: true }).click(); }
+
+
 // PR #152 (ui-issue header): prev/next counter, favorite star, "..." menu, icon pill pickers, one-line branch. API mode, demo session.
 // Depends on PR #152 being on main. Creates its own issues (shared DB).
 test.describe.configure({ mode: 'serial' });
@@ -148,7 +152,7 @@ test('pills: empty values show muted placeholders; estimate and due date keep na
   await expect(props).toContainText('Set parent');
   // Wait for each PATCH to land: a second edit sent before the first returns uses a stale If-Match and gets 412 (finding, pre-existing).
   const patched = () => page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/issues/'));
-  let w = patched(); await page.getByLabel('Estimate').selectOption('5'); expect((await w).status()).toBe(200);
+  let w = patched(); await setEstimate(page, '5'); expect((await w).status()).toBe(200);
   await expect(props).toContainText('5 pts');
   await expect(page.getByRole('list', { name: 'Activity' })).toContainText('set estimate to 5');
   w = patched(); await page.getByLabel('Due date').fill('2026-10-20'); expect((await w).status()).toBe(200);
@@ -157,7 +161,7 @@ test('pills: empty values show muted placeholders; estimate and due date keep na
   await expect(props).not.toContainText('mm/dd/yyyy');
   await page.reload(); await page.waitForSelector('html[data-ready]');
   await expect(props).toContainText('5 pts'); await expect(props).toContainText('Oct 20, 2026');
-  w = patched(); await page.getByLabel('Estimate').selectOption(''); expect((await w).status()).toBe(200);
+  w = patched(); await setEstimate(page, ''); expect((await w).status()).toBe(200);
   await expect(props).toContainText('Set estimate');
   w = patched(); await page.getByLabel('Due date').fill(''); expect((await w).status()).toBe(200);
   await expect(props).toContainText('Set due date');
@@ -166,8 +170,8 @@ test('pills: empty values show muted placeholders; estimate and due date keep na
 
 test('pills: Estimate with 1 point is singular ("1 pt")', async ({ page }) => {
   await open(page, B);
-  await page.getByLabel('Estimate').selectOption('1');
-  await expect(page.locator('dd.prop-native .prop-pill').first()).toHaveText('1 pt');
+  await setEstimate(page, '1');
+  await expect(page.getByRole('button', { name: /^Estimate:/ })).toHaveText('1 pt');
 });
 
 test('branch: single button, copies on click, full name in aria-label (tooltip: issue-page-d9), one line with ellipsis', async ({ page, context }) => {
@@ -199,7 +203,7 @@ test.fixme('assignee pill: an assigned issue shows the member, not "Unassigned"'
 // FINDING (pre-existing, not PR 152): two property edits sent before the first PATCH returns -> the second sends a stale If-Match, gets 412 and is dropped.
 test.fixme('rapid back-to-back edits (estimate then due date) both persist', async ({ page }) => {
   await open(page, B);
-  await page.getByLabel('Estimate').selectOption('3');
+  await setEstimate(page, '3');
   await page.getByLabel('Due date').fill('2026-10-21');
   await page.reload(); await page.waitForSelector('html[data-ready]');
   await expect(page.getByLabel('Due date')).toHaveValue('2026-10-21');

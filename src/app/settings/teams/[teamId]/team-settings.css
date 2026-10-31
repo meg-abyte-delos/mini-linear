@@ -11,14 +11,9 @@
 .ts-error { color: #e5484d; }
 .ts-swatch { flex: none; }
 
-/* Controls on tokens (D6 contrast fix): native buttons kept the browser face (#efefef) under the themed text colour, 1.08:1 in dark. */
+/* Controls on tokens (D6 contrast fix). Buttons are the Button/IconButton primitives (no .ts button rule); inputs and selects still native here. */
+.ts input:focus-visible, .ts select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ts { background: var(--bg); color: var(--fg); }
-.ts button { box-sizing: border-box; min-height: 28px; padding: 0 var(--sp-3, 12px); font: inherit; color: var(--fg); background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-sm, 6px); cursor: pointer; }
-.ts button:hover:not(:disabled) { background: var(--hover); }
-.ts button:focus-visible, .ts input:focus-visible, .ts select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.ts button:disabled { color: var(--dim); cursor: default; }
-.ts button[type='submit'] { color: var(--accent-fg); background: var(--accent); border-color: var(--accent); }
-.ts button[type='submit']:hover:not(:disabled) { background: var(--accent-hover); }
 .ts input:not([type='checkbox']):not([type='color']), .ts select { box-sizing: border-box; min-height: 28px; padding: 0 var(--sp-2, 8px); font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line-input, var(--line)); border-radius: var(--r-sm, 6px); }
 .ts input::placeholder { color: var(--dim); }
 .ts-muted { opacity: 1; color: var(--muted); }

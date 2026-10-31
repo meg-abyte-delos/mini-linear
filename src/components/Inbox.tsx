@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { EmptyState } from '@/components/ui';
+import { Button, CheckMark, EmptyState } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { IssueActivity } from '@/components/IssueDetail';
 import '@/app/ui-inbox-activity.css';
@@ -101,7 +101,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
       {TABS.map((x) => <button key={x.id} role='tab' aria-selected={tab === x.id} className={tab === x.id ? 'on' : ''} onClick={() => setTab(x.id)}>{x.label}</button>)}
     </div>
   );
-  if (err) return <div className='state error' role='alert'><p>Could not load notifications.</p><button className='btn' onClick={() => void load()}>Retry</button></div>;
+  if (err) return <div className='state error' role='alert'><p>Could not load notifications.</p><Button onClick={() => void load()}>Retry</Button></div>;
   if (!items) return <div className='state' role='status'><p>Loading…</p></div>;
   const empty = tab === 'all' ? { t: 'Inbox zero', h: 'Nothing needs your attention. Notifications about issues you follow land here.' } : tab === 'unread' ? { t: 'No unread notifications', h: 'You are all caught up.' } : tab === 'archived' ? { t: 'Nothing archived', h: 'Archived notifications show up here.' } : { t: 'Nothing snoozed', h: 'Snoozed notifications come back when their time is up.' };
   return (
@@ -112,14 +112,14 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
           {checked.size > 0 ? (
             <span className='bulk' role='toolbar' aria-label='Bulk actions'>
               <span>{checked.size} selected</span>
-              <button className='btn' data-size='24' onClick={() => void actMany(targets(), 'read')}>Mark read</button>
-              <button className='btn' data-size='24' onClick={() => void actMany(targets(), 'unread')}>Mark unread</button>
-              <button className='btn' data-size='24' onClick={() => void actMany(targets(), tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
-              <button className='btn' data-size='24' onClick={() => setSnoozeOpen(true)}>Snooze…</button>
-              <button className='btn' data-size='24' onClick={() => setChecked(new Set())}>Clear</button>
+              <Button size={24} onClick={() => void actMany(targets(), 'read')}>Mark read</Button>
+              <Button size={24} onClick={() => void actMany(targets(), 'unread')}>Mark unread</Button>
+              <Button size={24} onClick={() => void actMany(targets(), tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</Button>
+              <Button size={24} onClick={() => setSnoozeOpen(true)}>Snooze…</Button>
+              <Button size={24} onClick={() => setChecked(new Set())}>Clear</Button>
             </span>
           ) : <span>{unread} unread</span>}
-          {tab === 'all' && checked.size === 0 && <button className='btn' data-size='24' disabled={unread === 0} onClick={async () => { if (await client.readAll()) { await load(); } }}>Mark all as read</button>}
+          {tab === 'all' && checked.size === 0 && <Button size={24} disabled={unread === 0} onClick={async () => { if (await client.readAll()) { await load(); } }}>Mark all as read</Button>}
         </div>
         {snoozeOpen && (
           <div className='snooze-menu' role='menu' aria-label='Snooze until'>
@@ -132,7 +132,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
           <ul role='listbox' aria-label='Notifications'>
             {list.map((n, i) => (
               <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
-                <span className={`rowsel${checked.has(n.id) ? ' on' : ''}`} aria-hidden='true' data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }}>{checked.has(n.id) ? '☑' : '☐'}</span>
+                <CheckMark className={`rowsel${checked.has(n.id) ? ' on' : ''}`} checked={checked.has(n.id)} data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }} />
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
                 {n.actor ? <Avatar initials={initialsOf(personName(n.actor))} hue={hueFor(n.actor.id)} /> : <span className='nav-av' aria-hidden='true' data-kind='system' title='Due date reminder'><svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round'><rect x='2.5' y='3.5' width='11' height='10' rx='2' /><path d='M2.5 6.5h11M5.5 2v3M10.5 2v3M8 8.5v2l1.3.8' /></svg></span>}
                 <span className='nmain'>
@@ -155,10 +155,10 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
           <div className='idp-bar'>
             <span className='idp-id'>{sel.issue?.identifier ?? 'Deleted'}</span>
             <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
-              {sel.issue && <button className='btn' data-variant='primary' onClick={() => open(sel)}>Open issue</button>}
-              <button className='btn' data-variant='ghost' aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</button>
-              <button className='btn' data-variant='ghost' aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</button>
-              <button className='btn' data-variant='ghost' aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</button>
+              {sel.issue && <Button variant='primary' onClick={() => open(sel)}>Open issue</Button>}
+              <Button variant='ghost' aria-label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? 'Mark unread' : 'Mark read'}</Button>
+              <Button variant='ghost' aria-label={`Snooze ${sel.issue?.identifier ?? ''}`} onClick={() => setSnoozeOpen(true)}>Snooze</Button>
+              <Button variant='ghost' aria-label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}>{tab === 'archived' ? 'Unarchive' : 'Archive'}</Button>
             </div>
           </div>
           <div className='idp-body'>

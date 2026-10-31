@@ -10,4 +10,4 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { EmptyState } from './EmptyState';
 export { Select, type SelectOption } from './Select';
 export { Button, IconButton, type ButtonProps, type IconButtonProps } from './Button';
-export { Input, Checkbox, Toggle, type InputProps, type CheckProps } from './Input';
+export { Input, Checkbox, CheckMark, Toggle, type InputProps, type CheckProps } from './Input';

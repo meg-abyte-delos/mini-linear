@@ -77,7 +77,7 @@ test('members page: inline role dropdown, role tabs, row menu with a red Remove 
   test.skip((await others.count()) === 0, 'demo workspace has no other member');
   await others.first().getByRole('button', { name: /^Actions for/ }).click();
   await expect(page.getByRole('menuitem', { name: /^Make / })).toHaveCount(0);
-  await expect(page.getByRole('menuitem', { name: 'Remove from workspace' })).toHaveAttribute('data-destructive', 'true');
+  await expect(page.getByRole('menuitem', { name: 'Remove from workspace' })).toHaveAttribute('data-tone', 'danger');
   await page.getByRole('menuitem', { name: 'Remove from workspace' }).click();
   const dlg = page.getByRole('alertdialog');
   await expect(dlg).toContainText('loses access');
