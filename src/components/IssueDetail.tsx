@@ -471,7 +471,8 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         </section>
       </main>
 
-      <aside id='idp-props' ref={propsAsideRef} tabIndex={-1} className='idp-side' aria-label='Properties'>
+      <div id='idp-props' ref={propsAsideRef as React.RefObject<HTMLDivElement>} tabIndex={-1} className='idp-side' aria-label='Properties' role={propsOpen ? 'dialog' : 'complementary'} aria-modal={propsOpen || undefined}>
+        {propsOpen && <IconButton label='Close properties' size={24} className='idp-props-close' onClick={() => setPropsOpen(false)}><svg width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' aria-hidden='true'><path d='M4 4l8 8M12 4l-8 8' /></svg></IconButton>}
         <section className='side-group' aria-labelledby='sg-props'>
           <h3 id='sg-props' className='side-h'>Properties</h3>
           <dl>
@@ -502,7 +503,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           <dt>Branch</dt><dd><Tooltip label={branch}><button className='branch-btn' onClick={() => void copyBranch()} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code><span className='branch-copy'><PropIcon name='copy' /></span></button></Tooltip></dd>
           </dl>
         </section>
-      </aside>
+      </div>
       <Combobox open={!!pick} anchorRef={pickAnchor} onClose={() => setPick(null)} label={pickTitle[shown.kind]} multi={shown.kind === 'labels'} numbered={shown.kind === 'status'} startOnChecked={shown.kind === 'status'} options={options(shown.kind)} onPick={(id) => void onPick(id)} />
       <ConfirmDialog open={confirmDelete} title={`Delete ${ident}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void lifecycle('delete'); }}>
         <p>{issue.title}</p><p>The issue moves to the trash. You can restore it from there.</p>
