@@ -187,9 +187,10 @@ export const createComment = (req: Request, slug: string, rawIssue: string) => w
   await ctx.tx`insert into comments (id, workspace_id, issue_id, parent_comment_id, author_id, body) values (${id}, ${ctx.workspaceId}, ${issueId}, ${parent}, ${ctx.userId}, ${b.body})`;
   if (parent) {
     // A reply reopens a resolved thread: same bookkeeping as an explicit unresolve (version bump so a stale edit in another tab gets a 412, audit, change-feed event).
+    const was = await ctx.tx`select resolved_at from comments where id = ${parent}`;
     const reopened = await ctx.tx`update comments set resolved_at = null, resolved_by = null, version = version + 1 where id = ${parent} and resolved_at is not null returning version`;
     if (reopened.length) {
-      await audit(ctx, "comment", parent, "unresolve", { resolved_at: { before: "resolved", after: null } });
+      await audit(ctx, "comment", parent, "unresolve", { resolved_at: { before: was[0]?.resolved_at ?? null, after: null } });
       await emitSync(ctx, { entity: "comment", id: parent, op: "update", version: Number(reopened[0]!.version), issueId });
     }
   }
@@ -236,6 +237,7 @@ const setResolved = (resolved: boolean) => (req: Request, slug: string, rawId: s
   else await ctx.tx`update comments set resolved_at = null, resolved_by = null, version = version + 1 where id = ${id}`;
   const row = await getComment(ctx, id);
   await audit(ctx, "comment", id, resolved ? "resolve" : "unresolve", { resolved_at: { before: before.resolved_at, after: row.resolved_at } });
+  await emitSync(ctx, { entity: "comment", id, op: "update", version: Number(row.version), issueId: before.issue_id as string });
   return out(row);
 });
 export const resolveComment = setResolved(true);

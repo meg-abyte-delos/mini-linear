@@ -42,7 +42,7 @@ test('threads render with a rail, collapse, resolve and reopen from the root hea
   await expect(again.getByText('Resolved', { exact: true })).toBeVisible();
   await expect(again.getByRole('button', { name: /2 replies/ })).toHaveAttribute('aria-expanded', 'false');
 
-  // Reopen from the menu: replies are back.
+  // Reopen with the thread button: replies are back.
   await again.getByRole('button', { name: 'Reopen thread' }).click();
   await expect(again.getByText('First reply')).toBeVisible();
   await expect(again.getByText('Resolved', { exact: true })).toHaveCount(0);

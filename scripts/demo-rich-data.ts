@@ -147,7 +147,7 @@ export const RICH_ISSUES: RichIssue[] = [...mk('DEM', ROWS, 0, EXTRA_LABELS), ..
 export const issueByKey = (team: TeamKey, n: number) => RICH_ISSUES.find((x) => x.team === team && x.n === n)!;
 
 /** Comment bodies use {who} tokens for @mentions; the seed renders them as @[Display Name](uuid). `re` = index of the parent comment (replies are one level deep). */
-export type RichComment = { k: number; n: number; by: Who; after: number; body: string; re?: number; resolved?: boolean };
+export type RichComment = { k: number; n: number; by: Who; after: number; body: string; re?: number; resolved?: boolean; resolvedBy?: Who };
 const C = (k: number, n: number, by: Who, after: number, body: string, extra: Partial<RichComment> = {}): RichComment => ({ k, n, by, after, body, ...extra });
 export const RICH_COMMENTS: RichComment[] = [
   C(0, 11, 'admin', 1, 'Please keep it consistent with the board shortcuts. {maya} can you check j and k on the board too?'),
@@ -212,7 +212,7 @@ export const RICH_COMMENTS: RichComment[] = [
   C(58, 24, 'maya', 2, 'Should just now cover the first minute? It feels less jumpy than 0m ago.', { re: 57 }),
   C(59, 24, 'leo', 2, 'Yes, under 45 seconds. It refreshes every minute.', { re: 57 }),
   C(60, 24, 'admin', 3, 'Good. Make sure it does not re-render the whole feed each tick.', { re: 57 }),
-  C(61, 33, 'priya', 1, '{leo} which auth schemes do we document? API keys only, or the session cookie too?', { resolved: true }),
+  C(61, 33, 'priya', 1, '{leo} which auth schemes do we document? API keys only, or the session cookie too?', { resolved: true, resolvedBy: 'leo' }),
   C(62, 33, 'leo', 1, 'API keys only. The cookie is an implementation detail of the web app.', { re: 61 }),
   C(63, 33, 'priya', 2, 'Agreed. I will add the scope table (read, write, admin).', { re: 61 }),
   C(64, 33, 'jonas', 2, 'Include the rate limit headers in the example response.', { re: 61 }),
