@@ -214,6 +214,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [hidden, setHidden] = useState<ReadonlySet<DisplayProp>>(() => new Set(DISPLAY_PROP_DEFAULT_OFF));
   const [showSub, setShowSub] = useState(true);
   const shown = (k: DisplayProp) => !hidden.has(k);
+  // Card/row properties are one shared setting on purpose (Linear): hiding Priority in List hides it on Board cards too.
   const toggleProp = (k: DisplayProp) => setHidden((h) => { const n = new Set(h); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const toggleGroup = (k: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(k)) n.delete(k); else n.add(k); return n; });
@@ -869,7 +870,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   );
   const card = (i: Issue, pos?: number, size?: number) => (
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
-      <div className='card-top'>{shown('id') ? <span className='id'>{i.identifier ?? i.id}</span> : <span />}{shown('assignee') && assignee(i)}</div>
+      {(shown('id') || shown('assignee')) && <div className='card-top'>{shown('id') ? <span className='id'>{i.identifier ?? i.id}</span> : <span />}{shown('assignee') && assignee(i)}</div>}
       <div className='card-title'>{i.title}</div>
       <div className='card-meta'>{subBadge(i)}{shown('priority') && <span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>}{shown('labels') && i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
@@ -961,6 +962,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                   <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
                     {view === 'list' && <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><DisplayPick label='Grouping' autoFocus value={grouping} labels={GROUPING_LABEL} onChange={setGrouping} /></div>}
                     <div className='dp-row'><span className='dp-k'><Icon name='views' />Ordering</span><DisplayPick label='Ordering' autoFocus={view === 'board'} value={ordering} labels={ORDERING_LABEL} onChange={setOrdering} /></div>
+                    {!canDrag && <div className='dp-h' role='note'>Drag and drop is off. Set Ordering to Manual to reorder.</div>}
                     <div className='dp-sep' role='separator' />
                     {view === 'list' && <label className='dp-row dp-switch'><span className='dp-k'>Show empty groups</span><input type='checkbox' role='switch' checked={showEmpty} disabled={grouping === 'none'} onChange={(e) => setShowEmpty(e.target.checked)} /><i aria-hidden='true' /></label>}
                     <label className='dp-row dp-switch'><span className='dp-k'>Show sub-issues</span><input type='checkbox' role='switch' checked={showSub} onChange={(e) => setShowSub(e.target.checked)} /><i aria-hidden='true' /></label>
