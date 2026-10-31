@@ -19,6 +19,8 @@
 .row .chip.proj::before { border-radius:2px; }
 .row .date { width:72px; flex:none; text-align:right; font-size:12px; font-variant-numeric:tabular-nums; }
 .row .av { width:18px; height:18px; font-size:9px; flex:none; }
+/* Unassigned placeholder takes the avatar box so Labels/Project pills stay pixel-aligned. */
+.row .av-none-ic { width:18px; height:18px; }
 .group h2 { gap:6px; padding:0 var(--sp-4) 0 8px; background:color-mix(in srgb, var(--fg) 5%, transparent); }
 .group h2 .gh-toggle { display:inline-flex; align-items:center; gap:8px; height:28px; padding:0 6px; border:0; border-radius:4px; background:none; color:inherit; font:inherit; cursor:pointer; }
 .group h2 .gh-toggle:hover { background:var(--hover); }
