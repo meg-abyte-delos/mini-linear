@@ -121,4 +121,3 @@
   .inbox-detail[data-props='open'] .idp-body > .inbox-props { transform:none; visibility:visible; box-shadow:var(--shadow-pop); transition:transform var(--dur-base) var(--ease-out); }
   .inbox-detail[data-props='open'] .idp-body > .inbox-scrim { display:block; position:absolute; inset:44px 0 0 0; z-index:4; background:var(--scrim-soft); }
 }
-@media (prefers-reduced-motion: reduce) { .inbox-detail .inbox-props { transition:none; } }
