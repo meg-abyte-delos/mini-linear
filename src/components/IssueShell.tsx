@@ -1,6 +1,7 @@
 'use client';
 // Issue page chrome: app sidebar + off-canvas drawer below 900px, toggled from the issue header (same behaviour as Shell).
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { WIDE_MQ } from '@/lib/breakpoints';
 import { AppSidebar } from '@/components/AppSidebar';
 
 type NavCtx = { open: boolean; toggle: () => void; toggleRef: React.RefObject<HTMLButtonElement | null> };
@@ -25,7 +26,7 @@ export function IssueShell({ slug, children }: { slug: string; children: ReactNo
     const a = document.activeElement;
     if (!a || a === document.body || side?.contains(a)) toggleRef.current?.focus();
   }, [open]);
-  useEffect(() => { const mq = window.matchMedia('(min-width: 900px)'); const f = () => { if (mq.matches) setOpen(false); }; f(); mq.addEventListener('change', f); return () => mq.removeEventListener('change', f); }, []);
+  useEffect(() => { const mq = window.matchMedia(WIDE_MQ); const f = () => { if (mq.matches) setOpen(false); }; f(); mq.addEventListener('change', f); return () => mq.removeEventListener('change', f); }, []);
   return (
     <Ctx.Provider value={{ open, toggle: () => setOpen((o) => !o), toggleRef }}>
       <div className='shell issue-shell' data-nav={open ? 'open' : undefined}>

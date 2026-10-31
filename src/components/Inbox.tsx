@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { NARROW_MQ } from '@/lib/breakpoints';
 import { Button, CheckMark, EmptyState, IconButton, Kbd } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { IssueActivity } from '@/components/IssueDetail';
@@ -65,7 +66,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
   const act = (n: Notif, action: InboxAction, until?: string, keepChecked = false) => actMany([n], action, until, keepChecked);
   // Linear: a notification is read as soon as it is shown. Only user-driven selection (click, j/k) marks it; the initial selection does not.
   // <=900px the preview pane is hidden (ui-inbox.css): moving the cursor must not mark read, and a click opens the issue.
-  const narrow = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
+  const narrow = () => typeof window !== 'undefined' && window.matchMedia(NARROW_MQ).matches;
   const show = (i: number) => { setCur(i); if (narrow()) return; const n = list[i]; if (n && !n.read_at && !readOnly) void act(n, 'read', undefined, true); }; // reading on view must not drop a multi-selection
   const open = (n: Notif) => { if (!n.read_at) void act(n, 'read'); onOpenIssue?.(n.issue_id); };
   const toggle = (id: string) => setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
