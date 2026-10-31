@@ -127,6 +127,7 @@
 /* Input */
 .input { height:28px; padding:0 var(--sp-2); border:1px solid var(--line); border-radius:var(--r-btn); background:var(--panel); color:var(--fg); font:inherit; font-size:var(--fs-base); transition:border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
 .input[data-size='32'] { height:32px; padding:0 var(--sp-3); }
+.input[data-size='24'] { height:24px; font-size:var(--fs-sm); }
 .input::placeholder { color:var(--dim); }
 .input:hover:not(:disabled) { border-color:var(--line-input, color-mix(in srgb, var(--fg) 22%, transparent)); }
 .input:focus { outline:none; border-color:var(--accent); box-shadow:var(--accent-ring); }

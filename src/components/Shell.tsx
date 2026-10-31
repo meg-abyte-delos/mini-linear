@@ -1,5 +1,5 @@
 'use client';
-import { EmptyState, Menu, Tooltip, type MenuEntry } from '@/components/ui';
+import { Button, Checkbox, EmptyState, Input, Menu, Tooltip, type MenuEntry } from '@/components/ui';
 import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
@@ -939,14 +939,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></button>
               {tbMenu === 'filter' && <FilterMenu filters={filters} onClose={() => { setTbMenu(null); document.getElementById('fb-add')?.focus(); }} onPick={(k) => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }} />}
             </div>
-            {activeCount(filters) > 0 && <button className='fclear' onClick={() => setFilters(emptyFilters())}>Clear filters</button>}
-            {activeCount(filters) > 0 && !readOnly && !activeViewId && !saving && <button className='fchip save-view' onClick={() => setSaving({ name: '', shared: false, err: false })}>Save view</button>}
+            {activeCount(filters) > 0 && <Button variant='ghost' size={24} onClick={() => setFilters(emptyFilters())}>Clear filters</Button>}
+            {activeCount(filters) > 0 && !readOnly && !activeViewId && !saving && <Button size={24} onClick={() => setSaving({ name: '', shared: false, err: false })}>Save view</Button>}
             {saving && (
               <form className='save-form' onSubmit={(e) => { e.preventDefault(); void saveView(); }} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setSaving(null); } }}>
-                <input autoFocus aria-label='View name' aria-invalid={saving.err} placeholder='View name' maxLength={80} value={saving.name} onChange={(e) => setSaving({ ...saving, name: e.target.value, err: false })} />
-                <label><input type='checkbox' checked={saving.shared} onChange={(e) => setSaving({ ...saving, shared: e.target.checked })} /> Shared</label>
-                <button type='submit' className='fchip on'>Save</button>
-                <button type='button' className='fclear' onClick={() => setSaving(null)}>Cancel</button>
+                <Input size={24} autoFocus aria-label='View name' invalid={saving.err} placeholder='View name' maxLength={80} value={saving.name} onChange={(e) => setSaving({ ...saving, name: e.target.value, err: false })} />
+                <Checkbox label='Shared' checked={saving.shared} onChange={(e) => setSaving({ ...saving, shared: e.target.checked })} />
+                <Button type='submit' variant='primary' size={24}>Save</Button>
+                <Button variant='ghost' size={24} onClick={() => setSaving(null)}>Cancel</Button>
                 {saving.err && <span role='alert' className='save-err'>Enter a name (could not save).</span>}
               </form>
             )}

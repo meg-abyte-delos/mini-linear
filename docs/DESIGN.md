@@ -56,7 +56,7 @@ States: hover `--hover` + stronger border (primary: accent 88% + black); active 
 Linear ref: buttons are 28px, radius 6, medium weight, quiet borders; only the primary is colored.
 
 ### Input, Checkbox, Toggle
-`Input` (`.input`), `Checkbox` (`.cb`, 16px; 14px in row-select columns), `Toggle` (`role=switch`). Checkbox and Toggle require a name: `label`, `aria-label` or `aria-labelledby` (enforced by the type).
+`Input` (`.input`; data-size 28 default, 32 forms/auth, 24 inline in toolbars like the Save view form), `Checkbox` (`.cb`, 16px; 14px in row-select columns), `Toggle` (`role=switch`). Checkbox and Toggle require a name: `label`, `aria-label` or `aria-labelledby` (enforced by the type).
 28px (32 in forms/auth), radius 6, `--panel` fill, 1px `--line`, hover `--line-input`, focus `--accent` border + `--accent-ring`. Placeholder `--dim`. Error: `--danger` border + message below at `--fs-sm`.
 
 ### Select / Menu
