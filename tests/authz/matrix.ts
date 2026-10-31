@@ -212,12 +212,13 @@ export { ROLES };
  * Routes outside /w/{slug}: authenticated-user routes (session cookie only; a bearer API key is 401) and public routes.
  * `auth` = status per caller class: session (any signed-in user, whatever their workspace role), key (any API key), anon.
  */
-export type GlobalRow = { m: Method; path: string; kind: 'session' | 'public' | 'signed'; session?: number; key?: number; anon?: number; body?: unknown; note: string };
+export type GlobalRow = { m: Method; path: string; kind: 'session' | 'public' | 'signed' | 'own-suite'; session?: number; key?: number; anon?: number; body?: unknown; note: string };
 export const GLOBAL_ROWS: GlobalRow[] = [
   { m: 'GET', path: '/api/v1/me', kind: 'session', session: 200, key: 401, anon: 401, note: 'own profile; no id in the path' },
   { m: 'PATCH', path: '/api/v1/me', kind: 'session', session: 200, key: 401, anon: 401, body: { display_name: 'Fixture' }, note: 'own profile only' },
   { m: 'GET', path: '/api/v1/workspaces', kind: 'session', session: 200, key: 401, anon: 401, note: 'only the workspaces the caller belongs to' },
   { m: 'POST', path: '/api/v1/workspaces', kind: 'session', session: 422, key: 401, anon: 401, body: {}, note: 'any signed-in user may create a workspace (422 here: empty body)' },
+  { m: 'DELETE', path: '/api/v1/w/{slug}', kind: 'own-suite', note: 'owner only (403 admin/member/guest, 404 non-member); destroys the workspace, so it cannot run on the shared fixture; suite settings-delete-workspace' },
   { m: 'POST', path: '/api/v1/invites/accept', kind: 'session', session: 404, key: 401, anon: 401, body: {}, note: 'an unknown or empty token is 404; the caller must be signed in' },
   { m: 'POST', path: '/api/v1/auth/login', kind: 'public', note: 'public, rate limited; own suite m1-auth / t4-authn' },
   { m: 'POST', path: '/api/v1/auth/signup', kind: 'public', note: 'public, rate limited; own suite m1-auth / t4-authn' },

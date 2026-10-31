@@ -254,6 +254,9 @@ function pathFor(route: string, slug: string, real: boolean, actor?: U): string 
   return '/api/v1/' + out.join('/');
 }
 const isMut = (m: string) => m !== 'GET';
+// Routes that destroy the shared fixture (DELETE /w/{slug} deletes the workspace) are tested in their own suite
+// (settings-delete-workspace.test.ts) and must never be swept here: the member/admin sweep would delete w1.
+const OWN_SUITE = new Set(['DELETE w/[slug]']);
 const wRoutes = ROUTES.filter(([, r]) => r.startsWith('w/'));
 
 describe.runIf(runIntegration)('route inventory guard', () => {
@@ -272,7 +275,7 @@ describe.runIf(runIntegration)('route inventory guard', () => {
       for (const blk of src.matchAll(/export\s*\{([^}]*)\}/g)) for (const m of blk[1]!.matchAll(/\b(GET|POST|PATCH|PUT|DELETE)\b(?:\s+as\s+(GET|POST|PATCH|PUT|DELETE))?/g)) onDisk.add(`${m[2] ?? m[1]} ${rel}`);
     }
     const inTable = new Set(ROUTES.map(([m, r]) => `${m} ${r}`));
-    expect([...onDisk].filter((k) => !inTable.has(k)), 'routes with no role row').toEqual([]);
+    expect([...onDisk].filter((k) => !inTable.has(k) && !OWN_SUITE.has(k)), 'routes with no role row').toEqual([]);
     expect([...inTable].filter((k) => !onDisk.has(k)), 'matrix rows with no route').toEqual([]);
   });
 });

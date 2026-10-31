@@ -58,6 +58,15 @@ export const patchWorkspaceSettings = (req: Request, slug: string) => withWorksp
   return Response.json({ ...after, role: ctx.role });
 });
 
+/** DELETE /w/:slug: owner only (403 below, 404 for non-members). Session callers only: an API key never destroys a tenant. */
+export const deleteWorkspace = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
+  requireRole(ctx, "owner");
+  if (ctx.via === "api_key") throw new ApiError("forbidden", "workspaces can only be deleted from a session");
+  const r = await ctx.tx<{ ok: boolean }[]>`select delete_workspace() as ok`;
+  if (!r[0]?.ok) throw new ApiError("not_found");
+  return new Response(null, { status: 204 });
+});
+
 // ---------------------------------------------------------------- members
 const ROLES = ["owner", "admin", "member", "guest"] as const;
 /** Who may grant/touch which role: owners anything; admins only member/guest (and never an owner or admin). */
