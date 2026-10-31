@@ -101,7 +101,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, c
     finally { busyRef.current = false; setBusy(false); }
     if (!ok) return;
     if (!more) { onClose(); return; }
-    setTitle(''); setInvalid(false); setLinks([]); setLinkForm(null); desc.current = ''; setEditorKey((k) => k + 1); titleEl.current?.focus();
+    setTitle(''); setInvalid(false); setLinks([]); setLinkForm(null); setEstimate(null); setDue(null); setCycle(null); setShown2({ estimate: false, due: false, cycle: false }); desc.current = ''; setEditorKey((k) => k + 1); titleEl.current?.focus();
   }
 
   const person = people.find((p) => p.id === assignee);
@@ -121,7 +121,7 @@ export function NewIssueModal({ open, initialStatus, people, labels, projects, c
   };
   const onPick = (id: string) => {
     const k = lastPick.current;
-    if (k === 'team') setTeam(id);
+    if (k === 'team') { if (id !== team) setCycle(null); setTeam(id); } // cycles belong to one team: never carry one across
     else if (k === 'status') setStatus(id as Status);
     else if (k === 'priority') setPriority(Number(id) as Issue['priority']);
     else if (k === 'assignee') setAssignee(id === 'none' ? null : id);

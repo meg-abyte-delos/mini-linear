@@ -498,6 +498,10 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (readOnly) { setToast('Guests have read-only access.'); return; }
     setNewIssue({ ...(typeof status === 'string' ? { status } : {}) });
   }
+  const createdToast = (name: string, props: string[], links: boolean) => {
+    const bad = [...(props.length ? [`could not save ${props.join(', ')}`] : []), ...(links ? ['the attached links could not be saved'] : [])];
+    return bad.length ? `Created ${name}, but ${bad.join(' and ')}.` : `Created ${name}`;
+  };
   // C must always show what it created: leave the cycles view, and drop filters the new issue would not match.
   async function submitNew(d: NewIssueDraft): Promise<boolean> {
     const extra: Record<string, unknown> = {};
@@ -512,7 +516,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (d.estimate !== null) srv.estimate = d.estimate;
     if (d.due_date) srv.due_date = d.due_date;
     let made: Issue | null | undefined;
-    let patchFailed = false;
+    let failedProps: string[] = [];
+    let linksFailed = false;
     // Links picked in the modal become attachments of the new issue (API mode only; the mock store has no attachments).
     const attachLinks = async (id: string) => {
       if (!api || !d.links.length) return true;
@@ -520,16 +525,28 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       for (const l of d.links) { const r = await c.addAttachment(id, { kind: 'link', url: l.url, title: l.title }); if (!r.ok) ok = false; }
       return ok;
     };
+    // One PATCH for everything; when it is refused (a 422 on one value rejects the whole body) retry field by field,
+    // so only the offending properties are lost and the toast can name them.
+    const PROP_LABEL: Record<string, string> = { description: 'description', status: 'status', priority: 'priority', assignee_id: 'assignee', label_ids: 'labels', project_id: 'project', cycle_id: 'cycle', estimate: 'estimate', due_date: 'due date' };
+    const saveProps = async (row: Issue, all: Record<string, unknown>) => {
+      let ver = row.version; let issue: Issue | null = null;
+      const send = async (p: Record<string, unknown>) => { const r = await apiPatch(api!.slug, row, ver, p); if (r.issue) { ver = r.issue.version; issue = r.issue; } return r.kind === 'ok'; };
+      if (await send(all)) return { failed: [] as string[], issue: issue as Issue | null };
+      const failed: string[] = [];
+      for (const [k, v] of Object.entries(all)) if (!(await send({ [k]: v }))) failed.push(PROP_LABEL[k] ?? k);
+      return { failed, issue: issue as Issue | null };
+    };
     if (api) {
       const row = await apiCreate(api.slug, d.team_id || api.teamId, d.title);
       if (!row) { setToast('Could not create the issue.'); return false; }
       if (d.team_id && d.team_id !== (teamScope ?? api.teamId)) {
         // Another team's issue does not belong in this team's store: apply the properties server-side, then just confirm.
-        const other = { ...extra, ...srv, ...(row.status !== d.status ? { status: d.status } : {}) };
-        let failed = false;
-        if (Object.keys(other).length) { const r = await apiPatch(api.slug, row, row.version, other); failed = r.kind !== 'ok'; }
-        if (!(await attachLinks(row.id))) failed = true;
-        setToast(failed ? `Created ${row.identifier ?? d.title}, but some properties could not be saved.` : `Created ${row.identifier ?? d.title}`);
+        // The cycle belongs to the team the modal was opened on, never to this one.
+        const { cycle_id: _c, ...rest } = extra; void _c;
+        const other = { ...rest, ...srv, ...(row.status !== d.status ? { status: d.status } : {}) };
+        if (Object.keys(other).length) failedProps = (await saveProps(row, other)).failed;
+        linksFailed = !(await attachLinks(row.id));
+        setToast(createdToast(row.identifier ?? d.title, failedProps, linksFailed));
         return true;
       }
       versions.current.set(row.id, row.version);
@@ -537,16 +554,16 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       const patch = { ...extra, ...(row.status !== d.status ? { status: d.status } : {}) };
       if (Object.keys(patch).length || Object.keys(srv).length) {
         if (Object.keys(patch).length) store.current.update(row.id, patch);
-        // Await the follow-up PATCH here (not push()) so a failure is reported instead of being overwritten by the "Created" toast.
-        const r = await apiPatch(api.slug, row, row.version, { ...patch, ...srv });
+        // Await the follow-up PATCH here (not push()) so a failure is reported instead of being overwritten by the Created toast.
+        const r = await saveProps(row, { ...patch, ...srv });
+        failedProps = r.failed;
         if (r.issue) {
           versions.current.set(row.id, r.issue.version);
           const local = store.current.list().find((x) => x.id === row.id);
-          store.current.upsert(r.kind === 'ok' && local ? { ...local, version: r.issue.version, identifier: r.issue.identifier } : { ...r.issue, sort_key: row.sort_key });
+          store.current.upsert(!failedProps.length && local ? { ...local, version: r.issue.version, identifier: r.issue.identifier } : { ...r.issue, sort_key: row.sort_key });
         }
-        if (r.kind !== 'ok') patchFailed = true;
       }
-      if (!(await attachLinks(row.id))) patchFailed = true;
+      linksFailed = !(await attachLinks(row.id));
       made = store.current.list().find((x) => x.id === row.id);
     } else {
       made = store.current.create({ title: d.title, description: d.description, status: d.status, priority: d.priority, assignee_id: d.assignee_id });
@@ -558,7 +575,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (view === 'cycles' || view === 'projects') setView('list');
     if (made && activeCount(filters) > 0 && applyFilters([made], filters).length === 0) setFilters(emptyFilters());
     if (made) setSelId(made.id);
-    setToast(patchFailed ? `Created ${made?.identifier ?? d.title}, but some properties could not be saved.` : `Created ${made?.identifier ?? d.title}`);
+    setToast(createdToast(made?.identifier ?? d.title, failedProps, linksFailed));
     return true;
   }
   // Mock mode: the current user is the first mock user. API mode needs the session user + members API (same gap as the A picker).
