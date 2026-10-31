@@ -3,7 +3,7 @@
 // without a handler an item is a real link back into the Shell (standalone routes get their data from AppSidebar below).
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
-import { IconButton } from '@/components/ui';
+import { Button, IconButton } from '@/components/ui';
 import { SideIcon, TeamSection, WorkspaceSwitcher } from '@/components/SidebarParts';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
@@ -67,8 +67,8 @@ export function Sidebar(p: SidebarProps) {
           {p.views.map((v) => (
             <div key={v.id} className='sv-row'>
               <SideLink className={`side-link sub${active.viewId === v.id ? ' active' : ''}`} current={active.viewId === v.id} href={p.onView ? `?v=${v.id}` : `/?v=${v.id}`} onSelect={p.onView ? () => p.onView?.(v) : undefined} title={v.name}><span className='sv-name'>{v.name}</span>{v.shared && <span className='sv-tag'>Shared</span>}</SideLink>
-              <span className='sv-acts'><button className='sv-act' aria-label={`Copy link to ${v.name}`} onClick={() => p.onCopyView?.(v)}>{p.copied === v.id ? 'Copied' : 'Link'}</button>
-              {!p.readOnly && <button className='sv-act' aria-label={`Delete view ${v.name}`} onClick={() => p.onDeleteView?.(v)}>×</button>}</span>
+              <span className='sv-acts'><Button variant='ghost' size={24} className='sv-act' aria-label={`Copy link to ${v.name}`} onClick={() => p.onCopyView?.(v)}>{p.copied === v.id ? 'Copied' : 'Link'}</Button>
+              {!p.readOnly && <Button variant='ghost' size={24} className='sv-act' aria-label={`Delete view ${v.name}`} onClick={() => p.onDeleteView?.(v)}>×</Button>}</span>
             </div>
           ))}
         </div>
