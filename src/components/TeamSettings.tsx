@@ -117,7 +117,7 @@ export function TeamSettings({ slug, teamId, embedded = false, readOnly = false 
                 <option value="">No group</option>{groups.filter((x) => !x.team_id || x.team_id === l.team_id).map((x) => <option key={x.id} value={x.id}>{x.name} ({x.team_id ? 'team' : 'workspace'})</option>)}</select>
               <Button variant="ghost" size={24} tone="danger" aria-label={`Delete label ${l.name}`} onClick={() => void run(api.deleteLabel(l))}>Delete</Button></li>)}</ul></div>;
         })}
-        <form className="ts-row" onSubmit={(e) => { e.preventDefault(); if (!newLabel.name.trim()) return; void run(api.createLabel({ name: newLabel.name.trim(), color: newLabel.color, team_id: newLabel.scope === 'team' ? teamId : null, group_id: newLabel.group_id || null })).then(() => setNewLabel((n) => ({ ...n, name: '' }))); }}>
+        <form className="ts-row" onSubmit={(e) => { e.preventDefault(); if (!newLabel.name.trim()) return; void run(api.createLabel({ name: newLabel.name.trim(), color: newLabel.color, team_id: newLabel.scope === 'team' ? teamId : null, group_id: newLabel.group_id || null })).then((ok) => { if (ok) setNewLabel((n) => ({ ...n, name: '' })); }); }}>
           <input aria-label="New label name" placeholder="New label" value={newLabel.name} onChange={(e) => setNewLabel({ ...newLabel, name: e.target.value })} />
           <input type="color" aria-label="New label colour" value={newLabel.color} onChange={(e) => setNewLabel({ ...newLabel, color: e.target.value })} />
           <select aria-label="New label scope" value={newLabel.scope} onChange={(e) => setNewLabel({ ...newLabel, scope: e.target.value as 'team' | 'workspace' })}><option value="team">This team</option><option value="workspace">Workspace</option></select>
