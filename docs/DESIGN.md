@@ -45,7 +45,6 @@ axe 0 violations in dark and light on every touched screen. Text >= 4.5:1, large
 ### Button / IconButton
 React `Button` (`variant` primary|secondary|ghost, `size` 24|28|32, `tone="danger"`, `loading`) and `IconButton` (`label` required: accessible name + tooltip) from `@/components/ui`. They render `.btn` + data attributes (CSS in ui-primitives.css). Never a bare `<button>` styled by a parent selector; comment actions (Reply, Edit, Delete, reactions) are ghost 24.
 
-Exception, hand-styled: `.add-row` (inline "+ Add sub-issue / relation" row on the issue page) is a full-width list row, not a button; it is styled on tokens in issue-detail.css (32px, `--muted`, hover `--hover`, `--r-btn`) and must not be copied for actions.
 | Variant | Look | When |
 |---|---|---|
 | `primary` | `--accent` fill, `--accent-fg` text | the one main action of a group (Create issue, Save). Max one per group |
@@ -53,6 +52,8 @@ Exception, hand-styled: `.add-row` (inline "+ Add sub-issue / relation" row on t
 | `ghost` | transparent, `--muted-strong` | toolbar / inline actions (Filter, Display) |
 | `icon` | ghost, square `width = height` | icon-only, always with `aria-label` + Tooltip |
 | `data-tone="danger"` | danger text + 45% border, 14% fill on hover | destructive (Delete workspace), combine with secondary |
+
+Exception, hand-styled: `.add-row` (inline "+ Add sub-issue / relation" row on the issue page) is a full-width list row, not a button; it is styled on tokens in issue-detail.css (32px, `--muted`, hover `--hover`, `--r-btn`) and must not be copied for actions.
 Sizes `data-size` 24 (dense toolbars, 12px text, 8px padding) · 28 (default, 12px padding) · 32 (forms, dialogs, auth).
 States: hover `--hover` + stronger border (primary: accent 88% + black); active = hover; focus-visible 2px accent, offset 1px; disabled `--dim` + .6 opacity, no hover. Loading = `aria-busy="true"`, disabled, spinner over the hidden label, width unchanged.
 Linear ref: buttons are 28px, radius 6, medium weight, quiet borders; only the primary is colored.
