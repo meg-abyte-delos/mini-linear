@@ -856,7 +856,18 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   }, []);
 
   const who = (id: string | null) => findPerson(people, id);
-  const inboxLookup = { person: (id: string | null) => who(id)?.name, label: (id: string) => LABELS.find((x) => x.id === id), project: (id: string | null) => (id ? PROJECTS.find((x) => x.id === id)?.name : undefined) };
+  // Inbox detail rail (IssueProperties): optimistic local update, then the API. The local store has no estimate / due date (its patch schema is strict), so those two are written onto the row directly.
+  function updateIssue(id: string, patch: Partial<Issue>) {
+    const cur = store.current.list().find((x) => x.id === id);
+    if (!cur) return;
+    const { estimate, due_date, ...local } = patch;
+    const row = Object.keys(local).length ? store.current.update(id, local as Parameters<typeof store.current.update>[1]) : cur;
+    if (!row) return;
+    if (estimate !== undefined || due_date !== undefined) store.current.upsert({ ...row, ...(estimate !== undefined ? { estimate } : {}), ...(due_date !== undefined ? { due_date } : {}) });
+    sync();
+    push(id, patch as Record<string, unknown>);
+  }
+  const inboxProps = { meta, people, today, onUpdate: (id: string, patch: Partial<Issue>) => { if (!readOnly) updateIssue(id, patch); } };
   const assignee = (i: Issue) => { const u = who(i.assignee_id); return u ? <span title={u.name} className='av-wrap'><Avatar initials={u.initials} hue={u.hue} /></span> : <span className='av-wrap' title='Unassigned'><UnassignedIcon /></span>; };
   // Linear: a click opens the full issue page (sidebar included); Space peeks in the side panel. Without an API there is no page, so the panel stays.
   const openIssue = (i: Issue) => { setSelId(i.id); if (api) router.push(`/w/${api.slug}/issue/${i.identifier ?? i.id}`); else setOpen(true); };
@@ -975,7 +986,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
           <EmptyState icon='issues' title='No issues yet' hint='Issues track the work your team is doing. Create one to get started.'
             action={!readOnly && <button className='btn' data-variant='primary' onClick={() => create()}>Create issue <kbd>C</kbd></button>} />
         ) : view === 'inbox' ? (
-          <Inbox client={inboxClient} slug={api?.slug} readOnly={readOnly} refreshKey={rtTick} getIssue={getIssue} lookup={inboxLookup} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
+          <Inbox client={inboxClient} slug={api?.slug} readOnly={readOnly} refreshKey={rtTick} getIssue={getIssue} props={inboxProps} onUnread={setUnreadCount} onOpenIssue={(id) => { setView('list'); setSelId(id); }} />
         ) : view === 'projects' && detailId && api ? (
           <ProjectDetail refreshKey={rtTick} slug={api.slug} projectId={detailId} canWrite={!readOnly} onBack={() => setDetailId(null)} onViewIssues={(id) => { setDetailId(null); goToProject(id); }}
             issues={allIssues.filter((i) => i.project_id === detailId).map((i) => ({ id: i.id, identifier: i.identifier ?? i.id, title: i.title, done: i.status === 'done' || i.status === 'canceled' }))}

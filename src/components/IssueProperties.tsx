@@ -7,6 +7,10 @@ import { Tooltip } from '@/components/ui';
 import { PropIcon } from '@/components/PropIcons';
 import { dueState, identifierOf, DUE_RE } from '@/lib/detail/issue-meta';
 import { findPerson, type Person } from '@/lib/people';
+// The rail's styles live with the component (the Inbox shows it too, not only the issue route).
+import '@/app/issue-detail.css';
+import '@/app/ui-issue-detail.css';
+import '@/app/ui-issue-page.css';
 
 export type PropKind = 'status' | 'priority' | 'estimate' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent';
 export interface IssuePropertiesHandle { open: (kind: PropKind, el: HTMLElement | null) => void }
