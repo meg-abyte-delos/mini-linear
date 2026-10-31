@@ -46,7 +46,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
   // Targets of an action: the checked rows, else the focused row.
   const targets = (): Notif[] => (checked.size > 0 ? list.filter((n) => checked.has(n.id)) : sel ? [sel] : []);
 
-  async function actMany(ns: Notif[], action: InboxAction, until?: string) {
+  async function actMany(ns: Notif[], action: InboxAction, until?: string, keepChecked = false) {
     if (ns.length === 0) return;
     const prev = items ?? [];
     const all = ns.flatMap((n) => members.get(n.id) ?? [n]); // an action on a row applies to every event of its issue
@@ -55,16 +55,16 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
     const leaves = action === 'archive' || action === 'snooze' || action === 'unarchive';
     // Optimistic update; the list is reloaded if any request fails.
     setItems(leaves ? prev.filter((x) => !ids.has(x.id)) : prev.map((x) => ids.has(x.id) ? { ...x, read_at: action === 'read' ? t : null } : x));
-    setChecked(new Set());
+    if (!keepChecked) setChecked(new Set());
     if (leaves) setCur((c) => Math.max(0, Math.min(c, list.length - ns.length - 1)));
     const res = await Promise.all(all.map((n) => client.act(n.id, action, until)));
     const failed = res.filter((r) => !r).length;
     if (failed) { setFail(`${failed} action${failed > 1 ? 's' : ''} failed`); await load(); } else setFail(null);
     onUnread(await client.unreadCount());
   }
-  const act = (n: Notif, action: InboxAction, until?: string) => actMany([n], action, until);
+  const act = (n: Notif, action: InboxAction, until?: string, keepChecked = false) => actMany([n], action, until, keepChecked);
   // Linear: a notification is read as soon as it is shown. Only user-driven selection (click, j/k) marks it; the initial selection does not.
-  const show = (i: number) => { setCur(i); const n = list[i]; if (n && !n.read_at && !readOnly) void act(n, 'read'); };
+  const show = (i: number) => { setCur(i); const n = list[i]; if (n && !n.read_at && !readOnly) void act(n, 'read', undefined, true); }; // reading on view must not drop a multi-selection
   const open = (n: Notif) => { if (!n.read_at) void act(n, 'read'); onOpenIssue?.(n.issue_id); };
   const toggle = (id: string) => setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 

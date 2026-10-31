@@ -17,8 +17,9 @@ test('inbox: badge, keyboard triage', async ({ page }) => {
   await expect(page.getByRole('option').first()).toHaveAttribute('aria-current', 'true');
   await page.keyboard.press('j');
   await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-current', 'true');
+  await expect(page.getByTestId('inbox-badge')).toHaveText('1'); // j shows DEM-2, which reads it
   await page.keyboard.press('u');
-  await expect(page.getByTestId('inbox-badge')).toHaveText('1');
+  await expect(page.getByTestId('inbox-badge')).toHaveText('2'); // u on a read row marks it unread again
   await page.keyboard.press('e');
   await expect(page.getByRole('option')).toHaveCount(2);
   await page.keyboard.press('k');

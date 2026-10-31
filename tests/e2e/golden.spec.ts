@@ -114,7 +114,8 @@ test('a11y: cycles and projects views have no wcag2a/aa violations', async ({ pa
 });
 
 test('a11y: detail panel and filter picker have no wcag2a/aa violations', async ({ page }) => {
-  await page.getByRole('option').first().click();
+  await page.getByRole('option').first().focus();
+  await page.keyboard.press(' '); // Space peeks; a click now opens the issue page
   await expect(page.getByRole('complementary', { name: 'Issue detail' })).toBeVisible();
   let r = await wcag(page);
   expect(r.violations.map((x) => `panel: ${x.id} x${x.nodes.length}`)).toEqual([]);

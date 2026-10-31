@@ -62,7 +62,8 @@ test('? overlay traps Tab and returns focus on close', async ({ page }) => {
 });
 
 test('Esc clears the multi-selection first, then closes the panel', async ({ page }) => {
-  await page.locator('[role=option]').first().click();
+  await page.locator('[role=option]').first().focus();
+  await page.keyboard.press(' '); // Space peeks; a click opens the issue page
   await expect(page.getByRole('complementary', { name: 'Issue detail' })).toBeVisible();
   await page.keyboard.press('x');
   await expect(page.locator('[data-multi]')).toHaveCount(1);
