@@ -13,7 +13,7 @@
 .dp-chip { height:24px; padding:0 var(--sp-2); font-size:var(--fs-sm); font-weight:var(--fw-medium); color:var(--dim); border-color:var(--line); background:none; }
 .dp-chip:hover { color:var(--muted-strong); background:var(--hover); }
 .dp-chip.on { background:var(--accent); border-color:transparent; color:var(--accent-fg); }
-.dp-chip.on:hover { background:var(--accent-hover); color:var(--accent-fg); }
+.dp-chip.on:hover { background:color-mix(in srgb, var(--accent) 88%, black); color:var(--accent-fg); } /* same as primary .btn hover: white stays >= 4.5:1 in both themes */
 
 /* 3. Cmd+K: readable group labels and footer keycaps (12px, AA), quiet 12px ID, heavier title. */
 .palette li.pal-group { font-size:var(--fs-sm); color:var(--muted-strong); }
