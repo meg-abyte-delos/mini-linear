@@ -432,7 +432,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
               ? <ActivityEvent key={t.at.id} at={t.at} actor={who(t.at.actor_id)} />
               : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={(x) => (client ? !!viewer?.userId && x.author_id === viewer.userId : x.author_id === ME)} canDelete={(x) => (client ? !!viewer?.userId && (x.author_id === viewer.userId || viewer.role === 'owner' || viewer.role === 'admin') : x.author_id === ME)} readOnly={readOnly} /></li>)}
           </ol>
-          {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} onAttach={() => { setLinkForm((f) => f ?? { url: '', title: '' }); setTimeout(() => document.getElementById('att-url')?.focus(), 0); }} />}
+          {!readOnly && <Composer label='Leave a comment' draftKey={`cmt-draft:${issue.identifier}`} onSubmit={(b) => postComment(b, null)} onAttach={() => { setLinkForm((f) => f ?? { url: '', title: '' }); setTimeout(() => document.getElementById('att-url')?.focus(), 0); }} />}
         </section>
       </main>
 
@@ -516,13 +516,22 @@ function SubBarFill({ pct }: { pct: number }) {
   return <span ref={ref} />;
 }
 
-function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = '', submitLabel }: { onAttach?: (() => void); label: string; onSubmit: (b: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean; initial?: string; submitLabel?: string }) {
+function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = '', submitLabel, draftKey }: { draftKey?: string; onAttach?: (() => void); label: string; onSubmit: (b: string) => Promise<boolean>; onCancel?: () => void; autoFocus?: boolean; initial?: string; submitLabel?: string }) {
   const inline = !onCancel && !!onAttach;
   const people = useContext(PeopleCtx);
   const [text, setText] = useState(initial);
   const [caret, setCaret] = useState(initial.length);
   const [sel, setSel] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // Optional draft in sessionStorage so leaving for the issue page (Attach) keeps what was typed.
+  useEffect(() => {
+    if (!draftKey) return;
+    try { const d = sessionStorage.getItem(draftKey); if (d) { setText(d); setCaret(d.length); } } catch { /* storage blocked */ }
+  }, [draftKey]);
+  useEffect(() => {
+    if (!draftKey) return;
+    try { if (text) sessionStorage.setItem(draftKey, text); else sessionStorage.removeItem(draftKey); } catch { /* storage blocked */ }
+  }, [draftKey, text]);
   // Autosize fallback for browsers without CSS field-sizing (CSSOM writes are allowed by the strict CSP).
   useEffect(() => { const el = ref.current; if (!el || CSS.supports('field-sizing', 'content')) return; el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }, [text]);
   const at = activeMention(text, caret);
@@ -535,7 +544,7 @@ function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = ''
     setText(r.text); setCaret(r.caret);
     requestAnimationFrame(() => { ref.current?.setSelectionRange(r.caret, r.caret); ref.current?.focus(); });
   }
-  async function submit() { const b = text.trim(); if (!b) return; if (await onSubmit(b)) { if (!initial) { setText(''); setCaret(0); } } }
+  async function submit() { const b = text.trim(); if (!b) return; if (await onSubmit(b)) { if (!initial) { setText(''); setCaret(0); } if (draftKey) { try { sessionStorage.removeItem(draftKey); } catch { /* storage blocked */ } } } }
   return (
     <div className={inline ? 'composer composer-inline' : 'composer'}>
       <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}…`} title='@ to mention, ⌘↵ to send' rows={3} value={text}
@@ -569,6 +578,12 @@ export function IssueActivity({ slug, issueId, identifier, readOnly = false }: {
   useEffect(() => {
     let live = true;
     void fetchNlPeople(slug).then((p) => { if (live) setNlPeople(p); });
+    return () => { live = false; };
+  }, [slug]);
+  const [role, setRole] = useState('');
+  useEffect(() => {
+    let live = true;
+    void fetch(`/api/v1/w/${slug}`).then((r) => (r.ok ? r.json() : null)).then((w: { role?: string } | null) => { if (live && w?.role) setRole(w.role); }).catch(() => undefined);
     return () => { live = false; };
   }, [slug]);
   const people = useMemo<readonly Person[]>(() => peopleFromNl(nlPeople), [nlPeople]);
@@ -630,9 +645,9 @@ export function IssueActivity({ slug, issueId, identifier, readOnly = false }: {
         <ol className='feed' aria-label='Activity'>
           {timeline.map((t) => t.kind === 'event'
             ? <ActivityEvent key={t.at.id} at={t.at} actor={who(t.at.actor_id)} />
-            : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={mine} canDelete={mine} readOnly={readOnly} /></li>)}
+            : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={mine} canDelete={(x) => mine(x) || role === 'owner' || role === 'admin'} readOnly={readOnly} /></li>)}
         </ol>
-        {!readOnly && <Composer label='Leave a comment' onSubmit={(b) => postComment(b, null)} onAttach={() => router.push(`/w/${slug}/issue/${identifier}`)} />}
+        {!readOnly && <Composer label='Leave a comment' draftKey={`cmt-draft:${identifier}`} onSubmit={(b) => postComment(b, null)} onAttach={() => router.push(`/w/${slug}/issue/${identifier}`)} />}
       </section>
     </MeCtx.Provider></PeopleCtx.Provider>
   );

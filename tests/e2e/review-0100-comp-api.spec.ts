@@ -54,3 +54,30 @@ test('Projects: status icon only in the Status column, folder glyph in the name 
     await expect(rows.nth(i).locator('.pj-stat .psi')).toHaveCount(1);
   }
 });
+
+test('Inbox composer: Attach keeps the draft on the issue page, and an admin can delete another author comment', async ({ page, browser }) => {
+  const title = `inbox-nits-${Date.now()}`;
+  const issue = await apiCreateIssue(page, title);
+  const ctx = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const mate = await ctx.newPage();
+  await login(mate, 'mate@example.test');
+  await mate.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
+  await mate.waitForSelector('html[data-ready]');
+  await mate.getByRole('combobox', { name: 'Leave a comment' }).fill('mate says hi, delete me');
+  await mate.getByRole('button', { name: 'Comment', exact: true }).click();
+  await expect(mate.getByRole('article', { name: /Comment by/ }).filter({ hasText: 'delete me' })).toHaveCount(1);
+  await ctx.close();
+
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  await page.getByRole('option').filter({ hasText: title }).first().click();
+  const detail = page.getByRole('complementary', { name: 'Notification detail' });
+  const cmt = detail.getByRole('article', { name: /Comment by/ }).filter({ hasText: 'delete me' });
+  await expect(cmt).toHaveCount(1);
+  await expect(cmt.getByRole('button', { name: 'Delete comment' })).toBeVisible();
+  await detail.getByRole('combobox', { name: 'Leave a comment' }).fill('half-written thought');
+  await detail.getByRole('button', { name: /Attach/ }).click();
+  await page.waitForURL(new RegExp(`/issue/${issue.identifier}`));
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('combobox', { name: 'Leave a comment' })).toHaveValue('half-written thought');
+});
