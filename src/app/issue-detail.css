@@ -98,10 +98,21 @@
 
 /* Step 2 primitives: comment controls are Button/IconButton; only layout lives here. */
 /* Reply: ghost 24, its label lines up with the comment text (4px offset + 8px button padding = the 12px comment padding). */
-.btn.cmt-reply{margin:calc(-1 * var(--sp-1)) 0 var(--sp-2) var(--sp-1)}
 .cmt-actions{gap:2px}
 .reacts{flex-wrap:wrap}
 .reacts .react{gap:3px;min-width:24px;justify-content:center;padding:0 6px;border-radius:var(--r-btn);color:var(--muted-strong)}
 .reacts .react.on{background:var(--sel);border-color:color-mix(in srgb,var(--accent) 45%,transparent);color:var(--fg)}
 .reacts .react .react-n{font-variant-numeric:tabular-nums}
 .idp .sec-add,.idp-rows li .x{color:var(--muted)}
+/* Threaded comments (Linear style): root, rail, indented replies, collapse toggle, reply composer at the bottom. Tokens only. */
+.cmt-thread{position:relative;margin-bottom:var(--sp-2)}.cmt-thread>.cmt{margin-bottom:var(--sp-1)}
+.cmt-thread .thread-resolved{margin-left:var(--sp-2)}.cmt-thread .thread-menu{margin-left:auto;display:inline-flex}
+.cmt-thread header{display:flex;align-items:center;gap:var(--sp-1)}
+.cmt-thread[data-resolved] .cmt{opacity:.85}
+.thread-toggle{display:inline-flex;align-items:center;gap:var(--sp-2);margin-left:var(--sp-2);color:var(--muted)}.thread-toggle .btn-label{display:inline-flex;align-items:center;gap:var(--sp-2)}
+.thread-caret{margin-left:var(--sp-1)}
+.thread-avs{display:inline-flex}.thread-avs .av{margin-left:-4px;box-shadow:0 0 0 2px var(--bg)}.thread-avs .av:first-child{margin-left:0}
+.replies.thread-rail{margin:0 0 var(--sp-1) var(--sp-4);padding-left:var(--sp-3);border-left:2px solid var(--line)}
+.thread-rail .cmt{margin-bottom:var(--sp-1)}
+.thread-reply{margin-left:var(--sp-2)}
+.cmt-thread>.composer{margin-left:var(--sp-4)}

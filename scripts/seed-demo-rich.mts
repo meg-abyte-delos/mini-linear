@@ -129,7 +129,7 @@ try {
     await c.query(`insert into comments (id, workspace_id, issue_id, author_id, body, created_at, updated_at, parent_comment_id, resolved_at, resolved_by) values ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9)
       on conflict (id) do update set body = excluded.body, author_id = excluded.author_id, issue_id = excluded.issue_id, created_at = excluded.created_at, updated_at = excluded.updated_at, parent_comment_id = excluded.parent_comment_id, resolved_at = excluded.resolved_at, resolved_by = excluded.resolved_by
       where (comments.body, comments.author_id, comments.issue_id, comments.created_at, comments.updated_at, comments.parent_comment_id, comments.resolved_at, comments.resolved_by) is distinct from (excluded.body, excluded.author_id, excluded.issue_id, excluded.created_at, excluded.updated_at, excluded.parent_comment_id, excluded.resolved_at, excluded.resolved_by)`,
-      [cid(m.k), W, iid, uid[m.by], body, at, m.re === undefined ? null : cid(m.re), resolvedAt, m.resolved ? uid.admin : null]);
+      [cid(m.k), W, iid, uid[m.by], body, at, m.re === undefined ? null : cid(m.re), resolvedAt, m.resolved ? (m.k === 61 ? uid.leo : uid.admin) : null]);
     await c.query('delete from comment_mentions where comment_id = $1', [cid(m.k)]);
     for (const w of new Set(mentionsOf(m.body))) await c.query('insert into comment_mentions (workspace_id, comment_id, user_id, created_at) values ($1,$2,$3,$4) on conflict do nothing', [W, cid(m.k), uid[w], at]);
     ev = 0;

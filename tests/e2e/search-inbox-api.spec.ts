@@ -21,8 +21,13 @@ async function notify(issueId: string, types: string[]) {
       await tx`insert into notifications (id, workspace_id, user_id, actor_id, type, issue_id) values (${randomUUID()}, ${WS}, ${USER}, null, ${t}::notification_type, ${issueId})`;
   });
 }
-const unreadCount = async (page: import('@playwright/test').Page) =>
-  ((await (await page.request.get(`/api/v1/w/${DEMO.slug}/notifications/unread-count`)).json()) as { unread_count: number }).unread_count;
+// The badge and the dots count unread ROWS (one per issue, see unreadRows in inbox-client), not raw notifications:
+// replies in a thread can leave several unread notifications on one issue, so compare against the same grouping.
+const unreadCount = async (page: import('@playwright/test').Page) => {
+  const j = (await (await page.request.get(`/api/v1/w/${DEMO.slug}/notifications?limit=100`)).json()) as { items: { issue_id: string; read_at: string | null }[] };
+  const unreadIssues = new Set(j.items.filter((n) => !n.read_at).map((n) => n.issue_id));
+  return unreadIssues.size;
+};
 
 test.describe('Search on the server route', () => {
   test('palette finds an issue through /search and Enter opens it', async ({ page }) => {

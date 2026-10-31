@@ -9,7 +9,8 @@ import { Combobox, type ComboOption } from '@/components/ui/Combobox';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
 import { useIssueRealtime } from '@/lib/detail/use-issue-realtime';
-import { Button, ConfirmDialog, IconButton, Tooltip, type MenuEntry } from '@/components/ui';
+import { Button, Chip, ConfirmDialog, IconButton, Tooltip, type MenuEntry } from '@/components/ui';
+import { participants, repliesLabel, repliesOf, threadOpen } from '@/lib/detail/threads';
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { listTeams } from '@/lib/settings-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
@@ -303,8 +304,14 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   async function postComment(body: string, parentId: string | null) {
     const r = client ? await client.addComment(issue.id, body, parentId) : null;
     if (r && !r.ok && !r.unsupported) { setToast('Could not post the comment'); return false; }
-    setComments((c) => [...c, r && r.ok ? r.data : { id: lid('c'), body, author_id: ME, parent_comment_id: parentId, created_at: now(), reactions: [] }]);
+    setComments((c) => [...c.map((x) => (parentId && x.id === parentId && x.resolved_at ? { ...x, resolved_at: null, resolved_by: null } : x)), r && r.ok ? r.data : { id: lid('c'), body, author_id: ME, parent_comment_id: parentId, created_at: now(), reactions: [] }]); // a reply reopens a resolved thread (the server does the same)
     return true;
+  }
+  async function resolveThread(c: Comment, on: boolean) {
+    const r = client ? await client.resolve(c.id, on) : null;
+    if (r && !r.ok && !r.unsupported) { setToast(r.status === 403 ? 'You cannot resolve this thread' : 'Could not update the thread'); return; }
+    setComments((cs) => cs.map((x) => (x.id === c.id ? (r && r.ok ? { ...x, ...r.data, reactions: x.reactions } : { ...x, resolved_at: on ? now() : null, resolved_by: on ? ME : null }) : x)));
+    if (!client) log(on ? 'resolved a thread' : 'reopened a thread');
   }
   async function editComment(c: Comment, body: string) {
     const r = client ? await client.editComment(c.id, body, c.version ?? 1) : null;
@@ -336,7 +343,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   }
 
   const roots = comments.filter((c) => !c.parent_comment_id);
-  const replies = (id: string) => comments.filter((c) => c.parent_comment_id === id);
+  const replies = (id: string) => repliesOf(comments, id);
   // One chronological timeline: thread roots interleave with change events (comment events are shown by the comment itself).
   const timeline = [
     ...activity.filter((a) => !/^(commented|edited a comment)$/.test(a.summary ?? a.action)).map((at) => ({ kind: 'event' as const, at, ts: Date.parse(at.created_at) || 0 })),
@@ -432,7 +439,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           <ol className='feed' aria-label='Activity'>
             {timeline.map((t) => t.kind === 'event'
               ? <ActivityEvent key={t.at.id} at={t.at} actor={who(t.at.actor_id)} />
-              : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={(x) => (client ? !!viewer?.userId && x.author_id === viewer.userId : x.author_id === ME)} canDelete={(x) => (client ? !!viewer?.userId && (x.author_id === viewer.userId || viewer.role === 'owner' || viewer.role === 'admin') : x.author_id === ME)} readOnly={readOnly} /></li>)}
+              : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onResolve={resolveThread} canResolve={viewer?.role !== 'guest'} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={(x) => (client ? !!viewer?.userId && x.author_id === viewer.userId : x.author_id === ME)} canDelete={(x) => (client ? !!viewer?.userId && (x.author_id === viewer.userId || viewer.role === 'owner' || viewer.role === 'admin') : x.author_id === ME)} readOnly={readOnly} /></li>)}
           </ol>
           {!readOnly && <Composer label='Leave a comment' draftKey={`cmt-draft:${issue.identifier}`} onSubmit={(b) => postComment(b, null)} onAttach={() => { setLinkForm((f) => f ?? { url: '', title: '' }); setTimeout(() => document.getElementById('att-url')?.focus(), 0); }} />}
         </section>
@@ -489,14 +496,21 @@ function ActivityEvent({ at, actor }: { at: ActivityItem; actor: Person | undefi
   );
 }
 
-function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, canDelete, readOnly }: { c: Comment; replies: Comment[]; onReact: (c: Comment, e: string) => void; onReply: (b: string) => Promise<boolean>; onEdit: (c: Comment, b: string) => Promise<boolean>; onDelete: (c: Comment) => void; canEdit: (c: Comment) => boolean; canDelete: (c: Comment) => boolean; readOnly: boolean }) {
+function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, onResolve, canEdit, canDelete, canResolve, readOnly }: { c: Comment; replies: Comment[]; onReact: (c: Comment, e: string) => void; onReply: (b: string) => Promise<boolean>; onEdit: (c: Comment, b: string) => Promise<boolean>; onDelete: (c: Comment) => void; onResolve: (c: Comment, on: boolean) => void; canEdit: (c: Comment) => boolean; canDelete: (c: Comment) => boolean; canResolve: boolean; readOnly: boolean }) {
   const people = useContext(PeopleCtx); const ME = useContext(MeCtx); const who = (id: string | null | undefined) => findPerson(people, id);
   const [replying, setReplying] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
-  const one = (x: Comment) => (
+  const [pref, setPref] = useState<boolean | null>(null); // the viewer's own collapse choice; null = default (collapsed when resolved)
+  const panelId = useId();
+  const resolved = !!c.resolved_at, open = threadOpen(c, pref);
+  const resolver = c.resolved_by ? who(c.resolved_by)?.name : null;
+  const people3 = participants(c, replies).slice(0, 3);
+  const one = (x: Comment, root: boolean) => (
     <article className='cmt' aria-label={`Comment by ${who(x.author_id)?.name ?? 'Someone'}`}>
       <header>{(() => { const u = who(x.author_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}<span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <Age iso={x.created_at} />{x.edited_at && <span className='dim'> (edited)</span>}
-        {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <Button variant='ghost' size={24} aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</Button>}{canDelete(x) && <Button variant='ghost' size={24} tone='danger' aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</Button>}</span>}</header>
+        {root && resolved && <span className='thread-resolved' title={resolver ? `Resolved by ${resolver}` : undefined}><Chip tone='accent'>Resolved</Chip></span>}
+        {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <Button variant='ghost' size={24} aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</Button>}{canDelete(x) && <Button variant='ghost' size={24} tone='danger' aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</Button>}</span>}
+        {root && !readOnly && canResolve && <span className='thread-menu'><IconButton label={resolved ? 'Reopen thread' : 'Resolve thread'} size={24} onClick={() => { onResolve(c, !resolved); setPref(null); }}><Icon name='checkSquare' size={16} /></IconButton></span>}</header>
       {editing === x.id ? <Composer label='Edit comment' initial={x.body} autoFocus submitLabel='Save' onSubmit={async (b) => { const ok = await onEdit(x, b); if (ok) setEditing(null); return ok; }} onCancel={() => setEditing(null)} /> : <Markdown source={x.body} empty='' />}
       <div className='reacts' role='group' aria-label='Reactions'>
         {EMOJIS.map((e) => { const r = x.reactions?.find((y) => y.emoji === e); return (r || !readOnly) && <Button key={e} variant='ghost' size={24} className={reactedBy(r, ME) ? 'react on' : 'react'} aria-pressed={reactedBy(r, ME)} aria-label={`React ${e}${r ? `, ${r.count}` : ''}`} disabled={readOnly} onClick={() => onReact(x, e)}>{e}{r && <span className='react-n'>{r.count}</span>}</Button>; })}
@@ -504,10 +518,16 @@ function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, canEdit, 
     </article>
   );
   return (
-    <div className='cmt-thread'>
-      {one(c)}
-      {replies.length > 0 && <ul className='replies'>{replies.map((r) => <li key={r.id}>{one(r)}</li>)}</ul>}
-      {!readOnly && (replying ? <Composer label='Reply' autoFocus onSubmit={async (b) => { const ok = await onReply(b); if (ok) setReplying(false); return ok; }} onCancel={() => setReplying(false)} /> : <Button variant='ghost' size={24} className='cmt-reply' onClick={() => setReplying(true)}>Reply</Button>)}
+    <div role='group' aria-label='Thread' className='cmt-thread' data-resolved={resolved || undefined} data-open={open}>
+      {one(c, true)}
+      {replies.length > 0 && (
+        <Button variant='ghost' size={24} className='thread-toggle' aria-expanded={open} aria-controls={panelId} onClick={() => setPref(!open)}>
+          <span className='thread-avs' aria-hidden='true'>{people3.map((id) => { const u = who(id); return u ? <Avatar key={id} initials={u.initials} hue={u.hue} /> : null; })}</span>
+          <span className='thread-count'>{repliesLabel(replies.length)}</span><span className='thread-caret' aria-hidden='true'>{open ? '\u25BE' : '\u25B8'}</span>
+        </Button>
+      )}
+      {replies.length > 0 && open && <ul id={panelId} className='replies thread-rail' aria-label='Replies'>{replies.map((r) => <li key={r.id}>{one(r, false)}</li>)}</ul>}
+      {!readOnly && (replying ? <Composer label='Reply' autoFocus onSubmit={async (b) => { const ok = await onReply(b); if (ok) { setReplying(false); setPref(true); } return ok; }} onCancel={() => setReplying(false)} /> : <Button variant='ghost' size={24} className='thread-reply' onClick={() => setReplying(true)}>Reply</Button>)}
     </div>
   );
 }
@@ -611,9 +631,14 @@ export function IssueActivity({ slug, issueId, identifier, readOnly = false }: {
   async function postComment(body: string, parentId: string | null) {
     const r = await client.addComment(issueId, body, parentId);
     if (!r.ok) { setToast('Could not post the comment'); return false; }
-    setComments((c) => [...c, r.data]);
+    setComments((c) => [...c.map((x) => (parentId && x.id === parentId && x.resolved_at ? { ...x, resolved_at: null, resolved_by: null } : x)), r.data]);
     void client.activity(issueId).then((a) => a.ok && setActivity(a.data.items));
     return true;
+  }
+  async function resolveThread(c: Comment, on: boolean) {
+    const r = await client.resolve(c.id, on);
+    if (!r.ok) { setToast(r.status === 403 ? 'You cannot resolve this thread' : 'Could not update the thread'); return; }
+    setComments((cs) => cs.map((x) => (x.id === c.id ? { ...x, ...r.data, reactions: x.reactions } : x)));
   }
   async function editComment(c: Comment, body: string) {
     const r = await client.editComment(c.id, body, c.version ?? 1);
@@ -642,7 +667,7 @@ export function IssueActivity({ slug, issueId, identifier, readOnly = false }: {
     }));
   }
   const who = (id: string | null | undefined) => findPerson(people, id);
-  const replies = (id: string) => comments.filter((c) => c.parent_comment_id === id);
+  const replies = (id: string) => repliesOf(comments, id);
   const timeline = [
     ...activity.filter((a) => !/^(commented|edited a comment)$/.test(a.summary ?? a.action)).map((at) => ({ kind: 'event' as const, at, ts: Date.parse(at.created_at) || 0 })),
     ...comments.filter((c) => !c.parent_comment_id).map((c) => ({ kind: 'comment' as const, c, ts: Date.parse(c.created_at) || 0 })),
@@ -656,7 +681,7 @@ export function IssueActivity({ slug, issueId, identifier, readOnly = false }: {
         <ol className='feed' aria-label='Activity'>
           {timeline.map((t) => t.kind === 'event'
             ? <ActivityEvent key={t.at.id} at={t.at} actor={who(t.at.actor_id)} />
-            : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={mine} canDelete={(x) => mine(x) || role === 'owner' || role === 'admin'} readOnly={readOnly} /></li>)}
+            : <li key={t.c.id} className='tl-cmt'><CommentItem c={t.c} replies={replies(t.c.id)} onResolve={resolveThread} canResolve={role !== 'guest'} onReact={toggleReaction} onReply={(b) => postComment(b, t.c.id)} onEdit={editComment} onDelete={removeComment} canEdit={mine} canDelete={(x) => mine(x) || role === 'owner' || role === 'admin'} readOnly={readOnly} /></li>)}
         </ol>
         {!readOnly && <Composer label='Leave a comment' draftKey={`cmt-draft:${identifier}`} onSubmit={(b) => postComment(b, null)} onAttach={() => router.push(`/w/${slug}/issue/${identifier}`)} />}
       </section>
