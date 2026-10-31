@@ -766,6 +766,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const helpOpen = useRef(false);
   const readOnlyRef = useRef(readOnly);
   useEffect(() => { orderedRef.current = ordered; currentIdRef.current = current?.id; actions.current = { askDelete, selectAll, reorder, create, cycleStatus, closePalette, openPalette, openPick, toggleSelect, extend, setView, setHelp, clearMulti: () => setMulti([]) }; helpOpen.current = help; paletteOpen.current = palette; multiRef.current = multi; readOnlyRef.current = readOnly; });
+  // Show sub-issues OFF hides those rows: drop them from the multi-selection so a bulk action never touches hidden rows.
+  useEffect(() => { if (showSub) return; const shown = new Set(withoutSubIssues(issues, false).map((x) => x.id)); setMulti((m) => (m.every((id) => shown.has(id)) ? m : m.filter((id) => shown.has(id)))); }, [showSub, issues]);
   // Roving focus: when focus is inside the issue collection, follow the selection.
   useEffect(() => {
     const root = mainRef.current;
