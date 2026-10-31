@@ -3,19 +3,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useCssVars } from '@/lib/ui/use-css-vars';
-import { USERS, STATUSES, STATUS_LABEL, PRIORITY_LABEL, fmtDate, type Issue, type Meta, type Status } from '@/lib/issues';
-import { Avatar, Icon, PriorityIcon, StatusIcon } from '@/components/icons';
+import { USERS, fmtDate, type Issue, type Meta } from '@/lib/issues';
+import { Avatar, Icon, StatusIcon } from '@/components/icons';
 import { Combobox, type ComboOption } from '@/components/ui/Combobox';
+import { IssueProperties, type IssuePropertiesHandle } from '@/components/IssueProperties';
 import { Markdown } from '@/components/Markdown';
 import { RichEditor } from '@/components/RichEditor';
 import { useIssueRealtime } from '@/lib/detail/use-issue-realtime';
-import { Button, Chip, ConfirmDialog, IconButton, Input, Tooltip, type MenuEntry } from '@/components/ui';
+import { Button, Chip, ConfirmDialog, IconButton, Input, type MenuEntry } from '@/components/ui';
 import { participants, repliesLabel, repliesOf, threadOpen } from '@/lib/detail/threads';
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { listTeams } from '@/lib/settings-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
 import { statusOf } from '@/lib/detail/activity-status';
-import { branchName, dueState, identifierOf, issueUrl, progress, DUE_RE } from '@/lib/detail/issue-meta';
+import { branchName, identifierOf, issueUrl, progress } from '@/lib/detail/issue-meta';
 import { activeMention, insertMention, suggest, type MentionUser } from '@/lib/detail/mentions';
 import { safeHref } from '@/lib/detail/markdown';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
@@ -27,10 +28,8 @@ import { IssueNavToggle } from '@/components/IssueShell';
 import { usePresence } from '@/lib/presence/use-presence';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
-type PickKind = 'status' | 'priority' | 'estimate' | 'assignee' | 'labels' | 'project' | 'cycle' | 'parent' | 'relation';
 const REL_ORDER: Relation['type'][] = ['blocks', 'blocked_by', 'related', 'duplicate'];
 const REL_LABEL: Record<Relation['type'], string> = { blocks: 'Blocks', blocked_by: 'Blocked by', related: 'Related', duplicate: 'Duplicate of' };
-const ESTIMATES = [0, 1, 2, 3, 5, 8, 13];
 const EMOJIS = ['👍', '🎉', '❤️', '👀'];
 const mentionUsers = (people: readonly Person[]): MentionUser[] => people.map((u) => ({ id: u.id, name: u.name, handle: u.name.split(' ')[0]?.toLowerCase() ?? u.id }));
 // Workspace directory for names, avatars and mentions: members in API mode, the USERS fixtures in mock mode.
@@ -74,7 +73,8 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [others, setOthers] = useState<DetailIssue[]>(all.filter((i) => i.id !== initial.id));
   const [title, setTitle] = useState(initial.title);
   const viewers = usePresence(slug, initial.id, viewer?.userId, api);
-  const [pick, setPick] = useState<{ kind: PickKind; el: HTMLElement | null; relType?: Relation['type'] } | null>(null);
+  const [pick, setPick] = useState<{ el: HTMLElement | null; relType: Relation['type'] } | null>(null);
+  const propsRef = useRef<IssuePropertiesHandle>(null);
   const [relations, setRelations] = useState<Relation[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -236,39 +236,18 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   }
   const saveDesc = (md: string) => { if (md !== issue.description) void update({ description: md }, 'updated the description'); };
 
-  function options(kind: PickKind): ComboOption[] {
-    switch (kind) {
-      case 'status': return STATUSES.map((s) => ({ id: s, label: STATUS_LABEL[s], checked: issue.status === s, lead: <StatusIcon status={s} /> }));
-      case 'priority': return PRIORITY_LABEL.map((l, p) => ({ id: String(p), label: l, checked: issue.priority === p, lead: <PriorityIcon priority={p as Issue['priority']} /> }));
-      case 'estimate': return [{ id: '', label: 'No estimate', checked: issue.estimate == null }, ...ESTIMATES.map((n) => ({ id: String(n), label: `${n} pt${n === 1 ? '' : 's'}`, checked: issue.estimate === n }))];
-      case 'assignee': return [{ id: '', label: 'Unassigned', checked: !issue.assignee_id }, ...people.map((u) => ({ id: u.id, label: u.name, checked: issue.assignee_id === u.id, lead: <Avatar initials={u.initials} hue={u.hue} /> }))];
-      case 'labels': return meta.labels.map((l) => ({ id: l.id, label: l.name, checked: issue.label_ids.includes(l.id) }));
-      case 'project': return [{ id: '', label: 'No project', checked: !issue.project_id }, ...meta.projects.map((p) => ({ id: p.id, label: p.name, checked: issue.project_id === p.id }))];
-      case 'cycle': return [{ id: '', label: 'No cycle', checked: !issue.cycle_id }, ...meta.cycles.map((c) => ({ id: c.id, label: c.name, checked: issue.cycle_id === c.id }))];
-      case 'parent': return [{ id: '', label: 'No parent', checked: !issue.parent_id }, ...others.filter((o) => o.parent_id !== issue.id && !o.deleted_at).map((o) => ({ id: o.id, label: `${identifierOf(o)} ${o.title}`, checked: issue.parent_id === o.id }))];
-      case 'relation': return others.filter((o) => !o.deleted_at && !relations.some((r) => r.related_issue_id === o.id)).map((o) => ({ id: o.id, label: `${identifierOf(o)} ${o.title}`, lead: <StatusIcon status={o.status} /> }));
-    }
+  function options(): ComboOption[] {
+    return others.filter((o) => !o.deleted_at && !relations.some((r) => r.related_issue_id === o.id)).map((o) => ({ id: o.id, label: `${identifierOf(o)} ${o.title}`, lead: <StatusIcon status={o.status} /> }));
   }
   async function onPick(id: string) {
     if (!pick) return;
-    const k = pick.kind;
-    if (k !== 'labels') setPick(null);
-    if (k === 'status') void update({ status: id as Status }, `set status to ${STATUS_LABEL[id as Status]}`);
-    else if (k === 'priority') void update({ priority: Number(id) as Issue['priority'] }, `set priority to ${PRIORITY_LABEL[Number(id)] ?? id}`);
-    else if (k === 'estimate') void update({ estimate: id === '' ? null : Number(id) }, id === '' ? 'removed the estimate' : `set estimate to ${id}`);
-    else if (k === 'assignee') void update({ assignee_id: id || null }, id ? `assigned to ${who(id)?.name ?? id}` : 'removed the assignee');
-    else if (k === 'labels') { const has = issue.label_ids.includes(id); void update({ label_ids: has ? issue.label_ids.filter((l) => l !== id) : [...issue.label_ids, id] }, `${has ? 'removed' : 'added'} label ${meta.labels.find((l) => l.id === id)?.name ?? id}`); }
-    else if (k === 'project') void update({ project_id: id || null }, id ? `moved to project ${meta.projects.find((p) => p.id === id)?.name}` : 'removed the project');
-    else if (k === 'cycle') void update({ cycle_id: id || null }, id ? `moved to ${meta.cycles.find((c) => c.id === id)?.name}` : 'removed the cycle');
-    else if (k === 'parent') void update({ parent_id: id || null }, id ? `set parent ${identifierOf(byId(id) ?? { id })}` : 'removed the parent');
-    else if (k === 'relation' && pick.relType) {
-      const type = pick.relType;
-      const local: Relation = { id: lid('r'), type, issue_id: issue.id, related_issue_id: id };
-      const r = client ? await client.addRelation(issue.id, type, id) : null;
-      if (r && !r.ok && !r.unsupported) { setToast('Could not add the relation'); return; }
-      setRelations((x) => [...x, r && r.ok ? r.data : local]);
-      log(`marked as ${REL_LABEL[type].toLowerCase()} ${identifierOf(byId(id) ?? { id })}`);
-    }
+    setPick(null);
+    const type = pick.relType;
+    const local: Relation = { id: lid('r'), type, issue_id: issue.id, related_issue_id: id };
+    const r = client ? await client.addRelation(issue.id, type, id) : null;
+    if (r && !r.ok && !r.unsupported) { setToast('Could not add the relation'); return; }
+    setRelations((x) => [...x, r && r.ok ? r.data : local]);
+    log(`marked as ${REL_LABEL[type].toLowerCase()} ${identifierOf(byId(id) ?? { id })}`);
   }
   async function removeRelation(rel: Relation) {
     const r = client ? await client.removeRelation(issue.id, rel.id) : null;
@@ -373,16 +352,10 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     ...roots.map((c) => ({ kind: 'comment' as const, c, ts: Date.parse(c.created_at) || 0 })),
   ].sort((a, b) => a.ts - b.ts);
   const pr = progress(children);
-  const due = dueState(issue.due_date, today);
-  // The Combobox stays mounted so it can animate out; it keeps the last kind while closed.
+  // The relation Combobox stays mounted so it can animate out; it keeps the last relation type while closed.
   if (pick) lastPick.current = pick;
-  const shown = pick ?? lastPick.current ?? { kind: 'status' as PickKind, el: null };
-  const pickTitle: Record<PickKind, string> = { status: 'Change status', priority: 'Set priority', estimate: 'Set estimate', assignee: 'Assign to', labels: 'Change labels', project: 'Move to project', cycle: 'Move to cycle', parent: 'Set parent issue', relation: `Add relation: ${lastPick.current?.relType ? REL_LABEL[lastPick.current.relType] : ''}` };
+  const shown = pick ?? lastPick.current;
   pickAnchor.current = pick?.el ?? null;
-  const open = (kind: PickKind) => (e: React.MouseEvent<HTMLButtonElement>) => setPick({ kind, el: e.currentTarget });
-  const assignee = who(issue.assignee_id);
-  const project = meta.projects.find((p) => p.id === issue.project_id);
-  const cycle = meta.cycles.find((c) => c.id === issue.cycle_id);
   const readOnly = !!issue.deleted_at;
   // Prev/next: live issues of the workspace in identifier order (the list's default sort).
   const nav = useMemo<HeaderNav | null>(() => {
@@ -403,14 +376,13 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
     ...(readOnly ? [] : [
       { type: 'separator' } as const,
       { id: 'subscribe', label: subscribed ? 'Unsubscribe' : 'Subscribe', icon: mi('M8 2.5a3.5 3.5 0 0 0-3.5 3.5c0 3-1.5 4-1.5 4h10s-1.5-1-1.5-4A3.5 3.5 0 0 0 8 2.5ZM6.8 12.5a1.3 1.3 0 0 0 2.4 0'), onSelect: () => void toggleSubscribe() },
-      { id: 'move', label: 'Move to project…', icon: mi('M2.5 4.5h3.2l1.3 1.5h6.5v6.5h-11zM8 8.2h3M9.8 7l1.2 1.2L9.8 9.4'), onSelect: () => { setPick({ kind: 'project', el: moreRef.current }); } },
+      { id: 'move', label: 'Move to project…', icon: mi('M2.5 4.5h3.2l1.3 1.5h6.5v6.5h-11zM8 8.2h3M9.8 7l1.2 1.2L9.8 9.4'), onSelect: () => propsRef.current?.open('project', moreRef.current) },
       { id: 'copy', label: 'Make a copy', icon: mi('M5.5 5.5h7v7h-7zM3.5 10.5v-8h8'), disabled: busy, onSelect: () => void makeCopy() },
       { id: 'archive', label: issue.archived_at ? 'Unarchive' : 'Archive', icon: mi('M2.5 3.5h11v3h-11zM3.5 6.5v6h9v-6M6.5 9h3'), onSelect: () => void lifecycle(issue.archived_at ? 'unarchive' : 'archive') },
       { type: 'separator' } as const,
       { id: 'delete', label: 'Delete', icon: mi('M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5M7 7v4M9 7v4'), destructive: true, onSelect: () => setConfirmDelete(true) },
     ]),
   ];
-  const dueLabel = issue.due_date ? new Date(`${issue.due_date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : 'Set due date';
 
   return (
     <div className='idp' data-props={propsOpen ? 'open' : undefined}>
@@ -442,7 +414,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
 
         <section className='idp-sec' aria-labelledby='h-rel'>
           <h2 id='h-rel'>Relations
-            {!readOnly && <span className='rel-add'><IconButton ref={relBtn} size={24} className='sec-add' label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}><Icon name='plus' /></IconButton>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button type='button' role='menuitem' className='menu-item' key={t} onClick={() => { setRelMenu(false); setPick({ kind: 'relation', relType: t, el: relBtn.current }); }}><span className='menu-label'>{REL_LABEL[t]}…</span></button>)}</div>}</span>}
+            {!readOnly && <span className='rel-add'><IconButton ref={relBtn} size={24} className='sec-add' label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}><Icon name='plus' /></IconButton>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button type='button' role='menuitem' className='menu-item' key={t} onClick={() => { setRelMenu(false); setPick({ relType: t, el: relBtn.current }); }}><span className='menu-label'>{REL_LABEL[t]}…</span></button>)}</div>}</span>}
           </h2>
           {REL_ORDER.map((t) => { const rs = relations.filter((r) => r.type === t); if (!rs.length) return null; return (
             <div key={t} className='rel-group'><div className='rel-type' id={`rg-${t}`}>{REL_LABEL[t]}</div>
@@ -473,38 +445,10 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
 
       <div id='idp-props' ref={propsAsideRef as React.RefObject<HTMLDivElement>} tabIndex={-1} className='idp-side' aria-label='Properties' role={propsOpen ? 'dialog' : 'complementary'} aria-modal={propsOpen || undefined}>
         {propsOpen && <IconButton label='Close properties' size={24} className='idp-props-close' onClick={() => setPropsOpen(false)}><svg width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.5' strokeLinecap='round' aria-hidden='true'><path d='M4 4l8 8M12 4l-8 8' /></svg></IconButton>}
-        <section className='side-group' aria-labelledby='sg-props'>
-          <h3 id='sg-props' className='side-h'>Properties</h3>
-          <dl>
-          <dt>Status</dt><dd><button disabled={readOnly} onClick={open('status')} aria-haspopup='dialog'><StatusIcon status={issue.status} />{STATUS_LABEL[issue.status]}</button></dd>
-          <dt>Priority</dt><dd><button disabled={readOnly} onClick={open('priority')} aria-haspopup='dialog'><PriorityIcon priority={issue.priority} />{PRIORITY_LABEL[issue.priority]}</button></dd>
-          <dt>Assignee</dt><dd><button disabled={readOnly} onClick={open('assignee')} aria-haspopup='dialog'>{assignee ? <Avatar initials={assignee.initials} hue={assignee.hue} /> : <PropIcon name='user' />}<span className={assignee ? undefined : 'prop-empty'}>{assignee?.name ?? 'Unassigned'}</span></button></dd>
-          <dt>Labels</dt><dd><button disabled={readOnly} onClick={open('labels')} aria-haspopup='dialog'>{issue.label_ids.length ? issue.label_ids.map((l) => { const m = meta.labels.find((x) => x.id === l); return <span key={l} className={`chip ${m?.hue ?? ''}`}>{m?.name ?? l}</span>; }) : <><PropIcon name='label' /><span className='prop-empty'>Add label</span></>}</button></dd>
-          </dl>
-        </section>
-        <section className='side-group' aria-labelledby='sg-plan'>
-          <h3 id='sg-plan' className='side-h'>Planning</h3>
-          <dl>
-          <dt>Estimate</dt><dd><button disabled={readOnly} onClick={open('estimate')} aria-haspopup='dialog' aria-label={`Estimate: ${issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}`}><PropIcon name='estimate' /><span className={issue.estimate == null ? 'prop-empty' : undefined}>{issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}</span></button></dd>
-          <dt><label htmlFor='prop-due'>Due date</label></dt><dd className='prop-native'><span className={`prop-pill due-${due}`} aria-hidden='true'><PropIcon name='due' /><span className={issue.due_date ? undefined : 'prop-empty'}>{dueLabel}</span>{due === 'overdue' && <span className='due-flag'>Overdue</span>}</span><input id='prop-due' type='date' disabled={readOnly} value={issue.due_date ?? ''} onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* not supported */ } }} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} /></dd>
-          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'} title={cycle?.name}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
-          </dl>
-        </section>
-        <section className='side-group' aria-labelledby='sg-org'>
-          <h3 id='sg-org' className='side-h'>Organization</h3>
-          <dl>
-          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'><PropIcon name='parent' /><span className={parent ? 'prop-trunc' : 'prop-empty'} title={parent ? `${identifierOf(parent)} ${parent.title}` : undefined}>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</span></button></dd>
-          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'><PropIcon name='project' /><span className={project ? 'prop-trunc' : 'prop-empty'} title={project?.name}>{project?.name ?? 'Add to project'}</span></button></dd>
-          </dl>
-        </section>
-        <section className='side-group' aria-labelledby='sg-git'>
-          <h3 id='sg-git' className='side-h'>Git</h3>
-          <dl>
-          <dt>Branch</dt><dd><Tooltip label={branch}><button className='branch-btn' onClick={() => void copyBranch()} aria-label={`Copy branch name ${branch}`}><PropIcon name='branch' /><code className='branch'>{branch}</code><span className='branch-copy'><PropIcon name='copy' /></span></button></Tooltip></dd>
-          </dl>
-        </section>
+        <IssueProperties handle={propsRef} issue={issue} meta={meta} people={people} readOnly={readOnly} today={today} onChange={(patch, label) => void update(patch, label)}
+          parent={{ current: parent, candidates: others.filter((o) => o.parent_id !== issue.id && !o.deleted_at) }} git={{ branch, onCopy: () => void copyBranch() }} />
       </div>
-      <Combobox open={!!pick} anchorRef={pickAnchor} onClose={() => setPick(null)} matchWidth label={pickTitle[shown.kind]} multi={shown.kind === 'labels'} numbered={shown.kind === 'status'} startOnChecked={shown.kind === 'status'} options={options(shown.kind)} onPick={(id) => void onPick(id)} />
+      <Combobox open={!!pick} anchorRef={pickAnchor} onClose={() => setPick(null)} matchWidth label={`Add relation: ${shown ? REL_LABEL[shown.relType] : ''}`} options={options()} onPick={(id) => void onPick(id)} />
       <ConfirmDialog open={confirmDelete} title={`Delete ${ident}?`} confirmLabel='Delete' destructive onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void lifecycle('delete'); }}>
         <p>{issue.title}</p><p>The issue moves to the trash. You can restore it from there.</p>
       </ConfirmDialog>
