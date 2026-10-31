@@ -248,10 +248,14 @@ test('inbox: editing the rail keeps an unsent comment draft', async ({ page }) =
   const detail = page.getByRole('complementary', { name: 'Notification detail' });
   const box = detail.getByRole('textbox', { name: 'Leave a comment' });
   await box.fill('draft that must survive');
+  // Mark the node: a remount (sessionStorage restoring the text) would drop the marker.
+  await box.evaluate((el) => { (el as HTMLElement).dataset.sameNode = '1'; });
   const rail = detail.getByRole('complementary', { name: 'Properties' });
   await rail.getByRole('button', { name: /^(Backlog|Todo|In progress|In review|Done|Canceled)$/i }).click();
   await page.getByRole('combobox', { name: /Change status/ }).fill('done');
   await page.keyboard.press('Enter');
   await expect(rail.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
-  await expect(detail.getByRole('textbox', { name: 'Leave a comment' })).toContainText('draft that must survive');
+  const after = detail.getByRole('textbox', { name: 'Leave a comment' });
+  await expect(after).toHaveValue('draft that must survive');
+  await expect(after).toHaveAttribute('data-same-node', '1');
 });
