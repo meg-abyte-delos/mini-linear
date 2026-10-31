@@ -25,6 +25,6 @@
 .board .presence { --presence-cut:var(--panel); }
 .card .presence { --presence-cut:var(--raised); }
 .card[aria-selected=true] .presence { --presence-cut:var(--sel-solid); }
-.idp-head .presence { margin-left:auto; margin-right:4px; }
+.idp-head .presence { margin-right:4px; }
 
 @media (prefers-reduced-motion: reduce) { .presence-av { transition:none; } .presence-av:hover { transform:none; } }

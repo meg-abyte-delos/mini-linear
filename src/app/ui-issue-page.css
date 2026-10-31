@@ -11,7 +11,10 @@
 .idp-head .crumbs { flex:none; }
 .idh-status { display:inline-flex; align-items:center; gap:var(--sp-2); height:var(--re-btn); padding:0 var(--sp-2); color:var(--fg); font-size:var(--fs-base); border-color:transparent; border-radius:var(--r-sm); transition:background-color var(--dur-instant) var(--ease-out); }
 .idh-status:hover:not(:disabled) { background:var(--hover); }
-.idp-head .presence { margin-left:auto; }
+/* Header: crumbs left, one right cluster (presence, Properties toggle, pager, star, more) at every width. */
+.idp-head { justify-content:flex-start; }
+.idp-head .crumbs { margin-right:auto; }
+.idp-head .presence { margin-left:0; }
 .idh-btn { transition:background-color var(--dur-instant) var(--ease-out), color var(--dur-instant) var(--ease-out); }
 .idh-btn:focus-visible, .idh-text:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 
