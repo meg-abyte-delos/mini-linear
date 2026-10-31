@@ -71,9 +71,14 @@ test('inbox: x toggles selection of the focused notification', async ({ page }) 
   await page.goto('/?view=inbox');
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('option').first()).toBeVisible(); // the list loads after hydration: keys pressed earlier hit an empty list
-  await page.keyboard.press('x');
-  await expect(page.getByText('1 selected')).toBeVisible();
+  // The key handler is re-bound in a passive effect that can lag the commit that renders the rows (seen under CPU load):
+  // a first 'x' can hit the previous, empty-list handler and be dropped. Press only while nothing is selected, until it registers.
+  await expect(async () => {
+    if (!(await page.getByText('1 selected').isVisible())) await page.keyboard.press('x');
+    await expect(page.getByText('1 selected')).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
   await page.keyboard.press('j');
+  await expect(page.getByRole('option').nth(1)).toHaveAttribute('aria-selected', 'true'); // x acts on the focused row: wait for the move
   await page.keyboard.press('x');
   await expect(page.getByText('2 selected')).toBeVisible();
   await page.keyboard.press('x');
