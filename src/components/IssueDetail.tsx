@@ -91,6 +91,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [propsOpen, setPropsOpen] = useState(false);
   const version = useRef(initial.version);
   const client = useMemo(() => (api ? detailApi(slug) : null), [api, slug]);
   const ident = identifierOf(issue);
@@ -390,11 +391,13 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const dueLabel = issue.due_date ? new Date(`${issue.due_date}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : 'Set due date';
 
   return (
-    <div className='idp'>
+    <div className='idp' data-props={propsOpen ? 'open' : undefined}>
+      <div className='idp-scrim' aria-hidden='true' onClick={() => setPropsOpen(false)} />
       <main className='idp-main' aria-label={`Issue ${ident}`}>
         <header className='idp-head'>
           <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>{teamLabel}</Link><span className='sep' aria-hidden='true'>›</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>›</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
           <PresenceStack presence={viewers} size='md' />
+          <button type='button' className='idh-btn idp-props-toggle' aria-label='Properties' title='Properties' aria-controls='idp-props' aria-expanded={propsOpen} onClick={() => setPropsOpen((o) => !o)}><PropIcon name='panel' /></button>
           <IssueHeaderBar ident={ident} nav={nav} readOnly={readOnly} entries={menuEntries} moreRef={moreRef} onRestore={() => void lifecycle('restore')} />
         </header>
         {(issue.archived_at || issue.deleted_at) && <p className='idp-banner' role='status'>{issue.deleted_at ? 'This issue is in the trash. Restore it to edit.' : `Archived ${fmtDate(issue.archived_at as string)}.`}</p>}
@@ -445,7 +448,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         </section>
       </main>
 
-      <aside className='idp-side' aria-label='Properties'>
+      <aside id='idp-props' className='idp-side' aria-label='Properties' onKeyDown={(e) => { if (e.key === 'Escape' && propsOpen) { e.stopPropagation(); setPropsOpen(false); } }}>
         <section className='side-group' aria-labelledby='sg-props'>
           <h3 id='sg-props' className='side-h'>Properties</h3>
           <dl>
@@ -460,14 +463,14 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
           <dl>
           <dt>Estimate</dt><dd><button disabled={readOnly} onClick={open('estimate')} aria-haspopup='dialog' aria-label={`Estimate: ${issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}`}><PropIcon name='estimate' /><span className={issue.estimate == null ? 'prop-empty' : undefined}>{issue.estimate == null ? 'Set estimate' : `${issue.estimate} pt${issue.estimate === 1 ? '' : 's'}`}</span></button></dd>
           <dt><label htmlFor='prop-due'>Due date</label></dt><dd className='prop-native'><span className={`prop-pill due-${due}`} aria-hidden='true'><PropIcon name='due' /><span className={issue.due_date ? undefined : 'prop-empty'}>{dueLabel}</span>{due === 'overdue' && <span className='due-flag'>Overdue</span>}</span><input id='prop-due' type='date' disabled={readOnly} value={issue.due_date ?? ''} onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* not supported */ } }} onChange={(e) => { const v = e.target.value; if (v && !DUE_RE.test(v)) return; void update({ due_date: v || null }, v ? `set due date to ${v}` : 'removed the due date'); }} /></dd>
-          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
+          <dt>Cycle</dt><dd><button disabled={readOnly} onClick={open('cycle')} aria-haspopup='dialog'><PropIcon name='cycle' /><span className={cycle ? 'prop-trunc' : 'prop-empty'} title={cycle?.name}>{cycle?.name ?? 'Add to cycle'}</span></button></dd>
           </dl>
         </section>
         <section className='side-group' aria-labelledby='sg-org'>
           <h3 id='sg-org' className='side-h'>Organization</h3>
           <dl>
-          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'><PropIcon name='parent' /><span className={parent ? 'prop-trunc' : 'prop-empty'}>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</span></button></dd>
-          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'><PropIcon name='project' /><span className={project ? 'prop-trunc' : 'prop-empty'}>{project?.name ?? 'Add to project'}</span></button></dd>
+          <dt>Parent</dt><dd><button disabled={readOnly} onClick={open('parent')} aria-haspopup='dialog'><PropIcon name='parent' /><span className={parent ? 'prop-trunc' : 'prop-empty'} title={parent ? `${identifierOf(parent)} ${parent.title}` : undefined}>{parent ? `${identifierOf(parent)} ${parent.title}` : 'Set parent'}</span></button></dd>
+          <dt>Project</dt><dd><button disabled={readOnly} onClick={open('project')} aria-haspopup='dialog'><PropIcon name='project' /><span className={project ? 'prop-trunc' : 'prop-empty'} title={project?.name}>{project?.name ?? 'Add to project'}</span></button></dd>
           </dl>
         </section>
         <section className='side-group' aria-labelledby='sg-git'>

@@ -5,6 +5,8 @@
 
 /* ---- Motion + type: theme independent ---- */
 :root {
+  /* Layout (public Linear values, à re-mesurer on the reference workspace): app sidebar, issue Properties rail. */
+  --sidebar-w:244px; --idp-side-min:280px; --idp-side-w:clamp(var(--idp-side-min), 24vw, 340px); --idp-label-w:96px;
   --r-btn:6px;         /* buttons and inputs */
   --dur-instant:80ms;  /* hover, row background */
   --dur-fast:120ms;    /* color/border changes, chevrons, checkboxes */

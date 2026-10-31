@@ -76,3 +76,10 @@ Content max 640 centered. Row: label (13/500) + description (12, muted) left, co
 
 ## 8. PR checklist
 1. Only tokens / primitives. 2. Capture before/after 1280 (dark), plus light and 768 when layout moves. 3. axe 0 dark + light. 4. tsc, vitest, e2e green. 5. One screen or component per PR.
+
+## 9. Layout (public Linear values, à re-mesurer)
+Not yet measured on a real Linear workspace (signup blocked, 2026-10-31). Values below are public observations; replace them with the measured reference when it lands. Source of truth: tokens.css.
+- App sidebar `--sidebar-w` 244px, on every app route including the issue page (`.shell` + `AppSidebar`). Off-canvas below 900px.
+- Issue Properties rail `--idp-side-w` = clamp(280px, 24vw, 340px): 307px at 1280, 340px at 1440. Never narrower than `--idp-side-min` 280px.
+- Property label column `--idp-label-w` 96px; values one line, ellipsis, full value in a tooltip (title).
+- Below 1024px the Properties rail is a right drawer (header toggle, scrim, Esc closes).

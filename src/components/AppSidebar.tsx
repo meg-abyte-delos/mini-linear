@@ -6,7 +6,7 @@ import { SideIcon, TeamSection, WorkspaceSwitcher } from '@/components/SidebarPa
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { listTeams } from '@/lib/settings-client';
 
-export function AppSidebar({ slug, current }: { slug: string | null; current: 'search' }) {
+export function AppSidebar({ slug, current }: { slug: string | null; current: 'search' | 'issue' }) {
   const [people, setPeople] = useState<NlPeople>(EMPTY_PEOPLE);
   const [teamName, setTeamName] = useState('Team');
   useEffect(() => {

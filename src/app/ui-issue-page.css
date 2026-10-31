@@ -1,6 +1,6 @@
 /* Issue page, Wave B: centered column, ID + status in the header, grouped properties, WYSIWYG description.
    Tokens only (tokens.css #187). Motion uses --dur-* / --ease-out; with prefers-reduced-motion the durations are 0ms (tokens.css). */
-:root { --idp-col-w:720px; --idp-side-w:300px; }
+:root { --idp-col-w:720px; } /* --idp-side-w / --idp-side-min / --idp-label-w: tokens.css */
 
 /* Layout: the writing column is centered with a readable measure; the properties rail keeps its own width. */
 .idp { grid-template-columns:minmax(0,1fr) var(--idp-side-w); }
@@ -33,3 +33,24 @@
 
 /* Review 20:00: Linear issue title 24px/600. */
 .idp-title { font-size:var(--fs-2xl); font-weight:var(--fw-semibold); line-height:1.3; letter-spacing:-0.01em; }
+
+/* fix/ui-issue-layout (Iris): issue page lives in .shell (app sidebar kept), Properties rail never narrower than --idp-side-min.
+   Layout tokens in tokens.css (public Linear values, à re-mesurer). */
+.issue-shell > .idp-host { overflow:hidden; }
+.idp-host > .idp { flex:1; min-height:0; overflow-y:auto; }
+.idp { grid-template-columns:minmax(0,1fr) var(--idp-side-w); }
+.idp-side { min-width:var(--idp-side-min); }
+.idp-side dl { grid-template-columns:var(--idp-label-w) minmax(0,1fr); }
+.idp-side dd button .prop-trunc, .idp-side dd .prop-trunc { flex:1; }
+.idp-side .prop-pill { white-space:nowrap; min-width:0; }
+.idp-props-toggle, .idp-scrim { display:none; }
+/* Below 1024px: Properties becomes a right drawer opened from the header. */
+@media (max-width:1023px) {
+  .idp { grid-template-columns:minmax(0,1fr); }
+  .idp > .idp-side { position:fixed; inset:0 0 0 auto; z-index:75; width:var(--idp-side-w); border-left:1px solid var(--line); border-top:0; overflow-y:auto; transform:translateX(100%); visibility:hidden; transition:transform var(--dur-base) var(--ease-out), visibility 0s linear var(--dur-base); }
+  .idp[data-props='open'] > .idp-side { transform:none; visibility:visible; box-shadow:var(--shadow-pop); transition:transform var(--dur-base) var(--ease-out); }
+  .idp[data-props='open'] > .idp-scrim { display:block; position:fixed; inset:0; z-index:74; background:var(--scrim-soft); }
+  .idp-props-toggle { display:inline-grid; }
+}
+/* With the app sidebar the writing column is narrower: the floating toolbar sits under the editor so it never covers the title. */
+.idp .re-bar { bottom:auto; top:calc(100% + var(--sp-1)); }
