@@ -32,7 +32,8 @@ test('inbox: mark all as read and empty state', async ({ page }) => {
   await page.goto('/?view=inbox');
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('option').first()).toBeVisible(); // the list loads after hydration: keys pressed earlier hit an empty list
-  await page.getByRole('button', { name: 'Mark all as read' }).click();
+  await page.getByRole('button', { name: 'Inbox options' }).click();
+  await page.getByRole('menuitem', { name: 'Mark all as read' }).click();
   await expect(page.getByTestId('inbox-badge')).toHaveCount(0);
   await page.keyboard.press('e');
   await page.keyboard.press('e');
@@ -160,7 +161,8 @@ test('inbox: the unread counter equals the number of unread dots', async ({ page
   await expect(page.getByRole('option').first()).toBeVisible();
   const dots = await page.locator('li.nrow[data-unread=true]').count();
   await expect(page.getByText(`${dots} unread`, { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Mark all as read' }).click();
+  await page.getByRole('button', { name: 'Inbox options' }).click();
+  await page.getByRole('menuitem', { name: 'Mark all as read' }).click();
   await expect(page.getByText('0 unread', { exact: true })).toBeVisible();
   await expect(page.locator('li.nrow[data-unread=true]')).toHaveCount(0);
 });

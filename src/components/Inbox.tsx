@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NARROW_MQ } from '@/lib/breakpoints';
-import { Button, CheckMark, EmptyState, IconButton, Kbd } from '@/components/ui';
+import { Button, CheckMark, EmptyState, IconButton, Kbd, Menu } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { IssueActivity } from '@/components/IssueDetail';
 import '@/app/ui-inbox-activity.css';
@@ -26,6 +26,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
   const [cur, setCur] = useState(0);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLButtonElement>(null);
   const [fail, setFail] = useState<string | null>(null);
   const load = useCallback(async () => {
     try { const r = await client.list(tab); setItems(r.items); onUnread(r.unread_count); setErr(false); setChecked(new Set()); } catch { setErr(true); }
@@ -124,7 +126,15 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
               <Button size={24} onClick={() => setChecked(new Set())}>Clear</Button>
             </span>
           ) : <span>{unread} unread</span>}
-          {tab === 'all' && checked.size === 0 && <Button size={24} disabled={unread === 0} onClick={async () => { if (await client.readAll()) { await load(); } }}>Mark all as read</Button>}
+          {checked.size === 0 && (
+            <>
+              <IconButton ref={moreRef} label='Inbox options' size={24} aria-haspopup='menu' aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
+                <svg width='16' height='16' viewBox='0 0 16 16' aria-hidden='true' focusable='false'><path d='M3.5 8h.01M8 8h.01M12.5 8h.01' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' /></svg>
+              </IconButton>
+              <Menu open={moreOpen} anchorRef={moreRef} onClose={() => setMoreOpen(false)} label='Inbox options' align='end'
+                entries={[{ id: 'read-all', label: 'Mark all as read', disabled: unread === 0, onSelect: () => { void (async () => { if (await client.readAll()) await load(); })(); } }]} />
+            </>
+          )}
         </div>
         {snoozeOpen && (
           <div className='snooze-menu' role='menu' aria-label='Snooze until'>
