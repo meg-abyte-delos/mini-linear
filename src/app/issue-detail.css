@@ -28,8 +28,8 @@
 .idp-rows{list-style:none;margin:0 0 var(--sp-2);padding:0}.idp-rows li{display:flex;align-items:center;gap:var(--sp-2);height:var(--row-h);border-radius:var(--r-sm);padding:0 var(--sp-2)}
 .idp-rows li:hover{background:var(--hover)}.idp-rows a{color:var(--fg);text-decoration:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rel-type{color:var(--muted);min-width:84px}
-.rel-add{position:relative}.menu{position:absolute;z-index:20;top:100%;left:0;margin-top:4px;background:var(--raised);border:1px solid var(--line);border-radius:var(--r-md);padding:4px;display:flex;flex-direction:column;min-width:160px}
-.menu button{border:0;text-align:left}
+.rel-add{position:relative}.menu{position:absolute;z-index:20;top:100%;left:0;margin-top:4px;background:var(--raised);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp-1);display:flex;flex-direction:column;min-width:160px;box-shadow:var(--shadow-pop)}
+.menu .menu-item{border:0;background:none;color:var(--fg);text-align:left;font:inherit}
 .inline-add{display:flex;gap:var(--sp-2)}.inline-add .input{flex:1;min-width:0}
 .feed{list-style:none;padding:0;margin:0 0 var(--sp-3);color:var(--muted)}.feed .ev{padding:3px 0;font-size:var(--fs-sm)}.feed .who,.cmt .who{color:var(--fg);font-weight:500}.feed time,.cmt time{color:var(--muted);margin-left:4px}
 .threads,.replies{list-style:none;padding:0;margin:0}.replies{margin-left:var(--sp-4);border-left:1px solid var(--line);padding-left:var(--sp-3)}
@@ -76,8 +76,8 @@
 .idp-rows li:hover .row-link,.idp-rows li:focus-within .row-link{padding-right:32px}
 .idp-rows .row-link,.idp-rows .row-link:hover{text-decoration:none}.idp-rows li .x{z-index:1;color:var(--fg)}
 .blocked-flag{color:var(--warn);font-size:var(--fs-sm)}
-.add-row{display:block;width:100%;text-align:left;border:0;color:var(--muted);height:32px;padding:0 8px;border-radius:6px}
-.add-row:hover,.add-row:focus-visible{background:color-mix(in srgb,var(--fg) 4%,transparent);color:var(--fg)}
+.add-row{display:block;width:100%;text-align:left;border:0;color:var(--muted);height:32px;padding:0 var(--sp-2);border-radius:var(--r-btn)}
+.add-row:hover,.add-row:focus-visible{background:var(--hover);color:var(--fg)}
 .parent-crumb{display:block;font-size:var(--fs-sm);color:var(--muted);text-decoration:none;margin-bottom:2px}
 .parent-crumb:hover{color:var(--fg)}
 

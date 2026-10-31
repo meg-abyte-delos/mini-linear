@@ -416,7 +416,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
 
         <section className='idp-sec' aria-labelledby='h-rel'>
           <h2 id='h-rel'>Relations
-            {!readOnly && <span className='rel-add'><IconButton ref={relBtn} size={24} className='sec-add' label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}><Icon name='plus' /></IconButton>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button role='menuitem' key={t} onClick={() => { setRelMenu(false); setPick({ kind: 'relation', relType: t, el: relBtn.current }); }}>{REL_LABEL[t]}…</button>)}</div>}</span>}
+            {!readOnly && <span className='rel-add'><IconButton ref={relBtn} size={24} className='sec-add' label='Add relation' aria-haspopup='menu' aria-expanded={relMenu} onClick={() => setRelMenu((v) => !v)}><Icon name='plus' /></IconButton>{relMenu && <div role='menu' className='menu' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRelMenu(false); relBtn.current?.focus(); } }}>{REL_ORDER.map((t) => <button type='button' role='menuitem' className='menu-item' key={t} onClick={() => { setRelMenu(false); setPick({ kind: 'relation', relType: t, el: relBtn.current }); }}><span className='menu-label'>{REL_LABEL[t]}…</span></button>)}</div>}</span>}
           </h2>
           {REL_ORDER.map((t) => { const rs = relations.filter((r) => r.type === t); if (!rs.length) return null; return (
             <div key={t} className='rel-group'><div className='rel-type' id={`rg-${t}`}>{REL_LABEL[t]}</div>
