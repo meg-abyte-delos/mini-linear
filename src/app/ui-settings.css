@@ -153,3 +153,25 @@
 .dlg-confirm:disabled { opacity:.4; cursor:not-allowed; filter:saturate(.5); }
 .set-label-row .set-color { margin-left:auto; }
 .set-label-row .set-color + .btn { margin-left:0; }
+
+/* Review 12:20 (Pierre): Linear settings rows. Label left, control right, hairline dividers; quiet controls; larger title. */
+.set-wrap .set-h1 { font-size:var(--fs-2xl); letter-spacing:-.01em; }
+.set-wrap .set-head > .set-desc, .set-wrap .set-h1 + .set-desc { margin-top:var(--sp-2); font-size:var(--fs-base); }
+.set-wrap .set-h2 { font-size:var(--fs-base); margin-bottom:var(--sp-3); }
+.set-wrap .set-card { background:transparent; border-color:var(--line-soft); }
+.set-wrap .set-form:not(.set-form-row) { gap:0; padding:0 var(--sp-4); }
+.set-wrap .set-form:not(.set-form-row) > .set-field { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,280px); align-items:center; column-gap:var(--sp-4); min-height:56px; padding:var(--sp-3) 0; border-bottom:1px solid var(--line-soft); }
+.set-wrap .set-form:not(.set-form-row) > .set-field .set-label { font-size:var(--fs-base); color:var(--fg); }
+.set-wrap .set-form:not(.set-form-row) > .set-actions { padding:var(--sp-3) 0; }
+.set-wrap .set-input, .set-wrap .set-select { height:28px; background:transparent; border-color:var(--line); font-size:var(--fs-base); }
+.set-wrap .set-input:hover:not(:disabled) { background:var(--hover); }
+.set-wrap .set-input:disabled { background:transparent; border-color:transparent; padding-inline:0; }
+/* Selects look like the app's menu triggers (chip, chevron, no box) rather than a native control. */
+.set-wrap .set-select.select-btn { width:auto; min-width:0; padding:0 var(--sp-2); border-color:transparent; color:var(--muted-strong); }
+.set-wrap .set-select.select-btn:hover:not(:disabled), .set-wrap .set-select.select-btn[aria-expanded='true'] { background:var(--hover); color:var(--fg); }
+.set-wrap .set-select.select-btn:disabled { color:var(--muted); }
+/* "···": visible at rest, clipped to its box (the stray dots came from the svg overflowing a fixed td). */
+.set-wrap .set-icon-btn { width:28px; height:28px; color:var(--muted-strong); overflow:hidden; }
+.set-wrap .set-icon-btn svg { display:block; flex:none; }
+.set-table:has(.set-col-role) td.set-end, .set-wrap .set-table td.set-end { overflow:hidden; text-overflow:clip; }
+.set-wrap .set-card-head { margin-bottom:var(--sp-2); }
