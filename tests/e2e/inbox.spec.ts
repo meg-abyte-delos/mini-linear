@@ -5,6 +5,8 @@ import { INBOX_STATE } from './global-setup';
 // At 1280 the detail pane is under 760px: the Properties rail is a drawer opened from the bar (fix/inbox-detail-reading-width).
 async function openRail(page: import('@playwright/test').Page) {
   const toggle = page.getByRole('complementary', { name: 'Notification detail' }).getByRole('button', { name: 'Properties', exact: true });
+  // isVisible() does not wait: first let the detail pane mount (#inbox-props in the DOM; a closed drawer is visibility:hidden, so a role query would never match), then decide.
+  await page.locator('#inbox-props').waitFor({ state: 'attached' });
   if (await toggle.isVisible() && (await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
 }
 
