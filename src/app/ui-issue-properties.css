@@ -1,0 +1,51 @@
+/* Properties rail (IssueProperties): the only issue-page styles the Inbox shares. Moved here from issue-detail.css, ui-issue-detail.css and ui-issue-page.css, which stay route-only because they hold unscoped rules (.chip, .menu, .md, .feed, .cmt, .composer, :root vars). Same order, same declarations. */
+/* from issue-detail.css */
+.idp-side{background:var(--side);border-left:1px solid var(--line);padding:var(--sp-4)}
+.idp-side dl{display:grid;grid-template-columns:84px minmax(0,1fr);gap:var(--sp-2) var(--sp-2);margin:0;align-items:center}
+.idp-side dt{color:var(--muted);font-size:var(--fs-sm)}.idp-side dd{margin:0;min-width:0}
+.idp-side dd button{border-color:transparent;display:flex;align-items:center;gap:6px;width:100%;text-align:left;flex-wrap:wrap}
+.idp-side select,.idp-side input[type=date]{width:100%;border-color:transparent;color-scheme:dark}
+[data-theme='light'] .idp-side select,[data-theme='light'] .idp-side input[type=date]{color-scheme:light}
+/* from ui-issue-detail.css */
+/* Properties sidebar: 32px rows, borderless pickers */
+.idp-side{padding:var(--sp-4) var(--sp-3)}
+.idp-side dl{grid-template-columns:88px minmax(0,1fr);gap:2px var(--sp-2)}
+.idp-side dt{font-size:var(--fs-sm);color:var(--muted);padding-left:var(--sp-1)}
+.idp-side dd button,.idp-side select,.idp-side input[type=date]{min-height:32px;padding:0 8px;border-color:transparent;border-radius:6px}
+.idp-side dd button:hover:not(:disabled),.idp-side select:hover,.idp-side input[type=date]:hover{background:color-mix(in srgb,var(--fg) 5%,transparent)}
+/* from ui-issue-detail.css */
+/* Property pills: icon + value, native select/date kept accessible as a transparent overlay */
+.idp-side dd button{display:flex;align-items:center;gap:8px;width:100%;min-width:0;text-align:left}
+.prop-ic{flex:none;color:var(--muted)}
+.prop-empty{color:var(--muted)}
+.prop-trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.prop-native{position:relative}
+.prop-pill{display:flex;align-items:center;gap:8px;min-height:32px;padding:0 8px;border-radius:6px;pointer-events:none}
+.prop-native select,.prop-native input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0}
+.prop-native select:disabled,.prop-native input[type=date]:disabled{cursor:default}
+.prop-native:hover .prop-pill{background:color-mix(in srgb,var(--fg) 5%,transparent)}
+.prop-native:focus-within .prop-pill{box-shadow:0 0 0 2px var(--accent)}
+.prop-pill.due-overdue{color:var(--danger)}
+.prop-pill .due-flag{margin-left:auto}
+/* Branch: one line, ellipsis, click copies */
+.idp-side dd .branch-btn{display:flex;flex-wrap:nowrap;align-items:center;overflow:hidden}
+.branch-btn .branch{display:block;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:normal;min-width:0}
+/* from ui-issue-detail.css */
+.branch-btn .branch-copy{flex:none;display:inline-flex;margin-left:auto;padding-left:6px;color:var(--muted)}
+.branch-btn:hover .branch-copy,.branch-btn:focus-visible .branch-copy{color:var(--fg)}
+/* from ui-issue-page.css */
+/* Properties: four labelled groups. */
+.side-group + .side-group { margin-top:var(--sp-4); padding-top:var(--sp-3); border-top:1px solid var(--line-soft); }
+.side-h { margin:0 0 var(--sp-1); padding-left:var(--sp-1); font-size:var(--fs-xs); font-weight:var(--fw-semibold);  text-transform:uppercase; color:var(--muted); }
+.idp-side dd button, .prop-pill { transition:background-color var(--dur-instant) var(--ease-out); }
+/* from ui-issue-page.css */
+.idp-side { min-width:var(--idp-side-min); }
+.idp-side dl { grid-template-columns:var(--idp-label-w) minmax(0,1fr); }
+.idp-side dd button .prop-trunc, .idp-side dd .prop-trunc { flex:1; }
+.idp-side .prop-pill { white-space:nowrap; min-width:0; }
+/* from ui-issue-page.css */
+.idp-side:focus { outline:none; }
+/* Rail-scoped copies of three route-wide rules (the originals stay in issue-detail.css for the issue page). */
+.idp-side .chip{border:1px solid var(--line);border-radius:999px;padding:0 6px;font-size:var(--fs-xs)}
+.idp-side .due-overdue{color:var(--danger)}.idp-side .due-flag{color:var(--danger);font-size:var(--fs-xs)}
+.idp-side .branch{font-size:var(--fs-xs);color:var(--muted-strong);word-break:break-all}

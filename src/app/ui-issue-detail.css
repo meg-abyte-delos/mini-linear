@@ -14,12 +14,6 @@
 .md-tabs [aria-selected=true]{background:color-mix(in srgb,var(--fg) 8%,transparent);border-color:transparent;color:var(--fg)}
 .md-input:focus,.composer textarea:focus{border-color:color-mix(in srgb,var(--fg) 24%,transparent)}
 
-/* Properties sidebar: 32px rows, borderless pickers */
-.idp-side{padding:var(--sp-4) var(--sp-3)}
-.idp-side dl{grid-template-columns:88px minmax(0,1fr);gap:2px var(--sp-2)}
-.idp-side dt{font-size:var(--fs-sm);color:var(--muted);padding-left:var(--sp-1)}
-.idp-side dd button,.idp-side select,.idp-side input[type=date]{min-height:32px;padding:0 8px;border-color:transparent;border-radius:6px}
-.idp-side dd button:hover:not(:disabled),.idp-side select:hover,.idp-side input[type=date]:hover{background:color-mix(in srgb,var(--fg) 5%,transparent)}
 
 /* Comments and composer */
 .cmt{background:color-mix(in srgb,var(--fg) 2%,transparent);border-color:var(--line-soft);padding:var(--sp-3)}
@@ -40,22 +34,6 @@
 .idh-more{position:relative}
 .idh-sep{height:1px;margin:4px 0;background:var(--line-soft)}
 
-/* Property pills: icon + value, native select/date kept accessible as a transparent overlay */
-.idp-side dd button{display:flex;align-items:center;gap:8px;width:100%;min-width:0;text-align:left}
-.prop-ic{flex:none;color:var(--muted)}
-.prop-empty{color:var(--muted)}
-.prop-trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.prop-native{position:relative}
-.prop-pill{display:flex;align-items:center;gap:8px;min-height:32px;padding:0 8px;border-radius:6px;pointer-events:none}
-.prop-native select,.prop-native input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0}
-.prop-native select:disabled,.prop-native input[type=date]:disabled{cursor:default}
-.prop-native:hover .prop-pill{background:color-mix(in srgb,var(--fg) 5%,transparent)}
-.prop-native:focus-within .prop-pill{box-shadow:0 0 0 2px var(--accent)}
-.prop-pill.due-overdue{color:var(--danger)}
-.prop-pill .due-flag{margin-left:auto}
-/* Branch: one line, ellipsis, click copies */
-.idp-side dd .branch-btn{display:flex;flex-wrap:nowrap;align-items:center;overflow:hidden}
-.branch-btn .branch{display:block;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;word-break:normal;min-width:0}
 /* Comment composer: no native resize grip (Linear), grows with its content instead (field-sizing + JS fallback). */
 .composer textarea{resize:none;overflow:hidden;field-sizing:content;max-height:50vh}
 .composer textarea:not(:placeholder-shown){overflow-y:auto}
@@ -68,8 +46,6 @@
 .feed .ev .ev-lead .dot{position:static;width:6px;height:6px}
 .feed .ev .ev-text{min-width:0;overflow-wrap:anywhere}
 .feed .ev .ev-status{display:inline-flex;vertical-align:middle;margin-right:4px}
-.branch-btn .branch-copy{flex:none;display:inline-flex;margin-left:auto;padding-left:6px;color:var(--muted)}
-.branch-btn:hover .branch-copy,.branch-btn:focus-visible .branch-copy{color:var(--fg)}
 
 /* Comment composer: attach + send icon buttons live inside the box, bottom-right; no separate Comment button. */
 .composer-inline{position:relative}

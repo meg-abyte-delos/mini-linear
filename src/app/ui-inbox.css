@@ -79,11 +79,9 @@
 .inbox-detail .idp-event { margin:0; color:var(--muted-strong); font-size:var(--fs-sm); }
 .inbox-detail .idp-main .inbox-preview { margin-top:20px; padding-top:20px; }
 .inbox-detail .idp-main .inbox-preview .md { font-size:var(--fs-base); color:var(--fg); }
-.inbox-detail dl.idp-props { flex:0 0 248px; align-content:start; grid-template-columns:84px minmax(0,1fr); row-gap:6px; padding:20px 16px; overflow-y:auto; border-left:1px solid var(--line-soft); }
-.inbox-detail .idp-props dt { color:var(--muted-strong); }
-.inbox-detail .idp-val { display:inline-flex; align-items:center; gap:6px; }
-.inbox-detail dd.idp-labels { display:flex; flex-wrap:wrap; gap:4px; white-space:normal; padding:2px 0; line-height:20px; }
-@media (max-width:1180px) { .inbox-detail dl.idp-props { flex-basis:200px; } .inbox-detail .idp-main { padding:24px 24px 40px; } }
+/* Properties rail: the issue page component (.idp-side); here it is a flex column of the detail body and scrolls on its own. */
+.inbox-detail .inbox-props { flex:0 0 var(--idp-side-min); overflow-y:auto; }
+@media (max-width:1180px) { .inbox-detail .idp-main { padding:24px 24px 40px; } }
 /* Review 20:00 (#288): Linear inbox list width. */
 .inbox-wrap .inbox { flex:0 0 clamp(360px, 32%, 520px); width:clamp(360px, 32%, 520px); min-width:0; max-width:none; }
 /* <=900px: the list takes the row, the preview pane hides (Enter / double-click opens the issue). The later .inbox-detail{display:flex} used to win and leave a 1px pane. */
@@ -104,3 +102,8 @@
 .nrow .cb.rowsel { width:14px; height:14px; }
 .nrow .cb.rowsel[data-checked]::after { left:3.5px; top:1px; width:3.5px; height:7px; }
 .cb.rowsel { display:block; box-sizing:border-box; cursor:pointer; }
+/* The rail's controls get the same base look as under `.idp` (issue-detail.css); the .idp-side rules then make them borderless. */
+.inbox-props button, .inbox-props input[type=date] { background:transparent; color:var(--fg); border:1px solid var(--line); border-radius:var(--r-sm); padding:3px 8px; font:inherit; cursor:pointer; }
+.inbox-props button:hover:not(:disabled) { background:var(--hover); }
+.inbox-props button:disabled, .inbox-props input:disabled { cursor:default; }
+.inbox-props button:focus-visible, .inbox-props input:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }

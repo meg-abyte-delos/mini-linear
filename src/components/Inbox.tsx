@@ -4,11 +4,13 @@ import { NARROW_MQ } from '@/lib/breakpoints';
 import { Button, CheckMark, EmptyState, IconButton, Kbd, Menu } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { IssueActivity } from '@/components/IssueDetail';
+import { IssueProperties } from '@/components/IssueProperties';
+import type { Person } from '@/lib/people';
 import '@/app/ui-inbox-activity.css';
-import { Avatar, PriorityIcon, StatusIcon } from '@/components/icons';
+import { Avatar, StatusIcon } from '@/components/icons';
 import { hueFor, initialsOf } from '@/lib/member-hue';
 import { personName } from '@/lib/nl-people';
-import { PRIORITY_LABEL, STATUS_LABEL, type Issue, type Status } from '@/lib/issues';
+import { STATUS_LABEL, type Issue, type Meta, type Status } from '@/lib/issues';
 import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type InboxAction, type InboxClient, type InboxTab, type Notif } from '@/lib/inbox-client';
 
 /**
@@ -16,10 +18,10 @@ import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type I
  * Tabs All/Unread/Archived/Snoozed, bulk read/archive on checked rows.
  * Keys: j/k move, x check, e archive, u toggle read, s snooze menu (1-3 pick a preset), h snooze until tomorrow, Enter open issue, Esc closes menus.
  */
-/** Optional name lookups so the detail pane can show properties like Linear's issue sidebar. */
-export interface InboxLookup { person: (id: string | null) => string | undefined; label: (id: string) => { name: string; hue: string } | undefined; project: (id: string | null) => string | undefined }
+/** What the detail pane needs to show and edit the issue Properties rail (same component as the issue page). Without it the rail is read-only status only. */
+export interface InboxProps { meta: Meta; people: readonly Person[]; today: string; onUpdate: (issueId: string, patch: Partial<Issue>) => void }
 
-export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, refreshKey = 0, readOnly = false }: { client: InboxClient; readOnly?: boolean; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; lookup?: InboxLookup; slug?: string; refreshKey?: number }) {
+export function Inbox({ client, onUnread, onOpenIssue, getIssue, props, slug, refreshKey = 0, readOnly = false }: { client: InboxClient; readOnly?: boolean; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; props?: InboxProps; slug?: string; refreshKey?: number }) {
   const [tab, setTab] = useState<InboxTab>('all');
   const [items, setItems] = useState<Notif[] | null>(null);
   const [err, setErr] = useState(false);
@@ -187,18 +189,13 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
                   {selIssue.description.trim() ? <Markdown source={selIssue.description} /> : <p className='md-empty'>No description.</p>}
                 </section>
               )}
-              {slug && sel.issue && <IssueActivity key={sel.issue_id} slug={slug} issueId={sel.issue_id} identifier={sel.issue.identifier} readOnly={readOnly} />}
+              {slug && sel.issue && <IssueActivity key={sel.issue_id} refreshKey={selIssue?.version ?? 0} slug={slug} issueId={sel.issue_id} identifier={sel.issue.identifier} readOnly={readOnly} />}
             </article>
-            <dl className='idp-props' aria-label='Properties'>
-              {sel.issue && <><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></>}
-              {selIssue && <><dt>Priority</dt><dd><span className='idp-val'><PriorityIcon priority={selIssue.priority} />{PRIORITY_LABEL[selIssue.priority]}</span></dd></>}
-              {selIssue && lookup && <><dt>Assignee</dt><dd>{lookup.person(selIssue.assignee_id) ?? 'Unassigned'}</dd></>}
-              {selIssue && lookup && selIssue.label_ids.length > 0 && <><dt>Labels</dt><dd className='idp-labels'>{selIssue.label_ids.map((l) => { const lb = lookup.label(l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</dd></>}
-              {selIssue && lookup && <><dt>Project</dt><dd>{lookup.project(selIssue.project_id) ?? 'No project'}</dd></>}
-              <dt>Event</dt><dd>{whoLabel(sel)}</dd>
-              <dt>When</dt><dd title={new Date(sel.created_at).toLocaleString()}>{shortWhen(sel.created_at)}</dd>
-              {sel.snoozed_until && <><dt>Snoozed until</dt><dd>{shortWhen(sel.snoozed_until)}</dd></>}
-            </dl>
+            <div className='idp-side inbox-props' role='complementary' aria-label='Properties'>
+              {selIssue && props ? <IssueProperties issue={selIssue} meta={props.meta} people={props.people} readOnly={readOnly} today={props.today} onChange={(patch) => props.onUpdate(selIssue.id, patch)} />
+                : sel.issue && <section className='side-group'><dl><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></dl></section>}
+              {sel.snoozed_until && <section className='side-group'><dl><dt>Snoozed until</dt><dd>{shortWhen(sel.snoozed_until)}</dd></dl></section>}
+            </div>
           </div>
         </aside>
       )}

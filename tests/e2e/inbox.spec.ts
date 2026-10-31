@@ -131,20 +131,19 @@ test('shell: the List/Board toggle is hidden on Inbox, Cycles and Projects', asy
   await expect(page.getByRole('group', { name: 'View', exact: true })).toBeVisible();
 });
 
-test('inbox: detail shows a status pill, a short date, a ghost Open issue, and titles carry a tooltip', async ({ page }) => {
+test('inbox: detail shows the issue Properties rail (no Event/When rows), a ghost Open issue, and titles carry a tooltip', async ({ page }) => {
   await page.goto('/?view=inbox');
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByRole('option').first()).toBeVisible();
   const detail = page.getByRole('complementary', { name: 'Notification detail' });
-  // never the raw snake_case enum
-  const pill = detail.locator('.inbox-status');
-  await expect(pill).toBeVisible();
-  await expect(pill.locator('svg.si')).toHaveCount(1);
-  await expect(pill).not.toContainText('_');
-  await expect(pill).toHaveText(/^(Backlog|Todo|In progress|In review|Done|Canceled)$/i);
-  // short date, not toLocaleString (30/10/2026, 10:00:00)
-  const when = await detail.getByText('When', { exact: true }).locator('xpath=following-sibling::dd[1]').textContent();
-  expect(when).toMatch(/^(just now|\d+[mh] ago|[A-Z][a-z]{2} \d{1,2}(, \d{4})?, \d{2}:\d{2})$/);
+  // Linear's rail: the issue page's Properties component, with no Event / When rows (the event is in the row and the activity)
+  const rail = detail.getByRole('complementary', { name: 'Properties' });
+  await expect(rail.getByRole('heading')).toHaveText(['Properties', 'Planning', 'Organization']);
+  await expect(rail.locator('dt')).not.toContainText(['Event', 'When']);
+  const statusBtn = rail.getByRole('button', { name: /^(Backlog|Todo|In progress|In review|Done|Canceled)$/i });
+  await expect(statusBtn).toBeVisible();
+  await expect(statusBtn.locator('svg.si')).toHaveCount(1); // never the raw snake_case enum
+  await expect(statusBtn).not.toContainText('_');
   // Open issue is the first action, ghost (Linear has no primary button in this header)
   const first = detail.getByRole('toolbar', { name: 'Notification actions' }).getByRole('button').first();
   await expect(first).toHaveText('Open issue');
@@ -226,4 +225,37 @@ test('inbox: opened directly, the sidebar marks Inbox and no Issues link', async
   await page.waitForSelector('html[data-ready]');
   const side = page.getByRole('complementary', { name: 'Sidebar' });
   await expect(side.locator('a.side-link[aria-current="page"]')).toHaveText([/Inbox/]);
+});
+
+test('inbox: the Properties rail edits the issue; the list row follows and a reload keeps it', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  const detail = page.getByRole('complementary', { name: 'Notification detail' });
+  const rail = detail.getByRole('complementary', { name: 'Properties' });
+  await rail.getByRole('button', { name: /^(Backlog|Todo|In progress|In review|Done|Canceled)$/i }).click();
+  await page.getByRole('combobox', { name: /Change status/ }).fill('done');
+  await page.keyboard.press('Enter');
+  await expect(rail.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+  await expect(page.getByRole('option').first().locator('.nstatus')).toHaveAttribute('data-status', 'done');
+  await page.reload();
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('complementary', { name: 'Notification detail' }).getByRole('complementary', { name: 'Properties' }).getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+});
+
+test('inbox: editing the rail keeps an unsent comment draft', async ({ page }) => {
+  await page.goto('/?view=inbox');
+  await page.waitForSelector('html[data-ready]');
+  const detail = page.getByRole('complementary', { name: 'Notification detail' });
+  const box = detail.getByRole('textbox', { name: 'Leave a comment' });
+  await box.fill('draft that must survive');
+  // Mark the node: a remount (sessionStorage restoring the text) would drop the marker.
+  await box.evaluate((el) => { (el as HTMLElement).dataset.sameNode = '1'; });
+  const rail = detail.getByRole('complementary', { name: 'Properties' });
+  await rail.getByRole('button', { name: /^(Backlog|Todo|In progress|In review|Done|Canceled)$/i }).click();
+  await page.getByRole('combobox', { name: /Change status/ }).fill('done');
+  await page.keyboard.press('Enter');
+  await expect(rail.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+  const after = detail.getByRole('textbox', { name: 'Leave a comment' });
+  await expect(after).toHaveValue('draft that must survive');
+  await expect(after).toHaveAttribute('data-same-node', '1');
 });
