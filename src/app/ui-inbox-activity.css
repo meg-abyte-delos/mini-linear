@@ -55,3 +55,8 @@
 /* Hover actions overlay the right of the header instead of reserving width the name needs. */
 .inbox-activity .cmt header { position:relative }
 .inbox-activity .cmt header .cmt-actions { position:absolute;right:0;top:50%;transform:translateY(-50%);background:var(--panel);border-radius:var(--r-btn) }
+/* Hidden hover actions must not swallow clicks; on thread roots they sit left of the Resolve/Reopen menu, which aligns right like on the issue page. */
+.inbox-activity .cmt header .cmt-actions { pointer-events:none }
+.inbox-activity .cmt:hover header .cmt-actions, .inbox-activity .cmt:focus-within header .cmt-actions { pointer-events:auto }
+.inbox-activity .cmt header .thread-menu { margin-left:auto;display:inline-flex }
+.inbox-activity .cmt header:has(.thread-menu) .cmt-actions { right:calc(24px + var(--sp-1)) }
