@@ -920,7 +920,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               </span>
             ))}
             <div className='fwrap'>
-              <button id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></button>
+              <Button variant='ghost' size={24} id='fb-add' className='tb-btn' aria-haspopup='menu' aria-expanded={tbMenu === 'filter'} onClick={() => setTbMenu(tbMenu === 'filter' ? null : 'filter')}><Icon name='filter' /><span>Filter</span></Button>
               {tbMenu === 'filter' && <FilterMenu filters={filters} onClose={() => { setTbMenu(null); document.getElementById('fb-add')?.focus(); }} onPick={(k) => { const r = document.getElementById('fb-add')?.getBoundingClientRect() ?? null; setTbMenu(null); setFilterPick({ kind: k, rect: r }); }} />}
             </div>
             {activeCount(filters) > 0 && <Button variant='ghost' size={24} onClick={() => setFilters(emptyFilters())}>Clear filters</Button>}
@@ -936,7 +936,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
             )}
             {(view === 'list' || view === 'board') && (
               <div className='tb-right'>
-                <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></button>
+                <Button variant='ghost' size={24} id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></Button>
                 {tbMenu === 'display' && (
                   <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
                     {view === 'list' && <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><DisplayPick label='Grouping' autoFocus value={grouping} labels={GROUPING_LABEL} onChange={setGrouping} /></div>}
