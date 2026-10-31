@@ -204,4 +204,6 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `POST /api/v1/auth/password-reset/confirm` | public | - | - | - | public, one-time token |
 | `POST /api/v1/auth/logout` | public | - | - | - | ends the caller own session; harmless without one |
 | `POST /api/v1/auth/logout-all` | public | - | - | - | ends all sessions of the caller; harmless without one |
+| `POST /api/v1/w/{slug}/settings/logo` | own-suite | - | - | - | admin/owner only (403 member/guest, 404 non-member); multipart body the JSON harness cannot send; suite settings-workspace-logo |
+| `GET /api/v1/w/{slug}/settings/logo` | own-suite | - | - | - | any member (404 non-member, 404 when no logo); suite settings-workspace-logo |
 | `POST /api/v1/integrations/github/webhook/{connectionId}` | signed | - | - | - | authenticated by the HMAC signature of the connection secret; suite a9-github |

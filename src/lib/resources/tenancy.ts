@@ -7,6 +7,7 @@ import { uuidv7 } from "../uuid7";
 import { recordAudit } from "../audit";
 import { hashToken, newToken } from "../auth/tokens";
 import { sendMail } from "../auth/mail";
+import { logoDto } from "./workspace-logo";
 import { type Row, audit, listPage, afterId, assertTeamAdmin } from "./common";
 
 const emailS = z.string().trim().toLowerCase().email().max(254);
@@ -42,7 +43,7 @@ export const getWorkspace = (req: Request, slug: string) => withWorkspaceCtx(req
 export const getWorkspaceSettings = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
   const r = await ctx.tx<Row[]>`select id, slug, name, logo_url from get_workspace_settings()`;
   if (!r[0]) throw new ApiError("not_found");
-  return Response.json({ ...r[0], role: ctx.role });
+  return Response.json({ ...logoDto(r[0]), role: ctx.role });
 });
 const logoS = z.union([z.literal(""), z.string().trim().max(2048).url().refine((u) => u.startsWith("https://"), "logo_url must be https")]);
 export const patchWorkspaceSettings = (req: Request, slug: string) => withWorkspaceCtx(req, slug, async (ctx) => {
@@ -54,8 +55,9 @@ export const patchWorkspaceSettings = (req: Request, slug: string) => withWorksp
   const after = r[0]!;
   const diff: Record<string, { before: unknown; after: unknown }> = {};
   for (const k of ["name", "slug", "logo_url"] as const) if (before[k] !== after[k]) diff[k] = { before: before[k], after: after[k] };
+  if (b.logo_url !== undefined) await ctx.tx`delete from workspace_logos`; // an external URL (or "") replaces any uploaded logo
   if (Object.keys(diff).length) await audit(ctx, "workspace", ctx.workspaceId, "update", diff);
-  return Response.json({ ...after, role: ctx.role });
+  return Response.json({ ...logoDto(after), role: ctx.role });
 });
 
 // ---------------------------------------------------------------- members

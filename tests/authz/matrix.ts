@@ -212,7 +212,7 @@ export { ROLES };
  * Routes outside /w/{slug}: authenticated-user routes (session cookie only; a bearer API key is 401) and public routes.
  * `auth` = status per caller class: session (any signed-in user, whatever their workspace role), key (any API key), anon.
  */
-export type GlobalRow = { m: Method; path: string; kind: 'session' | 'public' | 'signed'; session?: number; key?: number; anon?: number; body?: unknown; note: string };
+export type GlobalRow = { m: Method; path: string; kind: 'session' | 'public' | 'signed' | 'own-suite'; session?: number; key?: number; anon?: number; body?: unknown; note: string };
 export const GLOBAL_ROWS: GlobalRow[] = [
   { m: 'GET', path: '/api/v1/me', kind: 'session', session: 200, key: 401, anon: 401, note: 'own profile; no id in the path' },
   { m: 'PATCH', path: '/api/v1/me', kind: 'session', session: 200, key: 401, anon: 401, body: { display_name: 'Fixture' }, note: 'own profile only' },
@@ -226,6 +226,8 @@ export const GLOBAL_ROWS: GlobalRow[] = [
   { m: 'POST', path: '/api/v1/auth/password-reset/confirm', kind: 'public', note: 'public, one-time token' },
   { m: 'POST', path: '/api/v1/auth/logout', kind: 'public', note: 'ends the caller own session; harmless without one' },
   { m: 'POST', path: '/api/v1/auth/logout-all', kind: 'public', note: 'ends all sessions of the caller; harmless without one' },
+  { m: 'POST', path: '/api/v1/w/{slug}/settings/logo', kind: 'own-suite', note: 'admin/owner only (403 member/guest, 404 non-member); multipart body the JSON harness cannot send; suite settings-workspace-logo' },
+  { m: 'GET', path: '/api/v1/w/{slug}/settings/logo', kind: 'own-suite', note: 'any member (404 non-member, 404 when no logo); suite settings-workspace-logo' },
   { m: 'POST', path: '/api/v1/integrations/github/webhook/{connectionId}', kind: 'signed', note: 'authenticated by the HMAC signature of the connection secret; suite a9-github' },
 ];
 export const normPath = (p: string) => p.replace(/\{[A-Za-z0-9]+\}|\[[A-Za-z0-9]+\]/g, '{}');
