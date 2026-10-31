@@ -1,5 +1,7 @@
 'use client';
 
+import { Button, IconButton } from '@/components/ui';
+
 export type BulkKind = 'status' | 'priority' | 'assignee' | 'label' | 'project' | 'cycle';
 
 // 16px stroke glyphs, same grid as icons.tsx (kept local so this item does not touch the shared icon set).
@@ -26,19 +28,19 @@ export function SelectionBar({ count, canUndo, openKind = null, onAction, onUndo
   return (
     <div className='selbar' role='toolbar' aria-label={`Bulk actions for ${count} selected issues`}>
       <span className='selbar-count' aria-live='polite'>{count} selected</span>
-      <button className='selbar-x' aria-label='Clear selection' aria-keyshortcuts='Escape' title='Clear selection (Esc)' onClick={onClear}>
+      <IconButton className='selbar-x' size={24} label='Clear selection' aria-keyshortcuts='Escape' title='Clear selection (Esc)' onClick={onClear}>
         <svg width='12' height='12' viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.6' strokeLinecap='round' aria-hidden='true' focusable='false'><path d='M4 4l8 8M12 4l-8 8' /></svg>
-      </button>
+      </IconButton>
       <span className='selbar-sep' aria-hidden='true' />
       {ACTIONS.map((a) => (
-        <button key={a.kind} id={`sb-${a.kind}`} aria-haspopup='dialog' aria-expanded={openKind === a.kind}
+        <Button key={a.kind} variant='ghost' id={`sb-${a.kind}`} aria-haspopup='dialog' aria-expanded={openKind === a.kind}
           aria-keyshortcuts={a.key} title={a.key ? `${a.label} (${a.key})` : a.label}
           onClick={(e) => onAction(a.kind, e.currentTarget.getBoundingClientRect())}>
           <Glyph d={GLYPH[a.kind]} /><span>{a.label}</span>{a.key && <kbd aria-hidden='true'>{a.key}</kbd>}
-        </button>
+        </Button>
       ))}
-      {onDelete && <><span className='selbar-sep' aria-hidden='true' /><button className='selbar-del' id='sb-delete' aria-haspopup='dialog' aria-keyshortcuts='Delete' title='Delete (#)' onClick={onDelete}><span>Delete</span><kbd aria-hidden='true'>#</kbd></button></>}
-      {canUndo && <><span className='selbar-sep' aria-hidden='true' /><button className='selbar-undo' aria-keyshortcuts='Control+Z' onClick={onUndo}>Undo</button></>}
+      {onDelete && <><span className='selbar-sep' aria-hidden='true' /><Button variant='ghost' className='selbar-del' id='sb-delete' aria-haspopup='dialog' aria-keyshortcuts='Delete' title='Delete (#)' onClick={onDelete}><span>Delete</span><kbd aria-hidden='true'>#</kbd></Button></>}
+      {canUndo && <><span className='selbar-sep' aria-hidden='true' /><Button variant='ghost' className='selbar-undo' aria-keyshortcuts='Control+Z' onClick={onUndo}>Undo</Button></>}
     </div>
   );
 }
