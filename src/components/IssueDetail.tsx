@@ -15,7 +15,7 @@ import { participants, repliesLabel, repliesOf, threadOpen } from '@/lib/detail/
 import { createIssue, patchIssue } from '@/lib/api-client';
 import { listTeams } from '@/lib/settings-client';
 import { detailApi, reactedBy, type Attachment, type Comment, type Relation, type ActivityItem } from '@/lib/detail/api';
-import { statusOf } from '@/lib/detail/activity-status';
+import { splitStatusSummary } from '@/lib/detail/activity-status';
 import { branchName, identifierOf, issueUrl, progress } from '@/lib/detail/issue-meta';
 import { activeMention, insertMention, suggest, type MentionUser } from '@/lib/detail/mentions';
 import { safeHref } from '@/lib/detail/markdown';
@@ -458,11 +458,14 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
 }
 
 function ActivityEvent({ at, actor }: { at: ActivityItem; actor: Person | undefined }) {
-  const st = statusOf(at);
+  const text = at.summary ?? at.action;
+  const sp = /^created/.test(text) ? null : splitStatusSummary(text);
   return (
     <li className='ev'>
       <span className='ev-lead' aria-hidden='true'>{actor ? <Avatar initials={actor.initials} hue={actor.hue} /> : <span className='dot' />}</span>
-      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span> {st && !/^created/.test(at.summary ?? at.action) && <span className='ev-status'><StatusIcon status={st} /></span>}{at.summary ?? at.action}<span className='ev-sep' aria-hidden='true'> · </span><Age iso={at.created_at} /></span>
+      <span className='ev-text'><span className='who'>{actor?.name ?? 'Someone'}</span>{' '}{sp
+        ? <>{sp.lead}{sp.from ? <>from{' '}<span className='ev-status'><StatusIcon status={sp.from} /></span>{sp.fromText} to{' '}</> : <>to{' '}</>}<span className='ev-status'><StatusIcon status={sp.to} /></span>{sp.toText}{sp.tail}</>
+        : text}<span className='ev-sep' aria-hidden='true'> · </span><Age iso={at.created_at} /></span>
     </li>
   );
 }
