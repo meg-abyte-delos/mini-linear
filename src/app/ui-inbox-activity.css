@@ -60,3 +60,5 @@
 .inbox-activity .cmt:hover header .cmt-actions, .inbox-activity .cmt:focus-within header .cmt-actions { pointer-events:auto }
 .inbox-activity .cmt header .thread-menu { margin-left:auto;display:inline-flex }
 .inbox-activity .cmt header:has(.thread-menu) .cmt-actions { right:calc(24px + var(--sp-1)) }
+/* touch: no hover, so comment actions stay visible */
+@media (hover: none) { .inbox-activity .cmt header .cmt-actions { opacity:1;pointer-events:auto } }
