@@ -70,6 +70,17 @@ test('visual: cycles', async ({ page }) => {
   await check(page, 'cycles');
 });
 
+test('visual: new issue modal', async ({ page }) => {
+  await ready(page, `/?${TODAY}`, () => expect(page.getByRole('option').first()).toBeVisible());
+  await page.keyboard.press('c');
+  const dlg = page.getByRole('dialog', { name: 'New issue' });
+  await expect(dlg).toBeVisible();
+  await expect(dlg.getByRole('textbox', { name: 'Issue title' })).toBeFocused(); // caret hidden, focus ring settled
+  await settled(page);
+  await page.mouse.move(0, 0);
+  await check(page, 'new-issue', [page.locator('.date')]); // list dates behind the overlay = seed day: masked like list
+});
+
 test.describe('inbox', () => {
   test.use({ storageState: INBOX_STATE });
   test('visual: inbox', async ({ page }) => {
