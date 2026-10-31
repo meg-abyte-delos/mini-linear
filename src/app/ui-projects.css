@@ -64,3 +64,4 @@
 @media (prefers-reduced-motion: reduce) { .cycles .project.pj-row, .cycles .project.pj-row .pj-actions { transition:none; } }
 [data-theme='light'] .pj-track { fill:color-mix(in srgb, var(--fg) 14%, transparent); }
 @media (prefers-color-scheme: light) { html:not([data-theme]) .pj-track { fill:color-mix(in srgb, var(--fg) 14%, transparent); } }
+.pj-ic { flex:none; display:inline-grid; place-items:center; color:var(--muted); }
