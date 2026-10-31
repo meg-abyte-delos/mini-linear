@@ -507,7 +507,7 @@ function CommentItem({ c, replies, onReact, onReply, onEdit, onDelete, onResolve
   const people3 = participants(c, replies).slice(0, 3);
   const one = (x: Comment, root: boolean) => (
     <article className='cmt' aria-label={`Comment by ${who(x.author_id)?.name ?? 'Someone'}`}>
-      <header>{(() => { const u = who(x.author_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}<span className='who'>{who(x.author_id)?.name ?? 'Someone'}</span> <Age iso={x.created_at} />{x.edited_at && <span className='dim'> (edited)</span>}
+      <header>{(() => { const u = who(x.author_id); return u ? <Avatar initials={u.initials} hue={u.hue} /> : null; })()}<span className='who' title={who(x.author_id)?.name ?? 'Someone'}>{who(x.author_id)?.name ?? 'Someone'}</span> <Age iso={x.created_at} />{x.edited_at && <span className='dim'> (edited)</span>}
         {root && resolved && <span className='thread-resolved' title={resolver ? `Resolved by ${resolver}` : undefined}><Chip tone='accent'>Resolved</Chip></span>}
         {!readOnly && editing !== x.id && (canEdit(x) || canDelete(x)) && <span className='cmt-actions'>{canEdit(x) && <Button variant='ghost' size={24} aria-label='Edit comment' onClick={() => setEditing(x.id)}>Edit</Button>}{canDelete(x) && <Button variant='ghost' size={24} tone='danger' aria-label='Delete comment' onClick={() => onDelete(x)}>Delete</Button>}</span>}
         {root && !readOnly && canResolve && <span className='thread-menu'><IconButton label={resolved ? 'Reopen thread' : 'Resolve thread'} size={24} onClick={() => { onResolve(c, !resolved); setPref(null); }}><Icon name='checkSquare' size={16} /></IconButton></span>}</header>

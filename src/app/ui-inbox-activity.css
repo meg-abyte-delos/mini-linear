@@ -49,3 +49,9 @@
 .inbox-activity .cmt-actions { gap:2px }
 .inbox-activity .reacts .react { gap:3px;min-width:24px;justify-content:center;padding:0 6px;border-radius:var(--r-btn);color:var(--muted-strong) }
 .inbox-activity .reacts .react.on { background:var(--sel);border-color:color-mix(in srgb,var(--accent) 45%,transparent);color:var(--fg) }
+/* Narrow pane: author name stays on one line and truncates; avatar, time and actions never shrink. */
+.inbox-activity .cmt header .who { min-width:0;flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.inbox-activity .cmt header > :not(.who) { flex:none }
+/* Hover actions overlay the right of the header instead of reserving width the name needs. */
+.inbox-activity .cmt header { position:relative }
+.inbox-activity .cmt header .cmt-actions { position:absolute;right:0;top:50%;transform:translateY(-50%);background:var(--panel);border-radius:var(--r-btn) }
