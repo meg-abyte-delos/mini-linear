@@ -18,7 +18,7 @@ import { TABS, groupByIssue, relTime, shortWhen, whoLabel, snoozePresets, type I
 /** Optional name lookups so the detail pane can show properties like Linear's issue sidebar. */
 export interface InboxLookup { person: (id: string | null) => string | undefined; label: (id: string) => { name: string; hue: string } | undefined; project: (id: string | null) => string | undefined }
 
-export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, refreshKey = 0 }: { client: InboxClient; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; lookup?: InboxLookup; slug?: string; refreshKey?: number }) {
+export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, refreshKey = 0, readOnly = false }: { client: InboxClient; readOnly?: boolean; onUnread: (n: number) => void; onOpenIssue?: (issueId: string) => void; getIssue?: (issueId: string) => Issue | undefined; lookup?: InboxLookup; slug?: string; refreshKey?: number }) {
   const [tab, setTab] = useState<InboxTab>('all');
   const [items, setItems] = useState<Notif[] | null>(null);
   const [err, setErr] = useState(false);
@@ -165,7 +165,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
                   {selIssue.description.trim() ? <Markdown source={selIssue.description} /> : <p className='md-empty'>No description.</p>}
                 </section>
               )}
-              {slug && sel.issue && <IssueActivity key={sel.issue_id} slug={slug} issueId={sel.issue_id} identifier={sel.issue.identifier} />}
+              {slug && sel.issue && <IssueActivity key={sel.issue_id} slug={slug} issueId={sel.issue_id} identifier={sel.issue.identifier} readOnly={readOnly} />}
             </article>
             <dl className='idp-props' aria-label='Properties'>
               {sel.issue && <><dt>Status</dt><dd><span className='pill inbox-status' data-status={sel.issue.status}><StatusIcon status={sel.issue.status as Status} />{STATUS_LABEL[sel.issue.status as Status] ?? sel.issue.status}</span></dd></>}
