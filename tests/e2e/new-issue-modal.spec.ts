@@ -226,3 +226,21 @@ test('a lone slash in the description opens the bar and stays in the text', asyn
   await expect(m.getByRole('toolbar', { name: 'Description formatting' })).toHaveCount(0);
   await expect(ed).toHaveText('/x');
 });
+
+test('the header has the team icon on the chip, an Expand toggle and Close; Expand widens the dialog', async ({ page }) => {
+  await page.keyboard.press('c');
+  const m = modal(page);
+  await expect(m).toBeVisible();
+  await expect(m.locator('.ni-team svg.ic')).toHaveCount(1);
+  const w0 = (await m.boundingBox())!.width;
+  const expand = m.getByRole('button', { name: 'Expand' });
+  await expect(expand).toHaveAttribute('aria-pressed', 'false');
+  await expect(m.getByRole('button', { name: 'Close' })).toBeVisible();
+  await expand.click();
+  await expect(m.getByRole('button', { name: 'Collapse' })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await m.boundingBox())!.width).toBeGreaterThan(w0 + 100);
+  await page.keyboard.press('Escape');
+  await expect(m).toBeHidden();
+  await page.keyboard.press('c'); // reopens collapsed
+  await expect(modal(page).getByRole('button', { name: 'Expand' })).toBeVisible();
+});
