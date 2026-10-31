@@ -198,11 +198,11 @@ test('Display: Ordering Priority puts Urgent before Low/none inside a group; Cre
   await expect(dlg.getByLabel('Ordering')).toHaveAttribute('data-value', 'manual');
 });
 
-test('Display button only exists in list view (not board)', async ({ page }) => {
+test('Display button exists in list and board views', async ({ page }) => {
   await home(page);
   await expect(page.locator('#fb-display')).toBeVisible();
   await page.getByRole('button', { name: 'Board', exact: true }).click();
-  await expect(page.locator('#fb-display')).toHaveCount(0);
+  await expect(page.locator('#fb-display')).toBeVisible();
   await expect(page.locator('#fb-add')).toBeVisible();
 });
 
