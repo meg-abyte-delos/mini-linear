@@ -116,6 +116,7 @@ const PALETTE_ICON: Record<string, IconName> = {
 };
 function paletteIcon(id: string) {
   if (id.startsWith('move-')) { const st = id.slice(5); if ((STATUSES as readonly string[]).includes(st)) return <StatusIcon status={st as Status} />; }
+  if (id === 'status') return <StatusIcon status='in_progress' />; // Cycle status: status glyph, distinct from Go to cycles
   if (id.startsWith('hit-')) return <Icon name='issues' />;
   if (id.startsWith('filter-')) return <Icon name='filter' />;
   return <Icon name={PALETTE_ICON[id] ?? 'arrowRight'} />;

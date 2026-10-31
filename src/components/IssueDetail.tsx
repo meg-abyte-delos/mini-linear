@@ -538,7 +538,7 @@ function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = ''
   async function submit() { const b = text.trim(); if (!b) return; if (await onSubmit(b)) { if (!initial) { setText(''); setCaret(0); } } }
   return (
     <div className={inline ? 'composer composer-inline' : 'composer'}>
-      <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}…`} rows={3} value={text}
+      <textarea ref={ref} autoFocus={autoFocus} aria-label={label} placeholder={`${label}…`} title='@ to mention, ⌘↵ to send' rows={3} value={text}
         role='combobox' aria-expanded={list.length > 0} aria-controls={list.length > 0 ? listId : undefined} aria-autocomplete='list' aria-activedescendant={list[idx] ? `${listId}-${list[idx].id}` : undefined}
         onChange={(e) => { setText(e.target.value); setCaret(e.target.selectionStart); setSel(0); }}
         onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
@@ -553,7 +553,7 @@ function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = ''
           if (e.key === 'Escape' && onCancel) onCancel();
         }} />
       {list.length > 0 && <ul id={listId} role='listbox' aria-label='Mention a teammate' className='mention-list'>{list.map((u, k) => <li key={u.id} id={`${listId}-${u.id}`} role='option' aria-selected={k === idx} onMouseDown={(e) => { e.preventDefault(); choose(u); }}>{u.name} <span className='dim'>@{u.handle}</span></li>)}</ul>}
-      {inline ? <div className='composer-tools'><button type='button' className='composer-ic' aria-label='Attach link' title='Attach link' onClick={onAttach}><Icon name='attach' size={16} /></button><button type='button' className='composer-ic composer-send' aria-label='Comment' title='Comment' disabled={!text.trim()} onClick={() => void submit()}><Icon name='send' size={16} /></button></div>
+      {inline ? <div className='composer-tools'><button type='button' className='composer-ic' aria-label='Attach link' title='Attach link' onClick={onAttach}><Icon name='attach' size={16} /></button><button type='button' className='composer-ic composer-send' aria-label='Comment' title='Comment (⌘↵)' disabled={!text.trim()} onClick={() => void submit()}><Icon name='send' size={16} /></button></div>
         : <div className='composer-actions'>{onCancel && <button className='btn' data-variant='ghost' onClick={onCancel}>Cancel</button>}<button className='btn' data-variant='primary' disabled={!text.trim()} onClick={() => void submit()}>{submitLabel ?? (label === 'Reply' ? 'Reply' : 'Comment')}</button></div>}
     </div>
   );

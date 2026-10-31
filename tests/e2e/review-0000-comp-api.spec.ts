@@ -40,3 +40,27 @@ test('Cmd+K with an empty query: Create issue first, Help group last, one icon p
   for (const l of ['Select / unselect', 'Set status', 'Set priority', 'Set assignee', 'Set label']) expect(byLabel(l), l).not.toContain('M22 12h-6l-2 3h-4');
   expect(new Set([byLabel('Set priority'), byLabel('Set assignee'), byLabel('Set label'), byLabel('Keyboard shortcuts')]).size).toBe(4);
 });
+
+for (const width of [1280, 768]) {
+  test(`composer tools stay inside the box at ${width}px, empty and full, with the shortcut hint`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 900 });
+    const issue = await apiCreateIssue(page, `composer-w${width}-${Date.now()}`);
+    await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
+    await page.waitForSelector('html[data-ready]');
+    const box = page.getByRole('combobox', { name: 'Leave a comment' });
+    await expect(box).toHaveAttribute('title', '@ to mention, ⌘↵ to send');
+    const send = page.getByRole('button', { name: 'Comment', exact: true });
+    await expect(send).toHaveAttribute('title', 'Comment (⌘↵)');
+    const inside = async () => {
+      const b = (await box.boundingBox())!; const s = (await send.boundingBox())!;
+      expect(s.y).toBeGreaterThanOrEqual(b.y); expect(s.y + s.height).toBeLessThanOrEqual(b.y + b.height + 1);
+      expect(s.x + s.width).toBeLessThanOrEqual(b.x + b.width + 1);
+    };
+    await inside();
+    await box.scrollIntoViewIfNeeded();
+    await page.locator('.composer-inline').first().screenshot({ path: `/workspace/shots/nits-composer-${width}-empty.png` });
+    await box.fill(Array.from({ length: 12 }, (_, k) => `line ${k} of a long comment`).join('\n'));
+    await inside();
+    await page.locator('.composer-inline').first().screenshot({ path: `/workspace/shots/nits-composer-${width}-full.png` });
+  });
+}

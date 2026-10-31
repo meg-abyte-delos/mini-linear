@@ -78,6 +78,6 @@
 .composer-ic{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:var(--r-md);background:transparent;color:var(--fg);cursor:pointer}
 .composer-ic:hover:not(:disabled){background:color-mix(in srgb,var(--fg) 8%,transparent)}
 .composer-ic:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.composer-send:not(:disabled){background:var(--accent);color:#fff}
+.composer-send:not(:disabled){background:var(--accent);color:var(--accent-fg)}
 .composer-send:disabled{opacity:.4;cursor:default}
 .idp-sec[aria-labelledby=h-act]>.composer-inline .composer-tools{bottom:calc(var(--sp-3) + var(--sp-2))}
