@@ -10,12 +10,15 @@ test('settings page: left nav, primitives, delete team confirms in a dialog, axe
   const nav = page.getByRole('navigation', { name: 'Settings' });
   await expect(nav.getByRole('link', { name: 'General' })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('link', { name: 'Members' })).toHaveAttribute('href', '/w/demo/members');
-  await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
   // Content is a centered column no wider than 720px next to the 220px nav.
   const wrap = await page.locator('.set-wrap').boundingBox();
   expect(wrap!.width).toBeLessThanOrEqual(720);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
-  // Create a throwaway team, then delete it through the confirm dialog (no window.confirm).
+  // Teams live on their own page; create a throwaway team, then delete it through the confirm dialog (no window.confirm).
+  await nav.getByRole('link', { name: 'Teams', exact: true }).click();
+  await expect(page).toHaveURL(/\/w\/demo\/settings\/teams$/);
+  await expect(page.getByRole('heading', { name: 'Teams', level: 1 })).toBeVisible();
   await page.getByLabel('Team name').fill('Zeta Scratch');
   await page.getByRole('button', { name: 'Create team' }).click();
   await page.getByRole('button', { name: 'Delete team Zeta Scratch' }).click();
