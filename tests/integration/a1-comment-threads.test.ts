@@ -80,7 +80,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     await send(P.resolveComment as Fn, seed.a.admin, "POST", {}, seed.a.slug, root.id);
     expect((await (await send(P.unresolveComment as Fn, seed.a.member, "POST", {}, seed.a.slug, root.id)).json()).resolved_at).toBeNull();
     const au = await asOwner(seed.a.id, (tx) => tx`select action from audit_events where entity = 'comment' and entity_id = ${root.id} order by id`);
-    expect(au.map((r) => r.action)).toEqual(["create", "resolve", "resolve", "unresolve"]);
+    expect(au.map((r) => r.action)).toEqual(["create", "resolve", "unresolve", "resolve", "unresolve"]);
   });
 
   it("reactions: unique per user+emoji, idempotent add, own-only remove, aggregated on the comment, tenant isolated", async () => {
