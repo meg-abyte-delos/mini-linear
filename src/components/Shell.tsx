@@ -300,14 +300,30 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     return o.length === 1 ? o[0]!.label : `${o.length} selected`;
   }
   const [view, setViewState] = useState<View>(initialView);
-  // The view lives in the URL too (?view=board|cycles; list is the default and drops the param).
+  // The view lives in the URL too (?view=board|cycles; list is the default and drops the param). Inbox has its own path (/w/<slug>/inbox): entering and leaving it pushes a history entry, so Back returns to the previous view.
+  const INBOX_PATH = /^\/w\/[^/]+\/inbox$/;
   function setView(v: View) {
     if (v !== view) withViewTransition(() => setViewState(v)); else setViewState(v);
+    const onInboxPath = INBOX_PATH.test(window.location.pathname);
     const sp = new URLSearchParams(window.location.search);
-    if (v === 'list') sp.delete('view'); else sp.set('view', v);
+    sp.delete('view');
+    let path = window.location.pathname;
+    if (v === 'inbox' && api) path = `/w/${api.slug}/inbox`;
+    else { if (v !== 'list') sp.set('view', v); if (onInboxPath) path = '/'; }
     const qs = sp.toString().replace(/%2C/gi, ',');
-    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+    const url = `${path}${qs ? `?${qs}` : ''}${window.location.hash}`;
+    if (path !== window.location.pathname) window.history.pushState(null, '', url); else window.history.replaceState(null, '', url);
   }
+  // Back/Forward between those entries: derive the view from the URL (no URL write).
+  useEffect(() => {
+    const onPop = () => {
+      if (INBOX_PATH.test(window.location.pathname)) { setViewState('inbox'); return; }
+      const x = new URLSearchParams(window.location.search).get('view');
+      setViewState(x === 'board' || x === 'cycles' || x === 'projects' ? x : 'list');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [detailId, setDetailId] = useState<string | null>(null); // project detail page (API mode)
   const [selId, setSelId] = useState<string | null>(initialIssueId ?? null);
   // Inbox: HTTP in API mode, in-memory seed otherwise. The unread badge polls every 30s (API mode only).
