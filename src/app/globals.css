@@ -181,8 +181,9 @@ kbd { font:11px/1 'Inter Variable', Inter, sans-serif; color:var(--muted); backg
 .sv-tag { flex:0 0 auto; margin-left:auto; font-size:var(--fs-sm); color:var(--muted-strong); white-space:nowrap; }
 /* Linear-style: row actions overlay the right edge on hover/focus only, so the name keeps the full width. */
 .sv-acts { position:absolute; right:2px; top:50%; transform:translateY(-50%); display:flex; align-items:center; gap:2px; padding-left:6px; background:var(--hover); border-radius:4px; opacity:0; transition:opacity 120ms ease; }
-.sv-row:hover .sv-acts, .sv-row:focus-within .sv-acts { opacity:1; }
-.sv-row:hover .sv-tag, .sv-row:focus-within .sv-tag { visibility:hidden; }
+/* Review 22:00: :has(:focus-visible), not :focus-within, so a mouse click on the view does not pin the actions open (Linear: hover or keyboard focus only). */
+.sv-row:hover .sv-acts, .sv-row:has(:focus-visible) .sv-acts { opacity:1; }
+.sv-row:hover .sv-tag, .sv-row:has(:focus-visible) .sv-tag { visibility:hidden; }
 .sv-row:has([aria-current=page]) .sv-acts { background:var(--sel); }
 @media (hover:none) { .sv-acts { opacity:1; } .sv-tag { display:none; } }
 .sv-act { flex:0 0 auto; white-space:nowrap; }
