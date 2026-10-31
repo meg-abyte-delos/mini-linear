@@ -162,8 +162,11 @@
 .set-wrap .set-form:not(.set-form-row) { gap:0; padding:0 var(--sp-4); }
 .set-wrap .set-form:not(.set-form-row) > .set-field { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,280px); align-items:center; column-gap:var(--sp-4); min-height:56px; padding:var(--sp-3) 0; border-bottom:1px solid var(--line-soft); }
 .set-wrap .set-form:not(.set-form-row) > .set-field .set-label { font-size:var(--fs-base); color:var(--fg); }
+/* Hints sit under their control (column 2), never under the label. */
+.set-wrap .set-form:not(.set-form-row) > .set-field > .set-hint { grid-column:2; margin-top:var(--sp-1); }
+.set-wrap .set-logo-row .set-hint { flex-basis:100%; }
 .set-wrap .set-form:not(.set-form-row) > .set-actions { padding:var(--sp-3) 0; }
-.set-wrap .set-input, .set-wrap .set-select { height:28px; background:transparent; border-color:var(--line); font-size:var(--fs-base); }
+.set-wrap .set-input, .set-wrap .set-select { height:var(--set-ctl-h); background:transparent; border-color:var(--line); font-size:var(--fs-base); }
 .set-wrap .set-input:hover:not(:disabled) { background:var(--hover); }
 .set-wrap .set-input:disabled { background:transparent; border-color:transparent; padding-inline:0; }
 /* Selects look like the app's menu triggers (chip, chevron, no box) rather than a native control. */
