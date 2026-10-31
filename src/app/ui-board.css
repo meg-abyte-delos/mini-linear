@@ -7,10 +7,8 @@
 .board .col-head { height: 36px; min-height: 36px; display: flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 0; }
 .board .col-head h2 { flex: 1; min-width: 0; height: 36px; padding: 0 var(--sp-2); gap: var(--sp-2); font-size: var(--fs-base); font-weight: 500; background: none; border: 0; }
 .board .col-head h2 .count { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
-.board .col-act { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+.board .col-act { opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
 .board .col:hover .col-act, .board .col-act:focus-visible { opacity: 1; }
-.board .col-act:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); }
-.board .col-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* Cards: 86px tall (virtual.ts CARD_H 92 = 86 + 6 gap), single-line title. */
 .board .card {
@@ -84,7 +82,7 @@
 
 /* Header actions (··· then +) only on column hover / keyboard focus, like Linear. */
 .board .col-head:focus-within .col-act { opacity: 1; }
-.board .col-act[aria-expanded=true] { opacity: 1; background: color-mix(in srgb, var(--fg) 8%, transparent); color: var(--fg); }
+.board .col-act[aria-expanded=true] { opacity: 1; background: var(--hover); color: var(--fg); }
 
 /* Collapsed column: a narrow strip with the header only. */
 .board .col.folded { width: 44px; }

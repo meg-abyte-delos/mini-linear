@@ -84,8 +84,8 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd, 
     <section className={`col${overZone ? ' over-zone' : ''}${folded ? ' folded' : ''}`} aria-labelledby={`c-${status}`} {...zone}>
       <div className='col-head'>
         <h2 id={`c-${status}`}><StatusIcon status={status} /><span>{STATUS_LABEL[status]}</span><span className='count'>{items.length}</span></h2>
-        <button type='button' ref={moreRef} className='col-act' aria-label={`${STATUS_LABEL[status]} column options`} title='Column options' aria-haspopup='menu' aria-expanded={menu} onClick={() => setMenu((m) => !m)}><Icon name='more' /></button>
-        {onAdd && <button type='button' className='col-act' aria-label={`Add issue to ${STATUS_LABEL[status]}`} title='Add issue' onClick={() => onAdd(status)}><Icon name='plus' /></button>}
+        <IconButton ref={moreRef} size={24} className='col-act' label={`${STATUS_LABEL[status]} column options`} title='Column options' aria-haspopup='menu' aria-expanded={menu} onClick={() => setMenu((m) => !m)}><Icon name='more' /></IconButton>
+        {onAdd && <IconButton size={24} className='col-act' label={`Add issue to ${STATUS_LABEL[status]}`} title='Add issue' onClick={() => onAdd(status)}><Icon name='plus' /></IconButton>}
         <Menu open={menu} anchorRef={moreRef} onClose={() => setMenu(false)} label={`${STATUS_LABEL[status]} column`} entries={entries} align='end' />
       </div>
       <div className='col-scroll' ref={ref} onScroll={(e) => setTop(e.currentTarget.scrollTop)} data-testid={`col-${status}`}>
