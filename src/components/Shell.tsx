@@ -20,7 +20,7 @@ import { MIN_QUERY, searchApi, searchLocal, snippetParts, type SearchHit } from 
 import { CyclesList } from '@/components/CyclesList';
 import { parseNlCommand, nlLabel } from '@/lib/nl-command';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
-import { DISPLAY_PROP_DEFAULT_OFF, DISPLAY_PROP_LABEL, GROUPING_LABEL, estimateText, withoutSubIssues, ORDERING_LABEL, type DisplayProp, fitLabels, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
+import { orderIssues, DISPLAY_PROP_DEFAULT_OFF, DISPLAY_PROP_LABEL, GROUPING_LABEL, estimateText, withoutSubIssues, ORDERING_LABEL, type DisplayProp, fitLabels, listGroups, relDate, visibleOrder, type Grouping, type Ordering } from '@/lib/list-ui';
 import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people';
 import { bulkPatch as apiBulk, createIssue as apiCreate, isUuid, patchIssue as apiPatch } from '@/lib/api-client';
 import { applyBulkLocal, BULK_MAX, chunk, inverseGroups, labelTogglePatch, type BulkGroup, type BulkPatch } from '@/lib/bulk';
@@ -99,6 +99,7 @@ function Column({ status, items, renderCard, selectedId, overZone, zone, onAdd, 
 }
 
 // Cmd+K sections and icons, derived from the command id (Linear groups results under small labels).
+const BOARD_PROPS: readonly DisplayProp[] = ['id', 'priority', 'labels', 'assignee'];
 const NAV_IDS = new Set(['list', 'board', 'cycles', 'projects', 'go-project']);
 function paletteGroup(id: string): string {
   if (id === 'nl') return 'Suggested';
@@ -356,13 +357,15 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   useEffect(() => { document.documentElement.dataset.ready = '1'; return () => { delete document.documentElement.dataset.ready; }; }, []);
 
   // Same grouping, ordering and collapsed state as the list render, so j/k never lands on a hidden row.
+  // Board columns follow the same Ordering / Show sub-issues options as the list; Grouping stays Status (one column per status).
+  const boardItems = useCallback((s: Status) => orderIssues(withoutSubIssues(issues, showSub).filter((i) => i.status === s), ordering), [issues, showSub, ordering]);
   const groups = useMemo(() => listGroups(withoutSubIssues(issues, showSub), STATUSES, grouping, ordering, showEmpty), [issues, showSub, grouping, ordering, showEmpty]);
   const ordered = useMemo(
-    () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.filter((s) => !hiddenCols.has(s)).flatMap((s) => issues.filter((i) => i.status === s))),
-    [view, groups, collapsed, issues, hiddenCols],
+    () => (view === 'list' ? visibleOrder(groups, collapsed) : STATUSES.filter((s) => !hiddenCols.has(s)).flatMap((s) => boardItems(s))),
+    [view, groups, collapsed, boardItems, hiddenCols],
   );
   // Manual ordering only: with priority/created ordering a drop position would be meaningless.
-  const canDrag = view !== 'list' || ordering === 'manual';
+  const canDrag = ordering === 'manual';
   const current = ordered.find((i) => i.id === selId) ?? ordered[0];
   const orderedRef = useRef(ordered);
   const currentIdRef = useRef<string | undefined>(current?.id);
@@ -866,9 +869,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   );
   const card = (i: Issue, pos?: number, size?: number) => (
     <div key={i.id} role='option' aria-posinset={pos} aria-setsize={size} data-id={i.id} tabIndex={current?.id === i.id ? 0 : -1} aria-selected={current?.id === i.id} data-multi={multi.includes(i.id) || undefined} className={`card${dragId === i.id ? ' dragging' : ''}${overKey === i.id ? ' over' : ''}`} {...dragProps(i)} onClick={() => select(i, true)}>
-      <div className='card-top'><span className='id'>{i.identifier ?? i.id}</span>{assignee(i)}</div>
+      <div className='card-top'>{shown('id') ? <span className='id'>{i.identifier ?? i.id}</span> : <span />}{shown('assignee') && assignee(i)}</div>
       <div className='card-title'>{i.title}</div>
-      <div className='card-meta'>{subBadge(i)}<span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>{i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
+      <div className='card-meta'>{subBadge(i)}{shown('priority') && <span className='card-prio' data-none={i.priority === 0 || undefined} title={PRIORITY_LABEL[i.priority]}><PriorityIcon priority={i.priority} /></span>}{shown('labels') && i.label_ids.map((l) => { const lb = LABELS.find((x) => x.id === l); return lb ? <span key={l} className={`chip ${lb.hue}`}>{lb.name}</span> : null; })}</div>
     </div>
   );
 
@@ -951,19 +954,19 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
                 {saving.err && <span role='alert' className='save-err'>Enter a name (could not save).</span>}
               </form>
             )}
-            {view === 'list' && (
+            {(view === 'list' || view === 'board') && (
               <div className='tb-right'>
                 <button id='fb-display' className='tb-btn' aria-haspopup='dialog' aria-expanded={tbMenu === 'display'} onClick={() => setTbMenu(tbMenu === 'display' ? null : 'display')}><Icon name='display' /><span>Display</span></button>
                 {tbMenu === 'display' && (
                   <div className='tb-menu display' role='dialog' aria-label='Display options' onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTbMenu(null); document.getElementById('fb-display')?.focus(); } }}>
-                    <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><DisplayPick label='Grouping' autoFocus value={grouping} labels={GROUPING_LABEL} onChange={setGrouping} /></div>
-                    <div className='dp-row'><span className='dp-k'><Icon name='views' />Ordering</span><DisplayPick label='Ordering' value={ordering} labels={ORDERING_LABEL} onChange={setOrdering} /></div>
+                    {view === 'list' && <div className='dp-row'><span className='dp-k'><Icon name='list' />Grouping</span><DisplayPick label='Grouping' autoFocus value={grouping} labels={GROUPING_LABEL} onChange={setGrouping} /></div>}
+                    <div className='dp-row'><span className='dp-k'><Icon name='views' />Ordering</span><DisplayPick label='Ordering' autoFocus={view === 'board'} value={ordering} labels={ORDERING_LABEL} onChange={setOrdering} /></div>
                     <div className='dp-sep' role='separator' />
-                    <label className='dp-row dp-switch'><span className='dp-k'>Show empty groups</span><input type='checkbox' role='switch' checked={showEmpty} disabled={grouping === 'none'} onChange={(e) => setShowEmpty(e.target.checked)} /><i aria-hidden='true' /></label>
+                    {view === 'list' && <label className='dp-row dp-switch'><span className='dp-k'>Show empty groups</span><input type='checkbox' role='switch' checked={showEmpty} disabled={grouping === 'none'} onChange={(e) => setShowEmpty(e.target.checked)} /><i aria-hidden='true' /></label>}
                     <label className='dp-row dp-switch'><span className='dp-k'>Show sub-issues</span><input type='checkbox' role='switch' checked={showSub} onChange={(e) => setShowSub(e.target.checked)} /><i aria-hidden='true' /></label>
                     <div className='dp-sep' role='separator' />
-                    <div className='dp-h' id='dp-props'>Display properties</div>
-                    <div className='dp-props' role='group' aria-labelledby='dp-props'>{(Object.keys(DISPLAY_PROP_LABEL) as DisplayProp[]).map((k) => <button key={k} type='button' className={`dp-chip${shown(k) ? ' on' : ''}`} aria-pressed={shown(k)} onClick={() => toggleProp(k)}>{DISPLAY_PROP_LABEL[k]}</button>)}</div>
+                    <div className='dp-h' id='dp-props'>{view === 'board' ? 'Card properties' : 'Display properties'}</div>
+                    <div className='dp-props' role='group' aria-labelledby='dp-props'>{(Object.keys(DISPLAY_PROP_LABEL) as DisplayProp[]).filter((k) => view === 'list' || BOARD_PROPS.includes(k)).map((k) => <button key={k} type='button' className={`dp-chip${shown(k) ? ' on' : ''}`} aria-pressed={shown(k)} onClick={() => toggleProp(k)}>{DISPLAY_PROP_LABEL[k]}</button>)}</div>
                   </div>
                 )}
               </div>
@@ -1011,14 +1014,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         ) : (
           <div className='board'>
             {STATUSES.filter((s) => !hiddenCols.has(s)).map((s) => (
-              <Column key={s} status={s} items={issues.filter((i) => i.status === s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} onAdd={readOnly ? undefined : create} onHide={(st) => setHiddenCols((h) => toggleIn(h, st, true))} folded={foldedCols.has(s)} onFold={(st) => setFoldedCols((f) => toggleIn(f, st))} />
+              <Column key={s} status={s} items={boardItems(s)} renderCard={card} selectedId={current?.id} overZone={overKey === `z-${s}`} zone={zoneProps(s)} onAdd={readOnly ? undefined : create} onHide={(st) => setHiddenCols((h) => toggleIn(h, st, true))} folded={foldedCols.has(s)} onFold={(st) => setFoldedCols((f) => toggleIn(f, st))} />
             ))}
             {hiddenCols.size > 0 && (
               <aside className='board-hidden' aria-label='Hidden columns'>
                 <h3>Hidden columns</h3>
                 {STATUSES.filter((s) => hiddenCols.has(s)).map((s) => (
                   <button key={s} type='button' className='board-hidden-row' aria-label={`Show ${STATUS_LABEL[s]} column`} onClick={() => setHiddenCols((h) => toggleIn(h, s, false))}>
-                    <StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{issues.filter((i) => i.status === s).length}</span>
+                    <StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{boardItems(s).length}</span>
                   </button>
                 ))}
               </aside>
