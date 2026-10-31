@@ -111,6 +111,7 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect((await mut(P.patchProject as Fn, seed.a.guest, "PATCH", 2, { name: "g" }, seed.a.slug, p.id)).status).toBe(403);
   });
 
+  // explicit timeout: 120 sequential creates + paging, 5s default is too tight under CI load
   it("P-2 pagination: 120 projects, pages of 50, no gap or duplicate", async () => {
     for (let i = 0; i < 120; i++) await send(P.createProject as Fn, seed.b.admin, "POST", { name: `pg-${i}` }, seed.b.slug);
     const list = (q: string) => P.listProjects(new Request(`http://x/api${q}`, { headers: { "x-u": seed.b.admin } }), seed.b.slug);
@@ -122,8 +123,9 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
     expect(seen.length).toBe(120); expect(new Set(seen).size).toBe(120); expect([...seen].sort()).toEqual(seen);
     expect((await list("?limit=0")).status).toBe(422);
     expect((await list("?cursor=garbage")).status).toBeGreaterThanOrEqual(400);
-  });
+  }, 60_000);
 
+  // explicit timeout: many sequential round-trips, 5s default is too tight under CI load
   it("P-4/P-6 team scope controls visibility; delete detaches issues; cross-tenant is 404; RLS counts", async () => {
     const p = await (await send(P.createProject as Fn, seed.a.admin, "POST", { name: "scope", team_ids: [teamA] }, seed.a.slug)).json();
     const iss = await (await send(I.createIssue as Fn, seed.a.member, "POST", { team_id: teamA, title: "x", project_id: p.id }, seed.a.slug)).json();
@@ -140,5 +142,5 @@ if (process.env.CI && !haveDb) throw new Error("CI=true but DB urls unset: integ
       return tx`select (select count(*)::int from projects where workspace_id = ${seed.a.id}) as p, (select count(*)::int from project_teams where workspace_id = ${seed.a.id}) as t,
         (select count(*)::int from project_milestones where workspace_id = ${seed.a.id}) as m`; });
     expect(cnt[0]).toEqual({ p: 0, t: 0, m: 0 });
-  });
+  }, 30_000);
 });
