@@ -77,7 +77,7 @@ test('description editor is WYSIWYG and safe: no tabs, no script/raw html, unsaf
 
 test('comments: mention autocomplete, reply thread, reactions', async ({ page }) => {
   await ready(page);
-  const box = page.getByRole('combobox', { name: 'Leave a comment' });
+  const box = page.getByRole('textbox', { name: 'Leave a comment' });
   await box.click(); await box.pressSequentially('hey @ada'); // mate@example.test is 'Ada Kernel' (members carry display_name)
   await expect(page.getByRole('listbox', { name: 'Mention a teammate' })).toContainText('Ada Kernel');
   await page.keyboard.press('Enter');
@@ -91,7 +91,7 @@ test('comments: mention autocomplete, reply thread, reactions', async ({ page })
   await c.getByRole('button', { name: /React 👍/ }).click();
   await expect(c.getByRole('button', { name: 'React 👍, 1' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Reply', exact: true }).click();
-  const r = page.getByRole('combobox', { name: 'Reply' });
+  const r = page.getByRole('textbox', { name: 'Reply' });
   await r.fill('on it'); await r.press('Control+Enter');
   await expect(page.locator('.replies .cmt')).toContainText('on it');
   // a11y: every li sits in a real list (no li nested in a comment wrapper), and axe finds no list/listitem violation
@@ -154,14 +154,14 @@ test('delete and restore', async ({ page }) => {
 test('comments: edit, delete, and one chronological timeline with change events', async ({ page }) => {
   await ready(page);
   const feed = page.getByRole('list', { name: 'Activity' });
-  const box = page.getByRole('combobox', { name: 'Leave a comment' });
+  const box = page.getByRole('textbox', { name: 'Leave a comment' });
   await box.fill('first **draft**');
   await page.getByRole('button', { name: 'Comment', exact: true }).click();
   const c = page.getByRole('article', { name: /Comment by/ }).first();
   await expect(c.locator('strong')).toHaveText('draft');
   await c.hover();
   await c.getByRole('button', { name: 'Edit comment' }).click();
-  const ed = page.getByRole('combobox', { name: 'Edit comment' });
+  const ed = page.getByRole('textbox', { name: 'Edit comment' });
   await expect(ed).toHaveValue('first **draft**');
   await ed.fill('final _text_');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -195,7 +195,7 @@ test('D9: composer sits after the feed and never covers the last comment at 1280
   await page.setViewportSize({ width: 1280, height: 720 });
   await ready(page);
   for (const n of ['one', 'two', 'three', 'four']) {
-    const box = page.getByRole('combobox', { name: 'Leave a comment' });
+    const box = page.getByRole('textbox', { name: 'Leave a comment' });
     await box.fill(`Comment ${n}, long enough to look like a real remark`);
     await page.getByRole('button', { name: 'Comment', exact: true }).click();
     await expect(page.getByRole('article', { name: /Comment by/ })).toHaveCount(['one', 'two', 'three', 'four'].indexOf(n) + 1);

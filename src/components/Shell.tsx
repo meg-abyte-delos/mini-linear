@@ -1,5 +1,6 @@
 'use client';
 import { Button, Checkbox, EmptyState, Input, Menu, Tooltip, type MenuEntry } from '@/components/ui';
+import { WIDE_MQ } from '@/lib/breakpoints';
 import { withViewTransition } from '@/lib/motion';
 import { Inbox } from '@/components/Inbox';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
@@ -338,7 +339,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     if (!a || a === document.body || side?.contains(a)) navToggleRef.current?.focus();
   }, [navOpen]);
   // Back above 900px the drawer no longer exists: drop data-nav=open.
-  useEffect(() => { const mq = window.matchMedia('(min-width: 900px)'); const f = () => { if (mq.matches) setNavOpen(false); }; f(); mq.addEventListener('change', f); return () => mq.removeEventListener('change', f); }, []);
+  useEffect(() => { const mq = window.matchMedia(WIDE_MQ); const f = () => { if (mq.matches) setNavOpen(false); }; f(); mq.addEventListener('change', f); return () => mq.removeEventListener('change', f); }, []);
   const [pick, setPick] = useState<{ kind: PickKind; id: string; ids: string[]; rect: DOMRect | null } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const dragRef = useRef<string | null>(null);
@@ -1028,7 +1029,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
       </main>
       {open && current && (
         <aside className='panel' aria-label='Issue detail'>
-          <div className='panel-head'><span className='id'>{current.identifier ?? current.id}</span><a href={`/w/${api?.slug ?? 'delos'}/issue/${current.identifier ?? current.id}`}>Open</a><button onClick={() => setOpen(false)} aria-label='Close detail panel'>Esc</button></div>
+          <div className='panel-head'><span className='id'>{current.identifier ?? current.id}</span><a href={`/w/${api?.slug ?? 'delos'}/issue/${current.identifier ?? current.id}`}>Open</a><Button variant='ghost' size={24} onClick={() => setOpen(false)} aria-label='Esc, close detail panel'>Esc</Button></div>
           <h2>{current.title}</h2>
           <dl>
             <dt>Status</dt><dd><StatusIcon status={current.status} />{STATUS_LABEL[current.status]}</dd>

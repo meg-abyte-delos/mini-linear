@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { NARROW_MQ } from '@/lib/breakpoints';
 import { Button, CheckMark, EmptyState, IconButton, Kbd } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { IssueActivity } from '@/components/IssueDetail';
@@ -65,7 +66,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
   const act = (n: Notif, action: InboxAction, until?: string, keepChecked = false) => actMany([n], action, until, keepChecked);
   // Linear: a notification is read as soon as it is shown. Only user-driven selection (click, j/k) marks it; the initial selection does not.
   // <=900px the preview pane is hidden (ui-inbox.css): moving the cursor must not mark read, and a click opens the issue.
-  const narrow = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
+  const narrow = () => typeof window !== 'undefined' && window.matchMedia(NARROW_MQ).matches;
   const show = (i: number) => { setCur(i); if (narrow()) return; const n = list[i]; if (n && !n.read_at && !readOnly) void act(n, 'read', undefined, true); }; // reading on view must not drop a multi-selection
   const open = (n: Notif) => { if (!n.read_at) void act(n, 'read'); onOpenIssue?.(n.issue_id); };
   const toggle = (id: string) => setChecked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -160,7 +161,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
             <span className='idp-id'>{sel.issue?.identifier ?? 'Deleted'}</span>
             <div className='inbox-detail-actions' role='toolbar' aria-label='Notification actions'>
               {sel.issue && <Button variant='primary' onClick={() => open(sel)}>Open issue</Button>}
-              <IconButton label={`Mark ${sel.issue?.identifier ?? ''} ${sel.read_at ? 'unread' : 'read'}`} title={sel.read_at ? 'Mark unread (u)' : 'Mark read (u)'} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? <svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><circle cx='8' cy='8' r='3' fill='currentColor' stroke='none' /></svg> : <svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><path d='M3.5 8.5l3 3 6-7' /></svg>}</IconButton>
+              <IconButton label={`${sel.read_at ? 'Mark unread' : 'Mark read'} ${sel.issue?.identifier ?? ''}`.trim()} title={sel.read_at ? 'Mark unread (u)' : 'Mark read (u)'} onClick={() => void act(sel, sel.read_at ? 'unread' : 'read')}>{sel.read_at ? <svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><circle cx='8' cy='8' r='3' fill='currentColor' stroke='none' /></svg> : <svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><path d='M3.5 8.5l3 3 6-7' /></svg>}</IconButton>
               <IconButton label={`Snooze ${sel.issue?.identifier ?? ''}`} title='Snooze (s)' onClick={() => setSnoozeOpen(true)}><svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><circle cx='8' cy='8.5' r='5' /><path d='M8 6v2.7l1.6 1M3 3l1.6-1.2M13 3l-1.6-1.2' /></svg></IconButton>
               <IconButton label={`${tab === 'archived' ? 'Unarchive' : 'Archive'} ${sel.issue?.identifier ?? ''}`} title={tab === 'archived' ? 'Unarchive' : 'Archive (e)'} onClick={() => void act(sel, tab === 'archived' ? 'unarchive' : 'archive')}><svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'><rect x='2.5' y='3' width='11' height='3' rx='1' /><path d='M3.5 6v6.5a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V6M6.5 8.5h3' /></svg></IconButton>
             </div>

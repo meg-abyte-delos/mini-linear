@@ -10,7 +10,7 @@ test('Inbox detail: Activity feed and comment composer under the description', a
   const issue = await apiCreateIssue(page, title);
   await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
   await page.waitForSelector('html[data-ready]');
-  const box = page.getByRole('combobox', { name: 'Leave a comment' });
+  const box = page.getByRole('textbox', { name: 'Leave a comment' });
   await box.click();
   await box.pressSequentially('ping @mate');
   const posted = page.waitForResponse((r) => /\/issues\/[^/]+\/comments$/.test(r.url()) && r.request().method() === 'POST');
@@ -26,7 +26,7 @@ test('Inbox detail: Activity feed and comment composer under the description', a
   const detail = mate.getByRole('complementary', { name: 'Notification detail' });
   await expect(detail.getByRole('heading', { name: 'Activity', exact: true })).toBeVisible();
   await expect(detail.getByRole('article', { name: /Comment by/ }).first()).toContainText('ping @mate');
-  const reply = detail.getByRole('combobox', { name: 'Leave a comment' });
+  const reply = detail.getByRole('textbox', { name: 'Leave a comment' });
   await expect(reply).toBeVisible();
   await reply.fill('seen from the inbox');
   await detail.getByRole('button', { name: 'Comment', exact: true }).click();
@@ -68,7 +68,7 @@ test('Inbox composer: Attach keeps the draft on the issue page, and an admin can
   await login(mate, 'mate@example.test');
   await mate.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
   await mate.waitForSelector('html[data-ready]');
-  await mate.getByRole('combobox', { name: 'Leave a comment' }).fill('mate says hi, delete me');
+  await mate.getByRole('textbox', { name: 'Leave a comment' }).fill('mate says hi, delete me');
   await mate.getByRole('button', { name: 'Comment', exact: true }).click();
   await expect(mate.getByRole('article', { name: /Comment by/ }).filter({ hasText: 'delete me' })).toHaveCount(1);
   await ctx.close();
@@ -80,9 +80,9 @@ test('Inbox composer: Attach keeps the draft on the issue page, and an admin can
   const cmt = detail.getByRole('article', { name: /Comment by/ }).filter({ hasText: 'delete me' });
   await expect(cmt).toHaveCount(1);
   await expect(cmt.getByRole('button', { name: 'Delete comment' })).toBeVisible();
-  await detail.getByRole('combobox', { name: 'Leave a comment' }).fill('half-written thought');
+  await detail.getByRole('textbox', { name: 'Leave a comment' }).fill('half-written thought');
   await detail.getByRole('button', { name: /Attach/ }).click();
   await page.waitForURL(new RegExp(`/issue/${issue.identifier}`));
   await page.waitForSelector('html[data-ready]');
-  await expect(page.getByRole('combobox', { name: 'Leave a comment' })).toHaveValue('half-written thought');
+  await expect(page.getByRole('textbox', { name: 'Leave a comment' })).toHaveValue('half-written thought');
 });
