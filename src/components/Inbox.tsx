@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Button, CheckMark, EmptyState } from '@/components/ui';
+import { Button, CheckMark, EmptyState, Kbd } from '@/components/ui';
 import { Markdown } from '@/components/Markdown';
 import { IssueActivity } from '@/components/IssueDetail';
 import '@/app/ui-inbox-activity.css';
@@ -100,7 +100,7 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
 
   const tabs = (
     <div role='tablist' aria-label='Inbox views' className='inbox-tabs'>
-      {TABS.map((x) => <button key={x.id} role='tab' aria-selected={tab === x.id} className={tab === x.id ? 'on' : ''} onClick={() => setTab(x.id)}>{x.label}</button>)}
+      {TABS.map((x) => <Button key={x.id} variant='ghost' size={24} role='tab' aria-selected={tab === x.id} onClick={() => setTab(x.id)}>{x.label}</Button>)}
     </div>
   );
   if (err) return <div className='state error' role='alert'><p>Could not load notifications.</p><Button onClick={() => void load()}>Retry</Button></div>;
@@ -125,8 +125,8 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
         </div>
         {snoozeOpen && (
           <div className='snooze-menu' role='menu' aria-label='Snooze until'>
-            {presets.map((p, i) => <button key={p.id} role='menuitem' onClick={() => { setSnoozeOpen(false); void actMany(targets(), 'snooze', p.until); }}>{p.label} <kbd>{i + 1}</kbd></button>)}
-            <button role='menuitem' onClick={() => setSnoozeOpen(false)}>Cancel</button>
+            {presets.map((p, i) => <Button key={p.id} variant='ghost' role='menuitem' onClick={() => { setSnoozeOpen(false); void actMany(targets(), 'snooze', p.until); }}>{p.label}<Kbd keys={String(i + 1)} /></Button>)}
+            <Button variant='ghost' role='menuitem' onClick={() => setSnoozeOpen(false)}>Cancel</Button>
           </div>
         )}
         {fail && <p role='alert' className='toast'>{fail}</p>}
