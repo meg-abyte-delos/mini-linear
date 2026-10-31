@@ -1001,8 +1001,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               <aside className='board-hidden' aria-label='Hidden columns'>
                 <h3>Hidden columns</h3>
                 {STATUSES.filter((s) => hiddenCols.has(s)).map((s) => (
-                  <button key={s} type='button' className='board-hidden-row' aria-label={`Show ${STATUS_LABEL[s]} column`} onClick={() => setHiddenCols((h) => toggleIn(h, s, false))}>
-                    <StatusIcon status={s} /><span>{STATUS_LABEL[s]}</span><span className='count'>{boardItems(s).length}</span>
+                  <button key={s} type='button' className='board-hidden-row' onClick={() => setHiddenCols((h) => toggleIn(h, s, false))}>
+                    <StatusIcon status={s} /><span><span className='sr-only'>Show </span>{STATUS_LABEL[s]}<span className='sr-only'> column</span></span><span className='count' aria-hidden='true'>{boardItems(s).length}</span>
                   </button>
                 ))}
               </aside>
