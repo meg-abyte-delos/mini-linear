@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { settled } from './helpers/settled';
 
 // Visual baselines 1280x800 dark for screens outside the app shell: login, signup, search.
@@ -6,11 +6,11 @@ import { settled } from './helpers/settled';
 test.use({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark', reducedMotion: 'reduce' });
 const SHOT = { maxDiffPixelRatio: 0.002, animations: 'disabled' as const, caret: 'hide' as const };
 
-async function shot(page: Page, name: string) {
+async function shot(page: Page, name: string, mask: Locator[] = []) {
   await page.evaluate(() => document.fonts.ready);
   await settled(page);
   await page.mouse.move(0, 0);
-  await expect(page).toHaveScreenshot(`${name}-1280.png`, SHOT);
+  await expect(page).toHaveScreenshot(`${name}-1280.png`, { ...SHOT, mask });
 }
 
 test.describe('anonymous', () => {
@@ -28,12 +28,10 @@ test.describe('anonymous', () => {
 });
 
 test('visual: search results', async ({ page }) => {
-  // The sidebar Inbox badge is polled every 30s and would make the shot unstable: serve an empty inbox so the badge is absent.
-  await page.route(/\/api\/v1\/w\/[^/]+\/notifications\?limit=100/, (r) => r.fulfill({ json: { items: [], unread_count: 0 } }));
+  // The sidebar Inbox badge depends on the mode (mock client seeds unread rows, API mode polls the real inbox every 30s): mask it so the shot is mode-independent.
   await page.goto('/search?q=cron&today=2026-10-27');
   const first = page.getByRole('list', { name: /results/i }).getByRole('listitem').first();
   await expect(first).toBeVisible();
   await expect(first).toContainText(/cron/i); // real result, not an empty state or an unrelated first hit
-  await expect(page.getByTestId('inbox-badge')).toHaveCount(0);
-  await shot(page, 'search');
+  await shot(page, 'search', [page.getByTestId('inbox-badge')]);
 });
