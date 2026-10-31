@@ -39,6 +39,7 @@
 
 /* Combobox */
 .combo-input { width:100%; box-sizing:border-box; height:var(--combo-input-h); padding:0 var(--sp-3); color:var(--fg); background:transparent; border:0; border-bottom:1px solid var(--line-soft); outline:none; font:inherit; }
+.combo-fit .combo-input { width:0; min-width:100%; } /* matchWidth: the filter input must not set the popover width, so it can line up with its trigger */
 .combo-input:focus-visible { box-shadow:inset 0 -1px 0 var(--accent); }
 .combo-list { list-style:none; margin:0; padding:var(--sp-1); max-height:var(--combo-list-max-h); overflow:auto; }
 .combo-opt { display:flex; align-items:center; gap:var(--sp-2); min-height:var(--side-item-h); padding:0 var(--sp-2); border-radius:var(--r-sm); cursor:pointer; }

@@ -129,3 +129,17 @@ test.describe('Properties drawer under 1024px', () => {
     await expect(toggle).toBeFocused();
   });
 });
+
+test('issue page: Status menu opens on the left edge of its trigger (not shifted left by viewport clamping)', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const issue = await apiCreateIssue(page, `layout-status-menu-${Date.now()}`);
+  await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
+  await page.waitForSelector('html[data-ready]');
+  const trigger = page.locator('.idp-side dd button').first();
+  await trigger.click();
+  const pop = page.getByRole('dialog', { name: /status/i });
+  await expect(pop).toBeVisible();
+  const t = (await trigger.boundingBox())!;
+  const p = (await pop.boundingBox())!;
+  expect(Math.abs(p.x - t.x)).toBeLessThanOrEqual(2);
+});
