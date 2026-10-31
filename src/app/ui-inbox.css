@@ -107,3 +107,17 @@
 .inbox-props button:hover:not(:disabled) { background:var(--hover); }
 .inbox-props button:disabled, .inbox-props input:disabled { cursor:default; }
 .inbox-props button:focus-visible, .inbox-props input:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+/* fix/inbox-detail-reading-width (Iris): the reading column never drops under ~420px. Detail pane < 860px (1440): reading padding 24px,
+   column 424px next to the rail. Detail pane < 760px (1280): the Properties rail leaves the row and becomes a drawer over the pane,
+   opened from the bar (same rule as the issue page under 1024px). */
+.inbox-detail { container:inbox-detail / inline-size; position:relative; }
+.inbox-detail .inbox-props-toggle, .inbox-detail .inbox-scrim { display:none; }
+@container inbox-detail (max-width:859px) { .inbox-detail .idp-main { padding:24px 24px 40px; } }
+@container inbox-detail (max-width:759px) {
+  .inbox-detail .idp-bar .inbox-props-toggle { display:inline-grid; margin-left:auto; }
+  .inbox-detail .idp-bar .inbox-props-toggle + .inbox-detail-actions { margin-left:0; }
+  .inbox-detail .idp-body > .inbox-props { position:absolute; top:44px; right:0; bottom:0; z-index:5; width:var(--idp-side-w); max-width:100%; transform:translateX(100%); visibility:hidden; transition:transform var(--dur-base) var(--ease-out), visibility 0s linear var(--dur-base); }
+  .inbox-detail .inbox-props-toggle[aria-expanded='true'] { background:var(--hover); color:var(--fg); }
+  .inbox-detail[data-props='open'] .idp-body > .inbox-props { transform:none; visibility:visible; box-shadow:var(--shadow-pop); transition:transform var(--dur-base) var(--ease-out); }
+  .inbox-detail[data-props='open'] .idp-body > .inbox-scrim { display:block; position:absolute; inset:44px 0 0 0; z-index:4; background:var(--scrim-soft); }
+}
