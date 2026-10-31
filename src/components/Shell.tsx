@@ -347,8 +347,12 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     prevView.current = view;
     const m = mainRef.current; if (!m) return;
     m.classList.remove('view-fade'); void m.offsetWidth; m.classList.add('view-fade');
-    const done = () => m.classList.remove('view-fade');
-    m.addEventListener('animationend', done, { once: true });
+    const done = (e: AnimationEvent) => {
+      if (e.target !== m) return; // ignore animationend bubbling from descendants
+      m.classList.remove('view-fade');
+      m.removeEventListener('animationend', done);
+    };
+    m.addEventListener('animationend', done);
     return () => m.removeEventListener('animationend', done);
   }, [view]);
   const [navOpen, setNavOpen] = useState(false);
