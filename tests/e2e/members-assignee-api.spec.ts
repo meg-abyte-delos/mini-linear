@@ -16,7 +16,7 @@ test('A assigns a real member, persists, and the picker lists members only', asy
   await page.goto('/');
   await page.waitForSelector('html[data-ready]');
   const row = page.locator(`[data-id="${it.id}"]`);
-  await row.click();
+  await row.getByTestId(/^select-/).click(); // a click on the row now opens the issue page; the checkbox selects it
   await page.keyboard.press('a');
   const dlg = page.getByRole('dialog', { name: 'Set assignee' });
   await expect(dlg).toBeVisible();

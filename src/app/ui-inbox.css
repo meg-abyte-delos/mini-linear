@@ -35,7 +35,7 @@
 .inbox-wrap { display:flex; min-height:0; min-width:0; flex:1; overflow:hidden; }
 /* Rows: no checkbox at rest, actor avatar at the left. */
 .nrow .rowsel { flex:none; width:14px; height:14px; opacity:0; transition:opacity var(--dur-instant) var(--ease-out); }
-.nrow:hover .rowsel, .nrow:focus-within .rowsel, .nrow .rowsel.on, .inbox ul:has(.rowsel.on) .rowsel { opacity:1; }
+.nrow:hover .rowsel, .nrow .rowsel.on, .inbox ul:has(.rowsel.on) .rowsel { opacity:1; }
 .nrow .ndot { flex:none; }
 .nrow .nav-av { flex:none; width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:600; background:var(--accent); color:var(--accent-fg); text-transform:uppercase; }
 /* System notifications (kind=system, no actor): neutral glyph, not a fake "S" avatar. */
@@ -68,6 +68,8 @@
 .inbox-detail .inbox-status { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border:1px solid var(--line); border-radius:11px; font-size:var(--fs-sm); color:var(--fg); vertical-align:middle; }
 .inbox-detail .inbox-status svg { width:12px; height:12px; flex:none; }
 @media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }
+/* Touch: no hover, so the row checkbox stays visible (Rex #351). */
+@media (hover: none) { .nrow .rowsel { opacity:1; } }
 
 /* Detail pane fills the width and height like Linear's inbox issue view:
    top bar (ID + actions), then a readable main column and a properties column on the right. */

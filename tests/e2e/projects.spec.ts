@@ -22,8 +22,7 @@ test('palette: Go to project, Assign to me, Copy issue id', async ({ page, conte
   await page.goto('/');
   await page.waitForSelector('html[data-ready]');
   // 'Assign to me' is not covered here: the front still resolves people from the mock USERS list (members directory lands with PR 4).
-  await page.locator('.row').first().click();
-  await page.keyboard.press('Escape');
+  await page.keyboard.press('j'); // select a row (a click now opens the issue page)
   const id = (await page.locator('.row[aria-selected="true"] .id').first().textContent())!;
   await page.keyboard.press('Control+k');
   await page.getByRole('combobox', { name: 'Search commands' }).fill('copy issue id');

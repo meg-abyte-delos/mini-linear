@@ -10,6 +10,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'delete-key', keys: ['Delete'], label: 'Delete issue(s)', group: 'Issues', hidden: true },
   { id: 'delete-bs', keys: ['Backspace'], label: 'Delete issue(s)', group: 'Issues', hidden: true },
   { id: 'open', keys: ['Enter'], label: 'Open issue', group: 'Issues' },
+  { id: 'peek', keys: [' '], label: 'Peek issue (toggle side panel)', group: 'Issues' },
   { id: 'next', keys: ['j'], label: 'Next issue', group: 'Navigation' },
   { id: 'prev', keys: ['k'], label: 'Previous issue', group: 'Navigation' },
   { id: 'go-issues', keys: ['g', 'i'], label: 'Go to issues', group: 'Navigation' },
@@ -24,7 +25,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'escape', keys: ['Escape'], label: 'Close / clear selection', group: 'General' },
 ];
 export const SEQUENCE_TIMEOUT_MS = 1500;
-export const formatKeys = (keys: string[]) => keys.map((k) => (k.length === 1 ? k.toUpperCase() : k.replace('Mod', '⌘').replace('Escape', 'Esc'))).join(' then ');
+export const formatKeys = (keys: string[]) => keys.map((k) => k === ' ' ? 'Space' : (k.length === 1 ? k.toUpperCase() : k.replace('Mod', '⌘').replace('Escape', 'Esc'))).join(' then ');
 
 export function isTypingTarget(el: EventTarget | null): boolean {
   const t = el as HTMLElement | null;

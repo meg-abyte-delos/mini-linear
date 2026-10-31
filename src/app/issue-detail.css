@@ -116,3 +116,13 @@
 .thread-rail .cmt{margin-bottom:var(--sp-1)}
 .thread-reply{margin-left:var(--sp-2)}
 .cmt-thread>.composer{margin-left:var(--sp-4)}
+
+/* Linear: the thread is one card; the root comment, the collapsed replies and the reply field all live inside it. */
+.cmt-thread{background:color-mix(in srgb,var(--fg) 2%,transparent);border:1px solid var(--line-soft);border-radius:var(--r-md);padding:var(--sp-3);margin-bottom:var(--sp-2)}
+.cmt-thread>.cmt,.cmt-thread .replies .cmt{background:none;border:0;border-radius:0;padding:0;margin:0}
+.cmt-thread>.cmt{margin-bottom:var(--sp-2)}
+.cmt-thread .thread-toggle{margin-left:0}
+.cmt-thread .replies.thread-rail{margin:var(--sp-2) 0 var(--sp-1) var(--sp-2)}
+.cmt-thread .thread-rail li+li{margin-top:var(--sp-3)}
+.cmt-thread .thread-reply{margin-left:0;margin-top:var(--sp-1)}
+.cmt-thread>.composer{margin-left:0}

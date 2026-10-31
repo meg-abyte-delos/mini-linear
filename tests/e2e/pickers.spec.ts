@@ -16,7 +16,7 @@ test('P sets priority via popover, focus returns to the issue', async ({ page })
   await page.keyboard.press('Enter');
   await expect(dlg).toBeHidden();
   await expect(page.locator(`[data-id="${id}"]`)).toBeFocused();
-  await page.keyboard.press('Enter');
+  await page.keyboard.press(' '); // Space peeks (Enter opens the issue page)
   await expect(detail(page)).toContainText('Urgent');
 });
 

@@ -5,7 +5,8 @@ test('palette NL action: assign + priority on the focused issue', async ({ page 
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await page.getByRole('option').first().click();
+  await page.waitForSelector('html[data-ready]');
+  await page.keyboard.press('j'); // select a row (a click now opens the issue page)
   await page.keyboard.press('Control+k');
   await page.getByRole('combobox', { name: 'Search commands' }).fill('assign to Ada, high priority');
   const row = page.locator('li.nl-action');
@@ -18,7 +19,8 @@ test('palette NL action: assign + priority on the focused issue', async ({ page 
 
 test('palette NL: a plain search phrase keeps search first', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('option').first().click();
+  await page.waitForSelector('html[data-ready]');
+  await page.keyboard.press('j'); // select a row (a click now opens the issue page)
   await page.keyboard.press('Control+k');
   await page.getByRole('combobox', { name: 'Search commands' }).fill('fix login, urgent'); // no verb: NL row exists but search stays first (names are API members now, so no mock 'Ada')
   await expect(page.locator('li.nl-action')).toBeVisible();

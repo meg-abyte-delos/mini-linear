@@ -1,20 +1,21 @@
 'use client';
 import { useId, useState, type ReactNode, type RefObject } from 'react';
 import { Popover } from './Popover';
+import { Kbd } from './Kbd';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import { moveIndex, firstEnabled, lastEnabled } from '@/lib/ui/nav';
 
 export interface ComboOption { id: string; label: string; lead?: ReactNode; hint?: ReactNode; checked?: boolean; disabled?: boolean }
-interface Props { open: boolean; anchorRef: RefObject<HTMLElement | null>; onClose: () => void; label: string; options: ComboOption[]; onPick: (id: string) => void; multi?: boolean; placeholder?: string; emptyText?: string }
+interface Props { open: boolean; anchorRef: RefObject<HTMLElement | null>; onClose: () => void; label: string; options: ComboOption[]; onPick: (id: string) => void; multi?: boolean; numbered?: boolean; startOnChecked?: boolean; placeholder?: string; emptyText?: string }
 
 // ARIA 1.2 combobox picker: the input keeps DOM focus, aria-activedescendant tracks the highlighted option.
 // Single-select closes on pick; multi stays open. Esc closes (Popover); Tab is left alone so focus moves on.
-export function Combobox({ open, anchorRef, onClose, label, options, onPick, multi, placeholder, emptyText = 'No match' }: Props) {
+export function Combobox({ open, anchorRef, onClose, label, options, onPick, multi, numbered, startOnChecked, placeholder, emptyText = 'No match' }: Props) {
   const uid = useId();
   const [q, setQ] = useState('');
   const [i, setI] = useState(0);
   const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) { setWasOpen(open); if (open) { setQ(''); setI(0); } } // fresh query and highlight on every open
+  if (open !== wasOpen) { setWasOpen(open); if (open) { setQ(''); setI(startOnChecked ? Math.max(options.findIndex((o) => o.checked), 0) : 0); } } // fresh query and highlight on every open
   const results = fuzzyFilter(options, q, (o) => o.label);
   const active = Math.min(i, Math.max(results.length - 1, 0));
   const optId = (id: string) => uid + '-o-' + id;
@@ -31,13 +32,14 @@ export function Combobox({ open, anchorRef, onClose, label, options, onPick, mul
             else if (e.key === 'ArrowUp') { e.preventDefault(); setI(Math.max(moveIndex(results, active, -1), 0)); }
             else if (e.key === 'Home') { e.preventDefault(); setI(Math.max(firstEnabled(results), 0)); }
             else if (e.key === 'End') { e.preventDefault(); setI(Math.max(lastEnabled(results), 0)); }
+            else if (numbered && q === '' && !e.metaKey && !e.ctrlKey && !e.altKey && /^[1-9]$/.test(e.key) && results[Number(e.key) - 1] && !results[Number(e.key) - 1]!.disabled) { e.preventDefault(); pick(results[Number(e.key) - 1]!); }
             else if (e.key === 'Enter') { e.preventDefault(); const o = results[active]; if (o) pick(o); }
           }}
         />
         <ul id={uid + '-list'} role='listbox' aria-label={label} aria-multiselectable={multi || undefined} className='combo-list'>
           {results.map((o, k) => (
             <li key={o.id} id={optId(o.id)} role='option' aria-selected={!!o.checked} aria-disabled={o.disabled || undefined} data-active={k === active} className='combo-opt' onMouseEnter={() => setI(k)} onClick={() => pick(o)}>
-              {o.lead}<span className='combo-label'>{o.label}</span>{o.hint}{o.checked !== undefined && <span className='tick' aria-hidden='true'>{o.checked ? String.fromCharCode(10003) : ''}</span>}
+              {o.lead}<span className='combo-label'>{o.label}</span>{o.hint}{numbered && q === '' && k < 9 && <span className='combo-num' aria-hidden='true'><Kbd keys={String(k + 1)} /></span>}{o.checked !== undefined && <span className='tick' aria-hidden='true'>{o.checked ? String.fromCharCode(10003) : ''}</span>}
             </li>
           ))}
           {results.length === 0 && <li role='option' aria-selected='false' aria-disabled='true' className='combo-empty'>{emptyText}</li>}
