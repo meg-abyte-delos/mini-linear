@@ -68,6 +68,8 @@
 .inbox-detail .inbox-status { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border:1px solid var(--line); border-radius:11px; font-size:var(--fs-sm); color:var(--fg); vertical-align:middle; }
 .inbox-detail .inbox-status svg { width:12px; height:12px; flex:none; }
 @media (prefers-reduced-motion: reduce) { .nrow .rowsel { transition:none; } }
+/* Touch: no hover, so the row checkbox stays visible (Rex #351). */
+@media (hover: none) { .nrow .rowsel { opacity:1; } }
 
 /* Detail pane fills the width and height like Linear's inbox issue view:
    top bar (ID + actions), then a readable main column and a properties column on the right. */
