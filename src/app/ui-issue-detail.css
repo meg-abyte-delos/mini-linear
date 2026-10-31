@@ -76,5 +76,5 @@
 .composer-inline textarea{padding-bottom:calc(var(--sp-2) + 28px)}
 .composer-tools{position:absolute;right:var(--sp-2);bottom:var(--sp-2);display:flex;align-items:center;gap:var(--sp-1)}
 .btn.composer-send:not(:disabled){background:var(--accent);color:var(--accent-fg)}
-
+.btn.composer-send[data-variant]:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 88%,#000);color:var(--accent-fg)}
 .idp-sec[aria-labelledby=h-act]>.composer-inline .composer-tools{bottom:calc(var(--sp-3) + var(--sp-2))}
