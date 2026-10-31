@@ -131,7 +131,7 @@ function markTerm(text: string, term: string) {
   return <>{text.slice(0, i)}<mark>{text.slice(i, i + t.length)}</mark>{text.slice(i + t.length)}</>;
 }
 
-export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, initialView = 'list', readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
+export function Shell({ initialIssues, loadError = null, truncated = false, initialFilters = emptyFilters(), today, meta = MOCK_META, api = null, readOnly = false, initialIssueId }: { initialIssues: Issue[]; loadError?: string | null; truncated?: boolean; initialFilters?: Filters; today: string; meta?: Meta; api?: { slug: string; teamId: string } | null; initialView?: View; readOnly?: boolean; initialIssueId?: string }) {
   const router = useRouter();
   const { labels: LABELS, cycles: CYCLES, projects: PROJECTS } = meta;
   const [toast, setToast] = useState<string | null>(truncated ? 'Showing the first 10,000 issues only. Narrow with filters.' : null);
@@ -241,8 +241,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
   const [copied, setCopied] = useState<string | null>(null);
   function applyView(v: SavedView) {
     const f = groupToFilters(v.filters);
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define -- event handler, runs after render
-    setFiltersState(f); setViewState(v.layout);
+    setFiltersState(f); setView(v.layout);
     setActiveViewId(v.id);
     const sp = new URLSearchParams(); sp.set('v', v.id);
     if (v.layout === 'board') sp.set('view', 'board');
@@ -299,11 +298,14 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     const o = filterOptions(kind).filter((x) => x.checked);
     return o.length === 1 ? o[0]!.label : `${o.length} selected`;
   }
-  const [view, setViewState] = useState<View>(initialView);
-  // The view lives in the URL too (?view=board|cycles; list is the default and drops the param). Inbox has its own path (/w/<slug>/inbox): entering and leaving it pushes a history entry, so Back returns to the previous view.
+  // The view is derived from the URL, with no local state: view = f(pathname, ?view). Inbox has its own path (/w/<slug>/inbox); the other views live in ?view= (list is the default and drops the param).
+  // Next syncs history.pushState/replaceState into usePathname/useSearchParams and restores them on Back/Forward, so the view cannot disagree with the URL (#400).
   const INBOX_PATH = /^\/w\/[^/]+\/inbox$/;
+  const navPath = usePathname();
+  const navView = useSearchParams()?.get('view') ?? null;
+  const view: View = INBOX_PATH.test(navPath) ? 'inbox' : navView === 'board' || navView === 'cycles' || navView === 'projects' || navView === 'inbox' ? navView : 'list';
+  // Entering and leaving the inbox pushes a history entry, so Back returns to the previous view; every other change replaces the entry.
   function setView(v: View) {
-    if (v !== view) withViewTransition(() => setViewState(v)); else setViewState(v);
     const onInboxPath = INBOX_PATH.test(window.location.pathname);
     const sp = new URLSearchParams(window.location.search);
     sp.delete('view');
@@ -312,40 +314,9 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
     else { if (v !== 'list') sp.set('view', v); if (onInboxPath) path = '/'; }
     const qs = sp.toString().replace(/%2C/gi, ',');
     const url = `${path}${qs ? `?${qs}` : ''}${window.location.hash}`;
-    if (path !== window.location.pathname) window.history.pushState(null, '', url); else window.history.replaceState(null, '', url);
+    const write = () => { if (path !== window.location.pathname) window.history.pushState(null, '', url); else window.history.replaceState(null, '', url); };
+    if (v !== view) withViewTransition(write); else write();
   }
-  // Back/Forward between those entries: derive the view from the URL (no URL write). Two paths, because the order of Next's own history handling and ours is not guaranteed:
-  // the raw popstate listener, and Next's router location (pathname + ?view=), which updates on every history traversal.
-  const viewFromLocation = (): View => {
-    if (INBOX_PATH.test(window.location.pathname)) return 'inbox';
-    const x = new URLSearchParams(window.location.search).get('view');
-    return x === 'board' || x === 'cycles' || x === 'projects' ? x : 'list';
-  };
-  // Next restores its own tree for the entry on popstate (and may re-render it with the view it was rendered for, e.g. the inbox page); that can land after our handler on a slow runner.
-  // So for a short window after a traversal the URL wins: re-derive after Next's tick, and again whenever the view changes while the window is open.
-  const popUntil = useRef(0);
-  useEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const onPop = () => {
-      popUntil.current = Date.now() + 1500;
-      setViewState(viewFromLocation());
-      for (const ms of [0, 50, 200, 600]) timers.push(setTimeout(() => setViewState(viewFromLocation()), ms));
-    };
-    window.addEventListener('popstate', onPop);
-    return () => { window.removeEventListener('popstate', onPop); timers.forEach(clearTimeout); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (Date.now() < popUntil.current && view !== viewFromLocation()) setViewState(viewFromLocation());
-  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
-  const navPath = usePathname();
-  const navView = useSearchParams()?.get('view') ?? null;
-  const navSeen = useRef(`${navPath}|${navView}`);
-  useEffect(() => {
-    const key = `${navPath}|${navView}`;
-    if (navSeen.current === key) return;
-    navSeen.current = key;
-    setViewState(viewFromLocation());
-  }, [navPath, navView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [detailId, setDetailId] = useState<string | null>(null); // project detail page (API mode)
   const [selId, setSelId] = useState<string | null>(initialIssueId ?? null);
   // Inbox: HTTP in API mode, in-memory seed otherwise. The unread badge polls every 30s (API mode only).
@@ -926,7 +897,7 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
         onIssues={(id) => { setTeamScope(id); if (view === 'cycles' || view === 'projects' || view === 'inbox') setView('list'); }}
         onCycles={(id) => { setTeamScope(id); setView('cycles'); }}
         onProjects={(id) => { setTeamScope(id); setView('projects'); }}
-        onView={(v) => { if (view === 'cycles' || view === 'projects' || view === 'inbox') setViewState('list'); applyView(v); }}
+        onView={(v) => { applyView(v); }}
         onCopyView={copyViewLink} onDeleteView={(v) => void deleteView(v)}
       />
       <main className='main' ref={mainRef} data-view={view}>
