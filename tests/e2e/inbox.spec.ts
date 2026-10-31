@@ -12,7 +12,7 @@ test('inbox: badge, keyboard triage', async ({ page }) => {
   await page.waitForSelector('html[data-ready]');
   await expect(page.getByTestId('inbox-badge')).toHaveText('2');
   await page.getByRole('link', { name: /^Inbox/ }).click();
-  await expect(page).toHaveURL(/view=inbox/);
+  await expect(page).toHaveURL(/\/w\/demo\/inbox$/);
   await expect(page.getByRole('option')).toHaveCount(3);
   await expect(page.getByRole('option').first()).toHaveAttribute('aria-current', 'true');
   await page.keyboard.press('j');
@@ -177,6 +177,48 @@ test('inbox: the options menu (Mark all as read marks everything) is only on the
   }
   await page.getByRole('tab', { name: 'All' }).click();
   await expect(page.getByRole('button', { name: 'Inbox options' })).toBeVisible();
+});
+
+test('inbox: dedicated /w/<slug>/inbox route renders the inbox, Inbox is the only active sidebar item and links to it', async ({ page }) => {
+  await page.goto('/w/demo/inbox');
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.getByRole('option').first()).toBeVisible();
+  await expect(page.locator('aside.side [aria-current=page]')).toHaveCount(1);
+  const link = page.getByRole('link', { name: /^Inbox/ });
+  await expect(link).toHaveAttribute('aria-current', 'page');
+  await expect(link).toHaveAttribute('href', '/w/demo/inbox');
+});
+
+test('inbox: unknown workspace slug on /w/<slug>/inbox is a 404', async ({ page }) => {
+  await page.goto('/w/no-such-ws/inbox');
+  await expect(page.getByText(/could not be found|404/i).first()).toBeVisible();
+  await expect(page.getByRole('option')).toHaveCount(0);
+});
+
+test('inbox: clicking Inbox rewrites the URL to /w/<slug>/inbox, leaving it restores /?view=, Back returns to the previous view', async ({ page }) => {
+  await page.goto('/?view=board');
+  await page.waitForSelector('html[data-ready]');
+  await page.getByRole('link', { name: /^Inbox/ }).click();
+  await expect(page).toHaveURL(/\/w\/demo\/inbox$/);
+  await expect(page.getByRole('option').first()).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/\?view=board$/);
+  await expect(page.locator('main[data-view=inbox]')).toHaveCount(0);
+  await expect(page.locator('main[data-view=board]')).toHaveCount(1);
+  await page.goForward();
+  await expect(page).toHaveURL(/\/w\/demo\/inbox$/);
+  await expect(page.locator('main[data-view=inbox]')).toHaveCount(1);
+});
+
+test('inbox: leaving the inbox from /w/<slug>/inbox puts the URL back on /?view=..., a reload stays out of the inbox', async ({ page }) => {
+  await page.goto('/w/demo/inbox');
+  await page.waitForSelector('html[data-ready]');
+  await page.getByRole('link', { name: /^Issues/ }).first().click();
+  await expect(page).toHaveURL(/^[^?]*\/(\?.*)?$/);
+  expect(new URL(page.url()).pathname).toBe('/');
+  await page.reload();
+  await page.waitForSelector('html[data-ready]');
+  await expect(page.locator('main[data-view=inbox]')).toHaveCount(0);
 });
 
 test('inbox: opened directly, the sidebar marks Inbox and no Issues link', async ({ page }) => {
