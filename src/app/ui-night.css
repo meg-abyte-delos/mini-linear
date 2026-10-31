@@ -52,7 +52,7 @@
   html:not([data-theme]) .panel { z-index:30; }
   html:not([data-theme]) .selbar, html:not([data-theme]) .toast { z-index:40; }
   html:not([data-theme]) .overlay { z-index:50; }
-  html:not([data-theme]) input:not([type=checkbox]):not([type=radio]),
+  html:not([data-theme]) input:not([type=checkbox]):not([type=radio]):not(.input),
   html:not([data-theme]) select, html:not([data-theme]) textarea { border-color:var(--line-input); }
 }
 
@@ -91,8 +91,8 @@
 }
 [data-theme='dark'] .switch .btn[aria-pressed=true] { box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
 
-/* Inputs: 3:1 border (non-text contrast) */
-[data-theme='dark'] input:not([type=checkbox]):not([type=radio]),
+/* Legacy inputs: 3:1 border (non-text contrast). The Input primitive (.input) owns its states: --line at rest, --line-input on hover, accent on focus (DESIGN.md Input). */
+[data-theme='dark'] input:not([type=checkbox]):not([type=radio]):not(.input),
 [data-theme='dark'] select, [data-theme='dark'] textarea { border-color:var(--line-input); }
 
 /* Elevated surfaces pick up hairlines + soft depth */

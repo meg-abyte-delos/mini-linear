@@ -140,7 +140,10 @@
 .set-file { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
 .set-slug { display:flex; align-items:center; }
 .set-slug-pre { height:var(--set-ctl-h); display:inline-flex; align-items:center; padding:0 var(--sp-2); color:var(--muted); background:var(--hover); border:1px solid var(--line); border-right:0; border-radius:var(--r-sm) 0 0 var(--r-sm); box-sizing:border-box; }
-.set-slug .set-input { border-radius:0 var(--r-sm) var(--r-sm) 0; }
+.set-slug .set-input, .set-slug .input { border-radius:0 var(--r-btn) var(--r-btn) 0; }
+/* Settings fields use the Input primitive (32, DESIGN.md Input); only layout lives here. */
+.set-field .input { box-sizing:border-box; width:100%; min-width:0; }
+.set-wrap .input:disabled { background:transparent; border-color:transparent; padding-inline:0; }
 .set-danger-card { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); border-color:color-mix(in srgb, var(--danger) 40%, var(--line)); }
 .set-confirm-field { margin-top:var(--sp-3); }
 .set-label-list { list-style:none; margin:var(--sp-3) 0 0; padding:0; }

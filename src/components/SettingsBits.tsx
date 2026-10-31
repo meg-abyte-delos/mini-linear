@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ConfirmDialog } from '@/components/ui';
+import { ConfirmDialog, Input } from '@/components/ui';
 
 /** One confirmation toast (role=status) that clears itself after 4 s. */
 export function useToast() {
@@ -24,7 +24,7 @@ export function NameConfirmDialog({ open, name, title, confirmLabel, busy, child
     <ConfirmDialog open={open} destructive busy={busy} confirmDisabled={typed !== name} title={title} confirmLabel={confirmLabel} onConfirm={onConfirm} onCancel={onCancel}>
       {children}
       <label className='set-field set-confirm-field'><span className='set-label'>Type <strong>{name}</strong> to confirm</span>
-        <input className='set-input' autoComplete='off' value={typed} onChange={(e) => setTyped(e.target.value)} aria-label={`Type ${name} to confirm`} /></label>
+        <Input size={32} autoComplete='off' value={typed} onChange={(e) => setTyped(e.target.value)} aria-label={`Type ${name} to confirm`} /></label>
     </ConfirmDialog>
   );
 }
