@@ -129,9 +129,9 @@ export function Inbox({ client, onUnread, onOpenIssue, getIssue, lookup, slug, r
         )}
         {fail && <p role='alert' className='toast'>{fail}</p>}
         {list.length === 0 ? <EmptyState icon='inbox' title={empty.t} hint={empty.h} /> : (
-          <ul role='listbox' aria-label='Notifications'>
+          <ul role='listbox' aria-label='Notifications' aria-multiselectable='true'>
             {list.map((n, i) => (
-              <li key={n.id} role='option' aria-selected={i === cur} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
+              <li key={n.id} role='option' aria-selected={checked.has(n.id)} aria-current={i === cur ? 'true' : undefined} data-unread={n.read_at ? undefined : 'true'} className={`nrow${i === cur ? ' sel' : ''}${n.read_at ? '' : ' unread'}`} onClick={() => setCur(i)} onDoubleClick={() => open(n)}>
                 <CheckMark className={`rowsel${checked.has(n.id) ? ' on' : ''}`} checked={checked.has(n.id)} data-testid={`select-${n.issue?.identifier ?? n.id}`} onClick={(e) => { e.stopPropagation(); toggle(n.id); }} />
                 <span className='ndot' aria-label={n.read_at ? 'Read' : 'Unread'} />
                 {n.actor ? <Avatar initials={initialsOf(personName(n.actor))} hue={hueFor(n.actor.id)} /> : <span className='nav-av' aria-hidden='true' data-kind='system' title='Due date reminder'><svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth='1.4' strokeLinecap='round' strokeLinejoin='round'><rect x='2.5' y='3.5' width='11' height='10' rx='2' /><path d='M2.5 6.5h11M5.5 2v3M10.5 2v3M8 8.5v2l1.3.8' /></svg></span>}
