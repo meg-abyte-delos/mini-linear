@@ -1000,8 +1000,8 @@ export function Shell({ initialIssues, loadError = null, truncated = false, init
               return (
                 <section key={key} className={`group${s && overKey === `z-${s}` ? ' over-zone' : ''}`} aria-labelledby={`g-${key}`} {...(s ? zoneProps(s) : {})}>
                   <h2 id={`g-${key}`}>
-                    <button className='gh-toggle' aria-expanded={!shut} aria-controls={`gl-${key}`} onClick={() => toggleGroup(key)}>{s && <StatusIcon status={s} />}<span>{s ? STATUS_LABEL[s] : 'All issues'}</span><span className='count'>{items.length}</span><i className='chev' aria-hidden='true'>▾</i></button>
-                    {s && !readOnly && <button className='gh-add' aria-label={`Add issue to ${STATUS_LABEL[s]}`} onClick={() => create(s)}><Icon name='plus' /></button>}
+                    <Button variant='ghost' size={28} className='gh-toggle' aria-expanded={!shut} aria-controls={`gl-${key}`} onClick={() => toggleGroup(key)}>{s && <StatusIcon status={s} />}<span className='gh-name'>{s ? STATUS_LABEL[s] : 'All issues'}</span><span className='count'>{items.length}</span><i className='chev' aria-hidden='true'>▾</i></Button>
+                    {s && !readOnly && <IconButton size={24} className='gh-add' label={`Add issue to ${STATUS_LABEL[s]}`} onClick={() => create(s)}><Icon name='plus' /></IconButton>}
                   </h2>
                   {!shut && <div id={`gl-${key}`} role='listbox' aria-labelledby={`g-${key}`}>{items.map(row)}</div>}
                 </section>

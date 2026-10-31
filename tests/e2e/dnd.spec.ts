@@ -1,7 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const statusOf = (page: Page, id: string) =>
-  page.locator(`[data-id="${id}"]`).evaluate((el) => el.closest('section')?.querySelector('h2 span:nth-child(2)')?.textContent);
+  page.locator(`[data-id="${id}"]`).evaluate((el) => {
+    // List group header: name lives in .gh-name inside the Button label; board column: 2nd span.
+    const h = el.closest('section')?.querySelector('h2');
+    return (h?.querySelector('.gh-name') ?? h?.querySelector('span:nth-child(2)'))?.textContent;
+  });
 
 // The view switch runs in a View Transition: the DOM swaps asynchronously and the
 // ::view-transition overlay swallows pointer events until it ends. Wait for both.
