@@ -81,12 +81,15 @@ test.describe('Properties drawer under 1024px', () => {
     await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
     await page.waitForSelector('html[data-ready]');
     const toggle = page.getByRole('button', { name: 'Properties', exact: true });
-    const aside = page.getByRole('complementary', { name: 'Properties' });
+    // The panel is role=complementary when closed and role=dialog (aria-modal) while the drawer is open (#349, Iris).
+    const aside = page.locator('#idp-props');
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(aside).toBeHidden();
     await toggle.click();
     await expect(aside).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Properties' })).toBeVisible();
+    await expect(aside).toHaveAttribute('aria-modal', 'true');
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     return { toggle, aside };
   }
@@ -104,6 +107,14 @@ test.describe('Properties drawer under 1024px', () => {
     const { toggle, aside } = await open(page, 'esc');
     await expect.poll(() => focusInside(aside)).toBe(true);
     await page.keyboard.press('Escape');
+    await expect(aside).toBeHidden();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toBeFocused();
+  });
+
+  test('the Close button closes the drawer and returns focus to the Properties button', async ({ page }) => {
+    const { toggle, aside } = await open(page, 'close');
+    await page.getByRole('button', { name: 'Close properties' }).click();
     await expect(aside).toBeHidden();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     await expect(toggle).toBeFocused();
