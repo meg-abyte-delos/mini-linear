@@ -6,7 +6,7 @@ import { SideIcon, TeamSection, WorkspaceSwitcher } from '@/components/SidebarPa
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
 import { listTeams } from '@/lib/settings-client';
 
-export function AppSidebar({ slug, current }: { slug: string | null; current: 'search' | 'issue' }) {
+export function AppSidebar({ slug, current, id, onNavigate }: { slug: string | null; current: 'search' | 'issue'; id?: string; onNavigate?: () => void }) {
   const [people, setPeople] = useState<NlPeople>(EMPTY_PEOPLE);
   const [teamName, setTeamName] = useState('Team');
   useEffect(() => {
@@ -17,7 +17,7 @@ export function AppSidebar({ slug, current }: { slug: string | null; current: 's
     return () => { live = false; };
   }, [slug]);
   return (
-    <aside className='side' aria-label='Sidebar'>
+    <aside id={id} className='side' aria-label='Sidebar' onClick={onNavigate ? (e) => { if ((e.target as HTMLElement).closest('a')) onNavigate(); } : undefined}>
       <div className='side-head'>
         <WorkspaceSwitcher slug={slug} people={people} />
         <Link className='side-icbtn' href='/search' aria-label='Search' aria-current={current === 'search' ? 'page' : undefined} title='Search'><SideIcon name='search' /></Link>

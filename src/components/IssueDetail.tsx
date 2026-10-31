@@ -23,6 +23,7 @@ import { MOCK_PEOPLE, findPerson, peopleFromNl, type Person } from '@/lib/people
 import { IssueHeaderBar, type HeaderNav } from '@/components/IssueHeaderBar';
 import { PropIcon } from '@/components/PropIcons';
 import { PresenceStack } from '@/components/PresenceStack';
+import { IssueNavToggle } from '@/components/IssueShell';
 import { usePresence } from '@/lib/presence/use-presence';
 
 export type DetailIssue = Issue & { estimate?: number | null; due_date?: string | null; archived_at?: string | null; branch_name?: string; url?: string };
@@ -92,9 +93,30 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [propsOpen, setPropsOpen] = useState(false);
+  const propsToggleRef = useRef<HTMLButtonElement>(null);
+  const propsAsideRef = useRef<HTMLElement>(null);
+  const propsWasOpen = useRef(false);
+  // Properties drawer (<1024px): focus its first control on open, Esc anywhere closes, focus back to the toggle on close.
+  useEffect(() => {
+    const aside = propsAsideRef.current;
+    if (propsOpen) {
+      propsWasOpen.current = true;
+      (aside?.querySelector<HTMLElement>('button:not([disabled]), a[href], input, [tabindex]:not([tabindex="-1"])') ?? aside)?.focus();
+      const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setPropsOpen(false); } };
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    }
+    if (!propsWasOpen.current) return;
+    propsWasOpen.current = false;
+    const a = document.activeElement;
+    if (!a || a === document.body || aside?.contains(a)) propsToggleRef.current?.focus();
+  }, [propsOpen]);
+  // The drawer only exists below 1024px: close it when the viewport grows past that.
+  useEffect(() => { const mq = window.matchMedia('(min-width: 1024px)'); const f = () => { if (mq.matches) setPropsOpen(false); }; f(); mq.addEventListener('change', f); return () => mq.removeEventListener('change', f); }, []);
   const version = useRef(initial.version);
   const client = useMemo(() => (api ? detailApi(slug) : null), [api, slug]);
   const ident = identifierOf(issue);
+  useEffect(() => { setPropsOpen(false); }, [initial.identifier]);
   // Breadcrumb root is the owning team's name ("Demo"), falling back to the identifier key until the team list loads.
   const [teamNames, setTeamNames] = useState<Record<string, string>>({});
   useEffect(() => { if (!api) return; let live = true; void listTeams(slug).then((ts) => { if (live) setTeamNames(Object.fromEntries(ts.map((t) => [t.id, t.name]))); }).catch(() => { /* keep fallback */ }); return () => { live = false; }; }, [api, slug]);
@@ -393,11 +415,12 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
   return (
     <div className='idp' data-props={propsOpen ? 'open' : undefined}>
       <div className='idp-scrim' aria-hidden='true' onClick={() => setPropsOpen(false)} />
-      <main className='idp-main' aria-label={`Issue ${ident}`}>
+      <main className='idp-main' aria-label={`Issue ${ident}`} inert={propsOpen || undefined}>
         <header className='idp-head'>
+          <IssueNavToggle />
           <nav aria-label='Breadcrumb' className='crumbs'><Link href='/'>{teamLabel}</Link><span className='sep' aria-hidden='true'>›</span>{parent && <><Link href={`/w/${slug}/issue/${identifierOf(parent)}`}>{identifierOf(parent)}</Link><span className='sep' aria-hidden='true'>›</span></>}<span className='id' aria-current='page'>{ident}</span></nav>
           <PresenceStack presence={viewers} size='md' />
-          <button type='button' className='idh-btn idp-props-toggle' aria-label='Properties' title='Properties' aria-controls='idp-props' aria-expanded={propsOpen} onClick={() => setPropsOpen((o) => !o)}><PropIcon name='panel' /></button>
+          <button type='button' ref={propsToggleRef} className='idh-btn idp-props-toggle' aria-label='Properties' title='Properties' aria-controls='idp-props' aria-expanded={propsOpen} onClick={() => setPropsOpen((o) => !o)}><PropIcon name='panel' /></button>
           <IssueHeaderBar ident={ident} nav={nav} readOnly={readOnly} entries={menuEntries} moreRef={moreRef} onRestore={() => void lifecycle('restore')} />
         </header>
         {(issue.archived_at || issue.deleted_at) && <p className='idp-banner' role='status'>{issue.deleted_at ? 'This issue is in the trash. Restore it to edit.' : `Archived ${fmtDate(issue.archived_at as string)}.`}</p>}
@@ -448,7 +471,7 @@ function IssueDetailBody({ slug, initial, all, meta, api, today, viewer = null, 
         </section>
       </main>
 
-      <aside id='idp-props' className='idp-side' aria-label='Properties' onKeyDown={(e) => { if (e.key === 'Escape' && propsOpen) { e.stopPropagation(); setPropsOpen(false); } }}>
+      <aside id='idp-props' ref={propsAsideRef} tabIndex={-1} className='idp-side' aria-label='Properties'>
         <section className='side-group' aria-labelledby='sg-props'>
           <h3 id='sg-props' className='side-h'>Properties</h3>
           <dl>

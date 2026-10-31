@@ -52,5 +52,6 @@
   .idp[data-props='open'] > .idp-scrim { display:block; position:fixed; inset:0; z-index:74; background:var(--scrim-soft); }
   .idp-props-toggle { display:inline-grid; }
 }
-/* With the app sidebar the writing column is narrower: the floating toolbar sits under the editor so it never covers the title. */
-.idp .re-bar { bottom:auto; top:calc(100% + var(--sp-1)); }
+/* With the app sidebar the writing column is narrower: the description toolbar sits under the editor so it never covers the title. Description only: the comment composer keeps its toolbar above. */
+.idp .idp-desc .re-bar { bottom:auto; top:calc(100% + var(--sp-1)); }
+.idp-side:focus { outline:none; }
