@@ -196,6 +196,7 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `PATCH /api/v1/me` | session | 200 | 401 | 401 | own profile only |
 | `GET /api/v1/workspaces` | session | 200 | 401 | 401 | only the workspaces the caller belongs to |
 | `POST /api/v1/workspaces` | session | 422 | 401 | 401 | any signed-in user may create a workspace (422 here: empty body) |
+| `DELETE /api/v1/w/{slug}` | own-suite | - | - | - | owner only (403 admin/member/guest, 404 non-member); destroys the workspace, so it cannot run on the shared fixture; suite settings-delete-workspace |
 | `POST /api/v1/invites/accept` | session | 404 | 401 | 401 | an unknown or empty token is 404; the caller must be signed in |
 | `POST /api/v1/auth/login` | public | - | - | - | public, rate limited; own suite m1-auth / t4-authn |
 | `POST /api/v1/auth/signup` | public | - | - | - | public, rate limited; own suite m1-auth / t4-authn |
