@@ -22,7 +22,7 @@ for (const p of PAGES) {
       await page.evaluate(() => document.fonts.ready);
       await settled(page);
       await page.mouse.move(0, 0);
-      await expect(page).toHaveScreenshot(`settings-${p.name}-1280.png`, { maxDiffPixelRatio: 0.015, animations: 'disabled', caret: 'hide' });
+      await expect(page).toHaveScreenshot(`settings-${p.name}-1280.png`, { maxDiffPixelRatio: 0.002, animations: 'disabled', caret: 'hide' });
     });
 
     for (const scheme of ['dark', 'light'] as const) {
