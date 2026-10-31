@@ -593,7 +593,7 @@ function Composer({ label, onSubmit, onCancel, onAttach, autoFocus, initial = ''
           if (e.key === 'Escape' && onCancel) onCancel();
         }} />
       {list.length > 0 && <ul id={listId} role='listbox' aria-label='Mention a teammate' className='mention-list'>{list.map((u, k) => <li key={u.id} id={`${listId}-${u.id}`} role='option' aria-selected={k === idx} onMouseDown={(e) => { e.preventDefault(); choose(u); }}>{u.name} <span className='dim'>@{u.handle}</span></li>)}</ul>}
-      {inline ? <div className='composer-tools'><button type='button' className='composer-ic' aria-label='Attach link' title='Attach link' onClick={onAttach}><Icon name='attach' size={16} /></button><button type='button' className='composer-ic composer-send' aria-label='Comment' title='Comment (⌘↵)' disabled={!text.trim()} onClick={() => void submit()}><Icon name='send' size={16} /></button></div>
+      {inline ? <div className='composer-tools'><IconButton label='Attach link' onClick={onAttach}><Icon name='attach' size={16} /></IconButton><IconButton label='Comment' title='Comment (⌘↵)' className='composer-send' disabled={!text.trim()} onClick={() => void submit()}><Icon name='send' size={16} /></IconButton></div>
         : <div className='composer-actions'>{onCancel && <Button variant='ghost' onClick={onCancel}>Cancel</Button>}<Button variant='primary' disabled={!text.trim()} onClick={() => void submit()}>{submitLabel ?? (label === 'Reply' ? 'Reply' : 'Comment')}</Button></div>}
     </div>
   );
