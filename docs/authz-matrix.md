@@ -120,9 +120,9 @@ Generated from `tests/authz/matrix.ts` (do not edit by hand: `UPDATE_AUTHZ_DOC=1
 | `POST /comments/{comment}/reactions` | 201 | 201 | 201 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /comments/{comment}/reactions` | 204 | 204 | 204 | 404 | 403 | 403 | 401 | 403 | 404 |
 | `GET /labels` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 200 | 404 |
-| `POST /labels` | 201 | 201 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
+| `POST /labels` | 201 | 201 | 201 | 201 | 403 | 403 | 401 | 403 | 404 |
 | `GET /labels/{label}` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 200 | 404 |
-| `PATCH /labels/{label}` | 200 | 200 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
+| `PATCH /labels/{label}` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 403 | 404 |
 | `DELETE /labels/{label}` | 204 | 204 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |
 | `GET /label-groups` | 200 | 200 | 200 | 200 | 403 | 403 | 401 | 200 | 404 |
 | `POST /label-groups` | 201 | 201 | 403 | 403 | 403 | 403 | 401 | 403 | 404 |

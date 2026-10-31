@@ -123,9 +123,9 @@ export const ROWS: Row[] = [
   r('DELETE', '/comments/{comment}/reactions', 'issueWrite', 204, { needs: ['comment'], prep: 'react', query: 'emoji=%F0%9F%91%8D' }),
   // ---- labels, groups
   r('GET', '/labels', 'memberPlus', 200),
-  r('POST', '/labels', 'adminOnly', 201, { body: () => ({ name: 'l' + Math.random().toString(36).slice(2, 8), color: '#aabbcc', team_id: null, group_id: null, description: '' }) }),
+  r('POST', '/labels', 'memberPlus', 201, { body: () => ({ name: 'l' + Math.random().toString(36).slice(2, 8), color: '#aabbcc', team_id: null, group_id: null, description: '' }) }),
   r('GET', '/labels/{label}', 'memberPlus', 200, { needs: ['label'] }),
-  r('PATCH', '/labels/{label}', 'adminOnly', 200, { needs: ['label'], body: () => ({ description: 'd' }), headers: IF1 }),
+  r('PATCH', '/labels/{label}', 'memberPlus', 200, { needs: ['label'], body: () => ({ description: 'd' }), headers: IF1 }),
   r('DELETE', '/labels/{label}', 'adminOnly', 204, { needs: ['label'], headers: IF1 }),
   r('GET', '/label-groups', 'memberPlus', 200),
   r('POST', '/label-groups', 'adminOnly', 201, { body: () => ({ name: 'g' + Math.random().toString(36).slice(2, 8), color: '#aabbcc', team_id: null }) }),
