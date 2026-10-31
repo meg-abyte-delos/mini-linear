@@ -30,7 +30,7 @@ export function IssueShell({ slug, children }: { slug: string; children: ReactNo
   return (
     <Ctx.Provider value={{ open, toggle: () => setOpen((o) => !o), toggleRef }}>
       <div className='shell issue-shell' data-nav={open ? 'open' : undefined}>
-        <AppSidebar slug={slug} current='issue' id='app-sidebar' onNavigate={() => setOpen(false)} />
+        <AppSidebar slug={slug} current='issue' id='app-sidebar' onNavigate={() => setOpen(false)} navOpen={open} />
         <div className='side-scrim' aria-hidden='true' onClick={() => setOpen(false)} />
         <div className='main idp-host' inert={open || undefined}>{children}</div>
       </div>

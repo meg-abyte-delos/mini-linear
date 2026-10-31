@@ -47,6 +47,15 @@ for (const width of [1280, 1440]) {
       expect(await labels('/search')).toEqual(list);
     });
 
+    test('sidebar marks the current route: Issues on the issue page, Search icon on /search', async ({ page }) => {
+      const issue = await apiCreateIssue(page, `layout-active-${width}-${Date.now()}`);
+      await page.goto(`/w/${DEMO.slug}/issue/${issue.identifier}`);
+      const side = page.getByRole('complementary', { name: 'Sidebar' });
+      await expect(side.locator('a.side-link[aria-current="page"]').first()).toHaveText(/Issues/);
+      await page.goto('/search');
+      await expect(side.getByRole('link', { name: 'Search', exact: true })).toHaveAttribute('aria-current', 'page');
+    });
+
     test('sidebar on the issue page has the same width as on the list', async ({ page }) => {
       const issue = await apiCreateIssue(page, `layout-same-${width}-${Date.now()}`);
       await page.goto('/');

@@ -1,8 +1,9 @@
 'use client';
 // The one app sidebar (Shell, issue page, Search): same `.side` markup everywhere. Shell passes handlers for in-page navigation;
-// without a handler an item is a real link back into the Shell (standalone routes use useSidebarData for the data).
+// without a handler an item is a real link back into the Shell (standalone routes get their data from AppSidebar below).
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { IconButton } from '@/components/ui';
 import { SideIcon, TeamSection, WorkspaceSwitcher } from '@/components/SidebarParts';
 import { httpInboxClient, mockInboxClient } from '@/lib/inbox-client';
 import { EMPTY_PEOPLE, fetchNlPeople, type NlPeople } from '@/lib/nl-people';
@@ -54,9 +55,9 @@ export function Sidebar(p: SidebarProps) {
       <div className='side-head'>
         <WorkspaceSwitcher slug={p.slug} people={p.people} />
         {p.onSearch
-          ? <button className='side-icbtn' onClick={p.onSearch} aria-label='Search' title='Search (⌘K)' aria-keyshortcuts='Meta+K Control+K'><SideIcon name='search' /></button>
+          ? <IconButton className='side-icbtn' onClick={p.onSearch} label='Search' title='Search (⌘K)' aria-keyshortcuts='Meta+K Control+K'><SideIcon name='search' /></IconButton>
           : <Link className='side-icbtn' href='/search' aria-label='Search' aria-current={on('search') ? 'page' : undefined} title='Search'><SideIcon name='search' /></Link>}
-        {!p.readOnly && p.onCompose && <button className='side-icbtn compose' onClick={p.onCompose} aria-label='New issue' title='New issue (C)' aria-keyshortcuts='C'><SideIcon name='compose' /></button>}
+        {!p.readOnly && p.onCompose && <IconButton className='side-icbtn compose' onClick={p.onCompose} label='New issue' title='New issue (C)' aria-keyshortcuts='C'><SideIcon name='compose' /></IconButton>}
       </div>
       <nav aria-label='Primary'>
         <SideLink className={`side-link${on('inbox') ? ' active' : ''}`} current={on('inbox')} href={p.onInbox ? '#inbox' : '/?view=inbox'} onSelect={p.onInbox}><SideIcon name='inbox' /><span>Inbox</span>{p.unread > 0 && <span className='badge' data-testid='inbox-badge' aria-label={`${p.unread} unread notifications`}>{p.unread > 99 ? '99+' : p.unread}</span>}</SideLink>
@@ -94,7 +95,7 @@ export function Sidebar(p: SidebarProps) {
 }
 
 /** Data for routes outside the Shell (issue page, Search): people, teams, saved views and the unread badge, same sources as Shell. */
-export function AppSidebar({ slug, current, id, onNavigate }: { slug: string | null; current: 'search' | 'issue'; id?: string; onNavigate?: () => void }) {
+export function AppSidebar({ slug, current, id, onNavigate, navOpen }: { slug: string | null; current: 'search' | 'issue'; id?: string; onNavigate?: () => void; navOpen?: boolean }) {
   const [people, setPeople] = useState<NlPeople>(EMPTY_PEOPLE);
   const [teams, setTeams] = useState<Team[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
@@ -118,8 +119,8 @@ export function AppSidebar({ slug, current, id, onNavigate }: { slug: string | n
   return (
     <Sidebar
       slug={slug} people={people} unread={unread} views={views} teams={sideTeams} homeTeamId={teams[0]?.id ?? null}
-      active={{ kind: current === 'search' ? 'search' : 'none' }} id={id ?? 'app-sidebar'} copied={copied}
-      {...(onNavigate ? { onNavigate, navOpen: true } : {})}
+      active={{ kind: current === 'search' ? 'search' : 'issues' }} id={id ?? 'app-sidebar'} copied={copied}
+      {...(onNavigate ? { onNavigate, navOpen: navOpen ?? false } : {})}
       onCopyView={(v) => { void navigator.clipboard?.writeText(viewUrl(window.location.origin, '/', v.id)).catch(() => undefined); setCopied(v.id); setTimeout(() => setCopied((c) => (c === v.id ? null : c)), 1500); }}
       onDeleteView={(v) => { void viewsClient.remove(v).then((ok) => { if (ok) setViews((l) => l.filter((x) => x.id !== v.id)); }); }}
     />
