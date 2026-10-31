@@ -26,7 +26,8 @@ export function settingsPatch(prev: Pick<WorkspaceSettings, 'name' | 'slug' | 'l
   return p;
 }
 export const patchSettings = (slug: string, patch: Record<string, string>, f: Fetch = fetch) => call<WorkspaceSettings>(f, 'PATCH', `${base(slug)}/settings`, patch);
-export const listTeams = async (slug: string, f: Fetch = fetch) => (await call<{ items: Team[] }>(f, 'GET', `${base(slug)}/teams?limit=100`)).items;
+/** `mine`: only the teams the caller belongs to (admins and owners still get all of them). */
+export const listTeams = async (slug: string, f: Fetch = fetch, mine = false) => (await call<{ items: Team[] }>(f, 'GET', `${base(slug)}/teams?limit=100${mine ? '&mine=1' : ''}`)).items;
 export const createTeam = (slug: string, name: string, key: string, f: Fetch = fetch) => call<Team>(f, 'POST', `${base(slug)}/teams`, { name, key });
 export const renameTeam = (slug: string, id: string, name: string, f: Fetch = fetch) => call<Team>(f, 'PATCH', `${base(slug)}/teams/${id}`, { name });
 export const deleteTeam = (slug: string, id: string, f: Fetch = fetch) => call<void>(f, 'DELETE', `${base(slug)}/teams/${id}`);

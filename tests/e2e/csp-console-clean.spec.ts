@@ -50,7 +50,7 @@ test('server-rendered HTML carries no style attributes (strict style-src)', asyn
 });
 
 test('team role is a ui Select (not a native select) and changes the role', async ({ page }) => {
-  await page.goto('/w/demo/settings');
+  await page.goto('/w/demo/settings/teams');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   const btn = page.getByRole('button', { name: /^Team role for / }).first();
   await expect(btn).toBeVisible();

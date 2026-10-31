@@ -13,7 +13,7 @@ function Swatch({ color }: { color: string }) {
 }
 const Scope = ({ teamId }: { teamId: string | null }) => <span className="ts-muted ts-scope" data-scope={teamId ? 'team' : 'workspace'}>{teamId ? 'Team' : 'Workspace'}</span>;
 
-export function TeamSettings({ slug, teamId }: { slug: string; teamId: string }) {
+export function TeamSettings({ slug, teamId, embedded = false, readOnly = false }: { slug: string; teamId: string; embedded?: boolean; readOnly?: boolean }) {
   const api = useMemo(() => teamSettingsApi(slug), [slug]);
   const [states, setStates] = useState<WorkflowState[]>([]);
   const [settings, setSettings] = useState<TS | null>(null);
@@ -48,10 +48,13 @@ export function TeamSettings({ slug, teamId }: { slug: string; teamId: string })
 
   if (loading) return <p className="ts-muted" role="status">Loading team settings…</p>;
   const sorted = sortStates(states);
+  const Root = embedded ? 'div' : 'main'; // inside the settings shell the shell owns the <main> landmark and the <h1>
   return (
-    <main className="ts" aria-labelledby="ts-title">
-      <h1 id="ts-title">Team settings</h1>
+    <Root className="ts" {...(embedded ? {} : { 'aria-labelledby': 'ts-title' })}>
+      {!embedded && <h1 id="ts-title">Team settings</h1>}
       {error && <p role="alert" className="ts-error">{error}</p>}
+      {readOnly && <p className="ts-muted">Only workspace admins can change these settings.</p>}
+      <fieldset className="ts-ro" disabled={readOnly}>
 
       <section aria-labelledby="ts-wf"><h2 id="ts-wf">Workflow</h2>
         {CATEGORIES.map((category) => (
@@ -126,6 +129,7 @@ export function TeamSettings({ slug, teamId }: { slug: string; teamId: string })
           <button type="submit" className="btn">Add group</button>
         </form>
       </section>
-    </main>
+      </fieldset>
+    </Root>
   );
 }

@@ -42,7 +42,7 @@ test('sidebar lists every team and the list only shows the selected team issues'
     await expect(page.locator('.palette-foot')).toHaveCount(0);
     await page.keyboard.press('Escape');
 
-    await page.goto('/w/demo/settings');
+    await page.goto('/w/demo/settings/teams');
     const card = page.locator('section.set-team', { has: page.getByRole('heading', { name: new RegExp(team.name) }) });
     await expect(card.locator('.set-card-head').getByRole('button')).toHaveCount(0);
     await expect(card.locator('.set-danger').getByRole('button', { name: `Delete team ${team.name}` })).toHaveText('Delete team');
