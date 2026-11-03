@@ -81,7 +81,7 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 20, cache: pnpm }
       - name: Cache Next.js build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .next/cache
           key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('app/**', 'src/**', 'lib/**', 'components/**') }}
@@ -138,7 +138,7 @@ jobs:
         run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright browsers
         id: pw-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
